@@ -1,0 +1,20 @@
+{
+    "[python]": {
+        "editor.formatOnSave": true,
+        "editor.defaultFormatter": "ms-python.black-formatter"
+    },
+    "isort.args": [
+        "--profile",
+        "black",
+        "--line-length",
+        "180"
+    ],
+    "black-formatter.args": [
+        "--line-length",
+        "180"
+    ],
+    "[markdown]": {
+        "editor.defaultFormatter": "yzhang.markdown-all-in-one"
+    },
+    "terminal.integrated.fontFamily": "\"MesloLGS NF\""
+}

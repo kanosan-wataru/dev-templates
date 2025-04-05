@@ -1,0 +1,32 @@
+{
+    // VS Code 推奨拡張機能リスト
+    "recommendations": [
+        // Python 開発環境
+        "ms-python.python",
+        "ms-toolsai.jupyter",
+        "ms-python.black-formatter",
+        "ms-python.isort",
+        // コードチェッカー
+        "streetsidesoftware.code-spell-checker",
+        "shardulm94.trailing-spaces",
+        "oderwat.indent-rainbow",
+        // Markdown
+        "yzhang.markdown-all-in-one",
+        "davidanson.vscode-markdownlint",
+        // Git
+        "mhutchie.git-graph",
+        "codezombiech.gitignore",
+        // CSV
+        "janisdd.vscode-edit-csv",
+        "mechatroner.rainbow-csv",
+        // ユーティリティ
+        "gruntfuggly.todo-tree",
+        "mikestead.dotenv",
+        // 言語パック
+        "ms-ceintl.vscode-language-pack-ja",
+        // Code Interpreter
+        "rooveterinaryinc.roo-cline",
+        "github.copilot",
+        "github.copilot-chat"
+    ]
+}
