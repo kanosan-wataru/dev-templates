@@ -70,12 +70,3 @@ fi
 # ----------------------------
 alias ls='ls --color=auto'
 alias la='ls -a'
-
-# ----------------------------
-# trash-cli エイリアス (条件付き)
-# ----------------------------
-# trash-put コマンドが存在する場合のみ rm を trash-put にエイリアス
-# 警告: trash-cli 開発者は挙動の違いからこの設定を推奨していません。
-if command -v trash-put &> /dev/null; then
-    alias rm='trash-put'
-fi
