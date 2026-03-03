@@ -57,8 +57,14 @@ echo "---------------------------------------------"
 # --- Zsh 設定ディレクトリの作成 ---
 ZSH_CONFIG_DIR="$HOME/.zsh"
 if [[ ! -d "$ZSH_CONFIG_DIR" ]]; then
-    mkdir -p "$ZSH_CONFIG_DIR"
-    chmod 700 "$ZSH_CONFIG_DIR"
+    if ! mkdir -p "$ZSH_CONFIG_DIR"; then
+        print -P "%F{160}エラー: $ZSH_CONFIG_DIR の作成に失敗しました。%f" >&2
+        exit 1
+    fi
+    if ! chmod 700 "$ZSH_CONFIG_DIR"; then
+        print -P "%F{160}エラー: $ZSH_CONFIG_DIR のパーミッション設定に失敗しました。%f" >&2
+        exit 1
+    fi
     echo "情報: $ZSH_CONFIG_DIR を作成しました。"
 else
     echo "情報: $ZSH_CONFIG_DIR は既に存在します。"
@@ -75,21 +81,39 @@ SCRIPT_DIR="${0:a:h}"
 BACKUP_SUFFIX=".backup.$(date +%Y%m%d%H%M%S)"
 
 # .zshrc の配置
+if [[ ! -f "$SCRIPT_DIR/.zshrc" ]]; then
+    print -P "%F{160}エラー: 配布元の .zshrc が見つかりません: $SCRIPT_DIR/.zshrc%f" >&2
+    exit 1
+fi
 if [[ -f "$HOME/.zshrc" ]]; then
-    cp -p "$HOME/.zshrc" "$HOME/.zshrc${BACKUP_SUFFIX}"
+    if ! cp -p "$HOME/.zshrc" "$HOME/.zshrc${BACKUP_SUFFIX}"; then
+        print -P "%F{160}エラー: .zshrc のバックアップに失敗しました。%f" >&2
+        exit 1
+    fi
     echo "情報: 既存の .zshrc を .zshrc${BACKUP_SUFFIX} にバックアップしました。"
 fi
-cp "$SCRIPT_DIR/.zshrc" "$HOME/.zshrc"
+if ! cp "$SCRIPT_DIR/.zshrc" "$HOME/.zshrc"; then
+    print -P "%F{160}エラー: .zshrc の配置に失敗しました。%f" >&2
+    exit 1
+fi
 echo "情報: .zshrc を配置しました。"
 
 # .p10k.zsh の配置
 if [[ -f "$SCRIPT_DIR/.zsh/.p10k.zsh" ]]; then
     if [[ -f "$ZSH_CONFIG_DIR/.p10k.zsh" ]]; then
-        cp -p "$ZSH_CONFIG_DIR/.p10k.zsh" "$ZSH_CONFIG_DIR/.p10k.zsh${BACKUP_SUFFIX}"
+        if ! cp -p "$ZSH_CONFIG_DIR/.p10k.zsh" "$ZSH_CONFIG_DIR/.p10k.zsh${BACKUP_SUFFIX}"; then
+            print -P "%F{160}エラー: .p10k.zsh のバックアップに失敗しました。%f" >&2
+            exit 1
+        fi
         echo "情報: 既存の .p10k.zsh を .p10k.zsh${BACKUP_SUFFIX} にバックアップしました。"
     fi
-    cp "$SCRIPT_DIR/.zsh/.p10k.zsh" "$ZSH_CONFIG_DIR/.p10k.zsh"
+    if ! cp "$SCRIPT_DIR/.zsh/.p10k.zsh" "$ZSH_CONFIG_DIR/.p10k.zsh"; then
+        print -P "%F{160}エラー: .p10k.zsh の配置に失敗しました。%f" >&2
+        exit 1
+    fi
     echo "情報: .p10k.zsh を配置しました。"
+else
+    print -P "%F{220}警告: .p10k.zsh が見つかりません。Powerlevel10k のデフォルト設定が使用されます。%f"
 fi
 echo "---------------------------------------------"
 

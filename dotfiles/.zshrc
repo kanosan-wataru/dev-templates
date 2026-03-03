@@ -11,7 +11,7 @@ fi
 # 履歴設定（~/.zsh ディレクトリは setup.sh で作成済みの前提）
 HISTFILE=~/.zsh/.zsh_history
 # フェールセーフ: ディレクトリが存在しなければ作成
-[[ -d "${HISTFILE:h}" ]] || mkdir -p "${HISTFILE:h}"
+[[ -d "${HISTFILE:h}" ]] || mkdir -p -m 700 "${HISTFILE:h}"
 export HISTSIZE=10000
 export SAVEHIST=50000
 # セッション間で履歴を即時共有
