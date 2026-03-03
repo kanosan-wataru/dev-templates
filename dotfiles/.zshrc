@@ -60,8 +60,8 @@ if (( $+functions[zinit] )); then
     zinit ice wait lucid ver"v0.7.1"
     zinit light zsh-users/zsh-autosuggestions
     # 複数単語での履歴検索 (c4dcddc)
-    # コミットハッシュ指定のためフルクローンが必要（depth=0）
-    zinit ice wait lucid depth=0 ver"c4dcddc"
+    # コミットハッシュ指定のためフルクローンが必要（depth 省略 = フルクローン）
+    zinit ice wait lucid ver"c4dcddc"
     zinit light zdharma-continuum/history-search-multi-word
     # シンタックスハイライト (プラグイン群の中で最後に読み込む) (0.8.0)
     zinit ice wait lucid ver"0.8.0"
