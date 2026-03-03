@@ -30,22 +30,13 @@ setopt HIST_SAVE_NO_DUPS
 
 
 # ----------------------------
-# Zinit (プラグインマネージャー) の読み込み
+# Zinit (プラグインマネージャー) の読み込みとプラグイン設定
 # ----------------------------
-# Zinit スクリプトを source (setup.sh または手動でインストールされている前提)
-if [[ -f "$HOME/.local/share/zinit/zinit.git/zinit.zsh" ]]; then
-    source "$HOME/.local/share/zinit/zinit.git/zinit.zsh"
+ZINIT_HOME="$HOME/.local/share/zinit/zinit.git"
+if [[ -f "$ZINIT_HOME/zinit.zsh" ]]; then
+    source "$ZINIT_HOME/zinit.zsh"
     autoload -Uz _zinit
     (( ${+_comps} )) && _comps[zinit]=_zinit
-else
-    print -P "%F{160}Zinit が見つかりません。セットアップスクリプトを実行するか、手動でインストールしてください。%f"
-fi
-
-# ----------------------------
-# Zinit プラグイン (Zinit経由で読み込み)
-# ----------------------------
-# zinit 関数が存在するか確認してから使用
-if command -v zinit &> /dev/null; then
 
     # Powerlevel10k テーマ
     zinit ice depth=1; zinit light romkatv/powerlevel10k
@@ -61,8 +52,11 @@ if command -v zinit &> /dev/null; then
     # 複数単語での履歴検索
     zinit load zdharma-continuum/history-search-multi-word
 
+    # 補完システムの初期化
+    autoload -Uz compinit
+    compinit
 else
-    print -P "%F{160}zinit コマンドが利用できないため、Zinit プラグインを読み込めません。%f"
+    print -P "%F{160}Zinit が見つかりません。セットアップスクリプトを実行してください。%f"
 fi
 
 # ----------------------------
