@@ -83,8 +83,9 @@ if [[ ! -f "$SCRIPT_DIR/.zshrc" ]]; then
     print -P "%F{160}エラー: 配布元の .zshrc が見つかりません: $SCRIPT_DIR/.zshrc%f" >&2
     exit 1
 fi
-if [[ -f "$ZSHRC_DEST" ]]; then
-    if ! command cp -p "$ZSHRC_DEST" "${ZSHRC_DEST}${BACKUP_SUFFIX}"; then
+# シンボリックリンクの場合もバックアップ対象（-h でリンク自体を検出）
+if [[ -f "$ZSHRC_DEST" || -h "$ZSHRC_DEST" ]]; then
+    if ! command mv "$ZSHRC_DEST" "${ZSHRC_DEST}${BACKUP_SUFFIX}"; then
         print -P "%F{160}エラー: .zshrc のバックアップに失敗しました。%f" >&2
         exit 1
     fi
@@ -98,12 +99,13 @@ print -P "情報: .zshrc を $ZSHRC_DEST に配置しました。"
 
 # .p10k.zsh の配置
 if [[ -f "$SCRIPT_DIR/.zsh/.p10k.zsh" ]]; then
-    if [[ -f "$ZSH_CONFIG_DIR/.p10k.zsh" ]]; then
-        if ! command cp -p "$ZSH_CONFIG_DIR/.p10k.zsh" "$ZSH_CONFIG_DIR/.p10k.zsh${BACKUP_SUFFIX}"; then
+    # シンボリックリンクの場合もバックアップ対象
+    if [[ -f "$ZSH_CONFIG_DIR/.p10k.zsh" || -h "$ZSH_CONFIG_DIR/.p10k.zsh" ]]; then
+        if ! command mv "$ZSH_CONFIG_DIR/.p10k.zsh" "$ZSH_CONFIG_DIR/.p10k.zsh${BACKUP_SUFFIX}"; then
             print -P "%F{160}エラー: .p10k.zsh のバックアップに失敗しました。%f" >&2
             exit 1
         fi
-        print -P "情報: 既存の .p10k.zsh を .p10k.zsh${BACKUP_SUFFIX} にバックアップしました。"
+        print -P "情報: 既存の .p10k.zsh を ${ZSH_CONFIG_DIR}/.p10k.zsh${BACKUP_SUFFIX} にバックアップしました。"
     fi
     if ! command cp -p "$SCRIPT_DIR/.zsh/.p10k.zsh" "$ZSH_CONFIG_DIR/.p10k.zsh"; then
         print -P "%F{160}エラー: .p10k.zsh の配置に失敗しました。%f" >&2
