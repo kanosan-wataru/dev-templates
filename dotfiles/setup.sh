@@ -27,9 +27,10 @@ if [[ ! -f "$ZINIT_DIR/zinit.zsh" ]]; then
         print -P "%F{160}エラー: Zinit 用ディレクトリの作成に失敗しました。%f" >&2
         exit 1
     fi
-    # git clone を実行
-    if command git clone https://github.com/zdharma-continuum/zinit "$ZINIT_DIR"; then
-        print -P "%F{33} %F{34}Zinit のインストールに成功しました。%f"
+    # git clone を実行（サプライチェーンリスク軽減のためタグをピン留め）
+    ZINIT_VERSION="v3.14.0"
+    if command git clone --branch "$ZINIT_VERSION" --depth 1 https://github.com/zdharma-continuum/zinit "$ZINIT_DIR"; then
+        print -P "%F{33} %F{34}Zinit ${ZINIT_VERSION} のインストールに成功しました。%f"
     else
         print -P "%F{160}エラー: Zinit の git clone に失敗しました。%f" >&2
         exit 1
