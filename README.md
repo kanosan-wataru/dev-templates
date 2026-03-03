@@ -6,7 +6,9 @@
 
 | ファイル | 説明 |
 |---------|------|
-| `dotfiles/.zshrc` | Zsh メイン設定（履歴、Zinit プラグイン、エイリアス） |
+| `dotfiles/.zshrc` | Zsh エントリーポイント（履歴設定、モジュール読み込み） |
+| `dotfiles/.zsh/plugins.zsh` | Zinit プラグイン設定 |
+| `dotfiles/.zsh/aliases.zsh` | エイリアス定義 |
 | `dotfiles/.zsh/.p10k.zsh` | Powerlevel10k テーマ設定 |
 | `dotfiles/setup.sh` | セットアップスクリプト（自動インストール・配置） |
 
@@ -28,7 +30,8 @@ zsh dotfiles/setup.sh
 1. Zsh / Git の存在確認
 2. [Zinit](https://github.com/zdharma-continuum/zinit) プラグインマネージャーのインストール
 3. `~/.zsh` ディレクトリの作成（パーミッション 700）
-4. `.zshrc` / `.p10k.zsh` の配置（既存ファイルはタイムスタンプ付きでバックアップ）
+4. 設定ファイルの配置（`.zshrc`, `plugins.zsh`, `aliases.zsh`, `.p10k.zsh`）
+   - 既存ファイルはタイムスタンプ付きでバックアップ
 
 完了後、`exec zsh` でシェルを再起動してください。
 
@@ -49,8 +52,10 @@ zsh dotfiles/setup.sh
 dev-templates/
 ├── dotfiles/
 │   ├── .zsh/
+│   │   ├── plugins.zsh    # Zinit プラグイン設定
+│   │   ├── aliases.zsh    # エイリアス定義
 │   │   └── .p10k.zsh      # Powerlevel10k 設定
-│   ├── .zshrc              # Zsh メイン設定
+│   ├── .zshrc              # エントリーポイント（履歴設定 + モジュール読み込み）
 │   └── setup.sh            # セットアップスクリプト
 ├── .gitignore
 └── README.md
