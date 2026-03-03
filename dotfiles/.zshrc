@@ -8,17 +8,10 @@ fi
 # ----------------------------
 # zsh_history (コマンド履歴)
 # ----------------------------
-# Zsh履歴ファイルのディレクトリ
-_zsh_history_dir=~/.zsh
-
-# ディレクトリが存在しない場合に作成
-if [[ ! -d "$_zsh_history_dir" ]]; then
-    mkdir -p "$_zsh_history_dir"
-    chmod 700 "$_zsh_history_dir" # パーミッションを設定
-fi
-
-# 履歴設定
-HISTFILE=$_zsh_history_dir/.zsh_history
+# 履歴設定（~/.zsh ディレクトリは setup.sh で作成済みの前提）
+HISTFILE=~/.zsh/.zsh_history
+# フェールセーフ: ディレクトリが存在しなければ作成
+[[ -d "${HISTFILE:h}" ]] || mkdir -p "${HISTFILE:h}"
 export HISTSIZE=10000
 export SAVEHIST=50000
 # セッション間で履歴を即時共有
