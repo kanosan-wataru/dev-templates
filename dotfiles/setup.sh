@@ -8,7 +8,7 @@ echo "Zsh環境のセットアップを開始します..."
 echo "---------------------------------------------"
 
 # --- Zsh実行確認 ---
-if [[ -z "$ZSH_VERSION" ]]; then
+if [ -z "$ZSH_VERSION" ]; then
     echo "エラー: このスクリプトは Zsh で実行する必要があります。" >&2
     echo "実行例: zsh $0" >&2
     exit 1
@@ -24,14 +24,14 @@ if [[ ! -f "$ZINIT_DIR/zinit.zsh" ]]; then
     print -P "%F{33} %F{220}Zinit (%F{33}zdharma-continuum/zinit%F{220}) をインストール中...%f"
     # ディレクトリ作成と権限設定
     if ! command mkdir -p "$(dirname "$ZINIT_DIR")"; then
-        print -P "%F{160}エラー: Zinit 用ディレクトリの作成に失敗しました。%f%b" >&2
+        print -P "%F{160}エラー: Zinit 用ディレクトリの作成に失敗しました。%f" >&2
         exit 1
     fi
     # git clone を実行
     if command git clone https://github.com/zdharma-continuum/zinit "$ZINIT_DIR"; then
-        print -P "%F{33} %F{34}Zinit のインストールに成功しました。%f%b"
+        print -P "%F{33} %F{34}Zinit のインストールに成功しました。%f"
     else
-        print -P "%F{160}エラー: Zinit の git clone に失敗しました。%f%b" >&2
+        print -P "%F{160}エラー: Zinit の git clone に失敗しました。%f" >&2
         exit 1
     fi
 else
