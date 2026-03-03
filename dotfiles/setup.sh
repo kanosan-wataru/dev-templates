@@ -35,8 +35,8 @@ echo "Zinit の状態を確認・インストールします..."
 ZINIT_HOME="${XDG_DATA_HOME:-$HOME/.local/share}/zinit/zinit.git"
 if [[ ! -f "$ZINIT_HOME/zinit.zsh" ]]; then
     print -P "%F{33} %F{220}Zinit (%F{33}zdharma-continuum/zinit%F{220}) をインストール中...%f"
-    # ディレクトリ作成
-    if ! command mkdir -p "$(dirname "$ZINIT_HOME")"; then
+    # ディレクトリ作成（パーミッションは 700 に固定）
+    if ! command mkdir -p -m 700 "$(dirname "$ZINIT_HOME")"; then
         print -P "%F{160}エラー: Zinit 用ディレクトリの作成に失敗しました。%f" >&2
         exit 1
     fi
