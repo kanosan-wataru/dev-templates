@@ -54,8 +54,11 @@ if (( $+functions[zinit] )); then
     compdef _zinit zinit
 
     # --- fzf (ファジーファインダー) ---
-    # GitHub Releases からプラットフォーム固有のバイナリを自動インストール (v0.70.0)
-    zinit ice from"gh-r" as"program" ver"v0.70.0"
+    # バージョンを変数で一元管理（バイナリと shell スクリプトの不整合を防止）
+    FZF_VERSION="v0.70.0"
+    FZF_RAW_URL="https://raw.githubusercontent.com/junegunn/fzf/${FZF_VERSION}/shell"
+    # GitHub Releases からプラットフォーム固有のバイナリを自動インストール
+    zinit ice from"gh-r" as"program" ver"${FZF_VERSION}"
     zinit light junegunn/fzf
     # fzf-tab: Tab 補完を fzf に置き換え (v1.2.0)
     # NOTE: compinit の後、かつ autosuggestions/syntax-highlighting より前に読み込む
@@ -67,10 +70,10 @@ if (( $+functions[zinit] )); then
 
     # fzf キーバインディング (Ctrl-R: 履歴検索, Ctrl-T: ファイル検索, Alt-C: ディレクトリ移動)
     zinit ice wait lucid
-    zinit snippet https://raw.githubusercontent.com/junegunn/fzf/v0.70.0/shell/key-bindings.zsh
+    zinit snippet "${FZF_RAW_URL}/key-bindings.zsh"
     # fzf 補完 (** トリガー)
     zinit ice wait lucid
-    zinit snippet https://raw.githubusercontent.com/junegunn/fzf/v0.70.0/shell/completion.zsh
+    zinit snippet "${FZF_RAW_URL}/completion.zsh"
 
     # オートサジェスチョン (v0.7.1)
     zinit ice wait lucid ver"v0.7.1"
