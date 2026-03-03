@@ -155,8 +155,8 @@ if (( UNINSTALL )); then
 
     for entry in "${MANAGED_FILES[@]}"; do
         # パイプ区切りでパース
-        dst="${${entry}[(ws:|:)2]}"
-        label="${${entry}[(ws:|:)3]}"
+        dst="${entry[(ws:|:)2]}"
+        label="${entry[(ws:|:)3]}"
 
         # Zsh Glob 限定子で最新のバックアップを検索
         # (N): マッチなしでもエラーにしない, (.): 通常ファイル, (om): 更新日時の新しい順, [1]: 最初の1つ
@@ -231,12 +231,12 @@ if [[ ! -f "$ZINIT_HOME/zinit.zsh" ]]; then
     }
     # git clone を実行（サプライチェーンリスク軽減のためタグをピン留め）
     run_cmd command git clone --branch "$ZINIT_VERSION" --depth 1 https://github.com/zdharma-continuum/zinit "$ZINIT_HOME" || {
-        if (( ! DRY_RUN )); then
-            print -P "%F{160}エラー: Zinit の git clone に失敗しました。%f" >&2
-            exit 1
-        fi
+        print -P "%F{160}エラー: Zinit の git clone に失敗しました。%f" >&2
+        exit 1
     }
-    if (( ! DRY_RUN )); then
+    if (( DRY_RUN )); then
+        print -P "情報: Zinit ${ZINIT_VERSION} をインストール予定です（dry-run）。"
+    else
         print -P "%F{33} %F{34}Zinit ${ZINIT_VERSION} のインストールに成功しました。%f"
     fi
 else
@@ -251,7 +251,11 @@ if [[ ! -d "$ZSH_CONFIG_DIR" ]]; then
         print -P "%F{160}エラー: $ZSH_CONFIG_DIR の作成に失敗しました。%f" >&2
         exit 1
     }
-    print -P "情報: $ZSH_CONFIG_DIR を作成しました。"
+    if (( DRY_RUN )); then
+        print -P "情報: $ZSH_CONFIG_DIR を作成予定です（dry-run）。"
+    else
+        print -P "情報: $ZSH_CONFIG_DIR を作成しました。"
+    fi
 else
     print -P "情報: $ZSH_CONFIG_DIR は既に存在します。"
 fi
@@ -263,10 +267,10 @@ print -P "設定ファイルを配置します..."
 
 for entry in "${MANAGED_FILES[@]}"; do
     # パイプ区切りでパース
-    src="${${entry}[(ws:|:)1]}"
-    dst="${${entry}[(ws:|:)2]}"
-    label="${${entry}[(ws:|:)3]}"
-    hint="${${entry}[(ws:|:)4]}"
+    src="${entry[(ws:|:)1]}"
+    dst="${entry[(ws:|:)2]}"
+    label="${entry[(ws:|:)3]}"
+    hint="${entry[(ws:|:)4]}"
     install_config "$src" "$dst" "$label" "$hint"
 done
 
