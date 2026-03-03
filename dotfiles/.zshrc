@@ -37,8 +37,10 @@ setopt HIST_IGNORE_SPACE
 ZINIT_HOME="$HOME/.local/share/zinit/zinit.git"
 if [[ -f "$ZINIT_HOME/zinit.zsh" ]]; then
     source "$ZINIT_HOME/zinit.zsh"
-    autoload -Uz _zinit
-    (( ${+_comps} )) && _comps[zinit]=_zinit
+fi
+
+# zinit 関数が正常に定義されている場合のみプラグインを読み込む
+if (( $+functions[zinit] )); then
 
     # Powerlevel10k テーマ
     zinit ice depth=1; zinit light romkatv/powerlevel10k
@@ -52,6 +54,10 @@ if [[ -f "$ZINIT_HOME/zinit.zsh" ]]; then
     autoload -Uz compinit
     zicompinit
 
+    # zinit の補完を登録（compinit 後に行う必要がある）
+    autoload -Uz _zinit
+    compdef _zinit zinit
+
     # オートサジェスチョン (compinit より後に読み込む)
     zinit light zsh-users/zsh-autosuggestions
     # 複数単語での履歴検索
@@ -59,7 +65,10 @@ if [[ -f "$ZINIT_HOME/zinit.zsh" ]]; then
     # シンタックスハイライト (最後尾での読み込みが推奨)
     zinit light zsh-users/zsh-syntax-highlighting
 else
-    print -P "%F{160}Zinit が見つかりません。セットアップスクリプトを実行してください。%f"
+    print -P "%F{160}Zinit が見つからない、または読み込みに失敗しました。セットアップスクリプトを確認してください。%f"
+    # Zinit が使えなくても標準の補完システムだけは初期化しておく
+    autoload -Uz compinit
+    compinit
 fi
 
 # ----------------------------
