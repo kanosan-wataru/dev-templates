@@ -53,16 +53,31 @@ if (( $+functions[zinit] )); then
     autoload -Uz _zinit
     compdef _zinit zinit
 
+    # --- fzf (ファジーファインダー) ---
+    # バージョンを変数で一元管理（バイナリと shell スクリプトの不整合を防止）
+    FZF_VERSION="v0.70.0"
+    FZF_RAW_URL="https://raw.githubusercontent.com/junegunn/fzf/${FZF_VERSION}/shell"
+    # GitHub Releases からプラットフォーム固有のバイナリを自動インストール
+    zinit ice from"gh-r" as"program" ver"${FZF_VERSION}"
+    zinit light junegunn/fzf
+    # fzf-tab: Tab 補完を fzf に置き換え (v1.2.0)
+    # NOTE: compinit の後、かつ autosuggestions/syntax-highlighting より前に読み込む
+    zinit ice ver"v1.2.0"
+    zinit light Aloxaf/fzf-tab
+
     # --- Turbo mode（遅延読み込み）---
     # プロンプト表示後にバックグラウンドで読み込み、シェル起動を高速化
+
+    # fzf キーバインディング (Ctrl-R: 履歴検索, Ctrl-T: ファイル検索, Alt-C: ディレクトリ移動)
+    zinit ice wait lucid
+    zinit snippet "${FZF_RAW_URL}/key-bindings.zsh"
+    # fzf 補完 (** トリガー)
+    zinit ice wait lucid
+    zinit snippet "${FZF_RAW_URL}/completion.zsh"
 
     # オートサジェスチョン (v0.7.1)
     zinit ice wait lucid ver"v0.7.1"
     zinit light zsh-users/zsh-autosuggestions
-    # 複数単語での履歴検索 (c4dcddc)
-    # コミットハッシュ指定のためフルクローンが必要（depth 省略 = フルクローン）
-    zinit ice wait lucid ver"c4dcddc"
-    zinit light zdharma-continuum/history-search-multi-word
     # シンタックスハイライト (プラグイン群の中で最後に読み込む) (0.8.0)
     zinit ice wait lucid ver"0.8.0"
     zinit light zsh-users/zsh-syntax-highlighting
