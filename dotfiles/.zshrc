@@ -12,7 +12,7 @@ fi
 HISTFILE=~/.zsh/.zsh_history
 # フェールセーフ: ディレクトリが存在しなければ作成
 [[ -d "${HISTFILE:h}" ]] || mkdir -p -m 700 "${HISTFILE:h}"
-export HISTSIZE=10000
+export HISTSIZE=50000
 export SAVEHIST=50000
 # セッション間で履歴を即時共有
 setopt INC_APPEND_HISTORY SHARE_HISTORY
@@ -35,27 +35,35 @@ fi
 # zinit 関数が正常に定義されている場合のみプラグインを読み込む
 if (( $+functions[zinit] )); then
 
-    # Powerlevel10k テーマ
-    zinit ice depth=1; zinit light romkatv/powerlevel10k
+    # Powerlevel10k テーマ (v1.9.1)
+    zinit ice depth=1 ver"v1.9.1"; zinit light romkatv/powerlevel10k
     # Powerlevel10k ユーザー設定ファイルが存在すれば source
     [[ ! -f "${ZDOTDIR:-$HOME}/.zsh/.p10k.zsh" ]] || source "${ZDOTDIR:-$HOME}/.zsh/.p10k.zsh"
 
-    # コンプリーション (fpathに追加するため compinit より前に読み込む)
-    zinit light zsh-users/zsh-completions
+    # コンプリーション (fpathに追加するため compinit より前に読み込む) (0.9.0)
+    zinit ice ver"0.9.0"; zinit light zsh-users/zsh-completions
 
     # 補完システムの初期化（Zinit のキャッシュ最適化版を使用）
     autoload -Uz compinit
     zicompinit
+    # compinit 前に intercept された compdef をリプレイ
+    zicdreplay
 
     # zinit の補完を登録（compinit 後に行う必要がある）
     autoload -Uz _zinit
     compdef _zinit zinit
 
-    # オートサジェスチョン (compinit より後に読み込む)
+    # --- Turbo mode（遅延読み込み）---
+    # プロンプト表示後にバックグラウンドで読み込み、シェル起動を高速化
+
+    # オートサジェスチョン (v0.7.1)
+    zinit ice wait lucid ver"v0.7.1"
     zinit light zsh-users/zsh-autosuggestions
-    # 複数単語での履歴検索
-    zinit load zdharma-continuum/history-search-multi-word
-    # シンタックスハイライト (最後尾での読み込みが推奨)
+    # 複数単語での履歴検索 (c4dcddc)
+    zinit ice wait lucid ver"c4dcddc"
+    zinit light zdharma-continuum/history-search-multi-word
+    # シンタックスハイライト (プラグイン群の中で最後に読み込む) (0.8.0)
+    zinit ice wait lucid ver"0.8.0"
     zinit light zsh-users/zsh-syntax-highlighting
 else
     print -P "%F{160}Zinit が見つからない、または読み込みに失敗しました。セットアップスクリプトを確認してください。%f"
