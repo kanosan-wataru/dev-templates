@@ -27,7 +27,7 @@ setopt HIST_IGNORE_SPACE
 # ----------------------------
 # Zinit (プラグインマネージャー) の読み込みとプラグイン設定
 # ----------------------------
-ZINIT_HOME="$HOME/.local/share/zinit/zinit.git"
+ZINIT_HOME="${XDG_DATA_HOME:-$HOME/.local/share}/zinit/zinit.git"
 if [[ -f "$ZINIT_HOME/zinit.zsh" ]]; then
     source "$ZINIT_HOME/zinit.zsh"
 fi
