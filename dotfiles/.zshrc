@@ -31,7 +31,13 @@ setopt HIST_IGNORE_SPACE
 ZSH_CONFIG_DIR="${ZDOTDIR:-$HOME}/.zsh"
 
 # プラグイン設定（Zinit + 各プラグインの読み込み）
-[[ -f "$ZSH_CONFIG_DIR/plugins.zsh" ]] && source "$ZSH_CONFIG_DIR/plugins.zsh"
+# 未配置/破損時は最低限の補完システムだけ初期化する
+if [[ -f "$ZSH_CONFIG_DIR/plugins.zsh" ]]; then
+    source "$ZSH_CONFIG_DIR/plugins.zsh"
+else
+    print -P "%F{220}警告: $ZSH_CONFIG_DIR/plugins.zsh が見つかりません。最低限の補完のみ有効化します。%f"
+    autoload -Uz compinit && compinit
+fi
 
 # エイリアス定義
 [[ -f "$ZSH_CONFIG_DIR/aliases.zsh" ]] && source "$ZSH_CONFIG_DIR/aliases.zsh"

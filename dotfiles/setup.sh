@@ -97,60 +97,32 @@ if ! command cp -p "$SCRIPT_DIR/.zshrc" "$ZSHRC_DEST"; then
 fi
 print -P "情報: .zshrc を $ZSHRC_DEST に配置しました。"
 
-# .p10k.zsh の配置
-if [[ -f "$SCRIPT_DIR/.zsh/.p10k.zsh" ]]; then
-    # シンボリックリンクの場合もバックアップ対象
-    if [[ -f "$ZSH_CONFIG_DIR/.p10k.zsh" || -h "$ZSH_CONFIG_DIR/.p10k.zsh" ]]; then
-        if ! command mv "$ZSH_CONFIG_DIR/.p10k.zsh" "$ZSH_CONFIG_DIR/.p10k.zsh${BACKUP_SUFFIX}"; then
-            print -P "%F{160}エラー: .p10k.zsh のバックアップに失敗しました。%f" >&2
+# 共通: 設定ファイルのバックアップと配置を行うヘルパー
+# 引数: $1=配布元パス $2=配置先パス $3=表示名 $4=未検出時の補足メッセージ
+install_config() {
+    local src="$1" dst="$2" label="$3" missing_hint="$4"
+    if [[ -f "$src" ]]; then
+        # シンボリックリンクの場合もバックアップ対象（-h でリンク自体を検出）
+        if [[ -f "$dst" || -h "$dst" ]]; then
+            if ! command mv "$dst" "${dst}${BACKUP_SUFFIX}"; then
+                print -P "%F{160}エラー: ${label} のバックアップに失敗しました。%f" >&2
+                exit 1
+            fi
+            print -P "情報: 既存の ${label} を ${dst}${BACKUP_SUFFIX} にバックアップしました。"
+        fi
+        if ! command cp -p "$src" "$dst"; then
+            print -P "%F{160}エラー: ${label} の配置に失敗しました。%f" >&2
             exit 1
         fi
-        print -P "情報: 既存の .p10k.zsh を ${ZSH_CONFIG_DIR}/.p10k.zsh${BACKUP_SUFFIX} にバックアップしました。"
+        print -P "情報: ${label} を配置しました。"
+    else
+        print -P "%F{220}警告: ${label} が見つかりません。${missing_hint}%f"
     fi
-    if ! command cp -p "$SCRIPT_DIR/.zsh/.p10k.zsh" "$ZSH_CONFIG_DIR/.p10k.zsh"; then
-        print -P "%F{160}エラー: .p10k.zsh の配置に失敗しました。%f" >&2
-        exit 1
-    fi
-    print -P "情報: .p10k.zsh を配置しました。"
-else
-    print -P "%F{220}警告: .p10k.zsh が見つかりません。Powerlevel10k のデフォルト設定が使用されます。%f"
-fi
+}
 
-# plugins.zsh の配置
-if [[ -f "$SCRIPT_DIR/.zsh/plugins.zsh" ]]; then
-    if [[ -f "$ZSH_CONFIG_DIR/plugins.zsh" || -h "$ZSH_CONFIG_DIR/plugins.zsh" ]]; then
-        if ! command mv "$ZSH_CONFIG_DIR/plugins.zsh" "$ZSH_CONFIG_DIR/plugins.zsh${BACKUP_SUFFIX}"; then
-            print -P "%F{160}エラー: plugins.zsh のバックアップに失敗しました。%f" >&2
-            exit 1
-        fi
-        print -P "情報: 既存の plugins.zsh を ${ZSH_CONFIG_DIR}/plugins.zsh${BACKUP_SUFFIX} にバックアップしました。"
-    fi
-    if ! command cp -p "$SCRIPT_DIR/.zsh/plugins.zsh" "$ZSH_CONFIG_DIR/plugins.zsh"; then
-        print -P "%F{160}エラー: plugins.zsh の配置に失敗しました。%f" >&2
-        exit 1
-    fi
-    print -P "情報: plugins.zsh を配置しました。"
-else
-    print -P "%F{220}警告: plugins.zsh が見つかりません。プラグインは手動で設定してください。%f"
-fi
-
-# aliases.zsh の配置
-if [[ -f "$SCRIPT_DIR/.zsh/aliases.zsh" ]]; then
-    if [[ -f "$ZSH_CONFIG_DIR/aliases.zsh" || -h "$ZSH_CONFIG_DIR/aliases.zsh" ]]; then
-        if ! command mv "$ZSH_CONFIG_DIR/aliases.zsh" "$ZSH_CONFIG_DIR/aliases.zsh${BACKUP_SUFFIX}"; then
-            print -P "%F{160}エラー: aliases.zsh のバックアップに失敗しました。%f" >&2
-            exit 1
-        fi
-        print -P "情報: 既存の aliases.zsh を ${ZSH_CONFIG_DIR}/aliases.zsh${BACKUP_SUFFIX} にバックアップしました。"
-    fi
-    if ! command cp -p "$SCRIPT_DIR/.zsh/aliases.zsh" "$ZSH_CONFIG_DIR/aliases.zsh"; then
-        print -P "%F{160}エラー: aliases.zsh の配置に失敗しました。%f" >&2
-        exit 1
-    fi
-    print -P "情報: aliases.zsh を配置しました。"
-else
-    print -P "%F{220}警告: aliases.zsh が見つかりません。エイリアスは手動で設定してください。%f"
-fi
+install_config "$SCRIPT_DIR/.zsh/.p10k.zsh"   "$ZSH_CONFIG_DIR/.p10k.zsh"   ".p10k.zsh"   "Powerlevel10k のデフォルト設定が使用されます。"
+install_config "$SCRIPT_DIR/.zsh/plugins.zsh"  "$ZSH_CONFIG_DIR/plugins.zsh" "plugins.zsh" "プラグインは手動で設定してください。"
+install_config "$SCRIPT_DIR/.zsh/aliases.zsh"  "$ZSH_CONFIG_DIR/aliases.zsh" "aliases.zsh" "エイリアスは手動で設定してください。"
 print -P "---------------------------------------------"
 
 
