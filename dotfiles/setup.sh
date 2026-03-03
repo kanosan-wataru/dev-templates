@@ -119,7 +119,11 @@ install_config() {
             print -P "%F{160}エラー: ${label} のバックアップに失敗しました。%f" >&2
             exit 1
         }
-        print -P "情報: 既存の ${label} を ${dst}${BACKUP_SUFFIX} にバックアップしました。"
+        if (( DRY_RUN )); then
+            print -P "情報: 既存の ${label} を ${dst}${BACKUP_SUFFIX} にバックアップします（予定）。"
+        else
+            print -P "情報: 既存の ${label} を ${dst}${BACKUP_SUFFIX} にバックアップしました。"
+        fi
     fi
 
     # 配置処理
@@ -127,7 +131,11 @@ install_config() {
         print -P "%F{160}エラー: ${label} の配置に失敗しました。%f" >&2
         exit 1
     }
-    print -P "情報: ${label} を配置しました。"
+    if (( DRY_RUN )); then
+        print -P "情報: ${label} を配置予定です（dry-run）。"
+    else
+        print -P "情報: ${label} を配置しました。"
+    fi
 }
 
 
@@ -143,16 +151,16 @@ if (( UNINSTALL )); then
         print -P "---------------------------------------------"
     fi
 
-    local restored=0
+    restored=0
 
     for entry in "${MANAGED_FILES[@]}"; do
         # パイプ区切りでパース
-        local dst="${${entry}[(ws:|:)2]}"
-        local label="${${entry}[(ws:|:)3]}"
+        dst="${${entry}[(ws:|:)2]}"
+        label="${${entry}[(ws:|:)3]}"
 
         # Zsh Glob 限定子で最新のバックアップを検索
         # (N): マッチなしでもエラーにしない, (.): 通常ファイル, (om): 更新日時の新しい順, [1]: 最初の1つ
-        local latest_backup=( "${dst}.backup."*(N.om[1]) )
+        latest_backup=( "${dst}.backup."*(N.om[1].) )
 
         if (( ${#latest_backup[@]} > 0 )); then
             # バックアップが存在する → 復元
@@ -255,10 +263,10 @@ print -P "設定ファイルを配置します..."
 
 for entry in "${MANAGED_FILES[@]}"; do
     # パイプ区切りでパース
-    local src="${${entry}[(ws:|:)1]}"
-    local dst="${${entry}[(ws:|:)2]}"
-    local label="${${entry}[(ws:|:)3]}"
-    local hint="${${entry}[(ws:|:)4]}"
+    src="${${entry}[(ws:|:)1]}"
+    dst="${${entry}[(ws:|:)2]}"
+    label="${${entry}[(ws:|:)3]}"
+    hint="${${entry}[(ws:|:)4]}"
     install_config "$src" "$dst" "$label" "$hint"
 done
 
