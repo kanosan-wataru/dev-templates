@@ -25,13 +25,32 @@ cd dev-templates
 zsh dotfiles/setup.sh
 ```
 
-セットアップスクリプトは以下を自動で行います:
+### オプション
 
-1. Zsh / Git の存在確認
+| オプション | 説明 |
+|-----------|------|
+| `--dry-run` | 実際の変更を行わず、実行内容をプレビュー表示 |
+| `--uninstall` | バックアップから設定ファイルを復元 |
+| `--help`, `-h` | ヘルプを表示 |
+
+```bash
+# 変更内容を事前に確認
+zsh dotfiles/setup.sh --dry-run
+
+# 設定ファイルをバックアップから復元
+zsh dotfiles/setup.sh --uninstall
+```
+
+### セットアップの流れ
+
+スクリプトは以下を自動で行います:
+
+1. Git の存在確認
 2. [Zinit](https://github.com/zdharma-continuum/zinit) プラグインマネージャーのインストール
 3. `~/.zsh` ディレクトリの作成（パーミッション 700）
 4. 設定ファイルの配置（`.zshrc`, `plugins.zsh`, `aliases.zsh`, `.p10k.zsh`）
-   - 既存ファイルはタイムスタンプ付きでバックアップ
+   - 既存ファイルと内容が同一の場合はスキップ（べき等）
+   - 内容が異なる場合はタイムスタンプ付きでバックアップ後に配置
 
 完了後、`exec zsh` でシェルを再起動してください。
 
@@ -46,10 +65,18 @@ zsh dotfiles/setup.sh
 | [zsh-autosuggestions](https://github.com/zsh-users/zsh-autosuggestions) | 履歴ベースのコマンド候補表示 |
 | [zsh-syntax-highlighting](https://github.com/zsh-users/zsh-syntax-highlighting) | コマンドラインのシンタックスハイライト |
 
+## CI
+
+Pull Request 作成時に GitHub Actions で以下のチェックが自動実行されます:
+
+- **Zsh 構文チェック** (`zsh -n`): `dotfiles/` 配下の `.zsh`, `.sh`, `.zshrc` ファイルの構文エラーを検出
+
 ## ディレクトリ構成
 
 ```
 dev-templates/
+├── .github/workflows/
+│   └── ci.yml              # CI: zsh -n 構文チェック
 ├── dotfiles/
 │   ├── .zsh/
 │   │   ├── plugins.zsh    # Zinit プラグイン設定
