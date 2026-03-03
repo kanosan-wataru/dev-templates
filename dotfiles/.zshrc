@@ -33,7 +33,10 @@ ZSH_CONFIG_DIR="${ZDOTDIR:-$HOME}/.zsh"
 # プラグイン設定（Zinit + 各プラグインの読み込み）
 # 未配置/破損時は最低限の補完システムだけ初期化する
 if [[ -f "$ZSH_CONFIG_DIR/plugins.zsh" ]]; then
-    source "$ZSH_CONFIG_DIR/plugins.zsh"
+    if ! source "$ZSH_CONFIG_DIR/plugins.zsh"; then
+        print -P "%F{220}警告: $ZSH_CONFIG_DIR/plugins.zsh の読み込みに失敗しました。最低限の補完のみ有効化します。%f"
+        autoload -Uz compinit && compinit
+    fi
 else
     print -P "%F{220}警告: $ZSH_CONFIG_DIR/plugins.zsh が見つかりません。最低限の補完のみ有効化します。%f"
     autoload -Uz compinit && compinit
