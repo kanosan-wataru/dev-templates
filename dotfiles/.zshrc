@@ -27,6 +27,8 @@ setopt INC_APPEND_HISTORY SHARE_HISTORY
 setopt HIST_IGNORE_ALL_DUPS
 # 履歴保存時に重複を削除し、最新のタイムスタンプのものを残す
 setopt HIST_SAVE_NO_DUPS
+# スペース始まりのコマンドを履歴に残さない（機密情報の漏洩防止）
+setopt HIST_IGNORE_SPACE
 
 
 # ----------------------------
@@ -43,18 +45,19 @@ if [[ -f "$ZINIT_HOME/zinit.zsh" ]]; then
     # Powerlevel10k ユーザー設定ファイルが存在すれば source
     [[ ! -f "${ZDOTDIR:-$HOME}/.zsh/.p10k.zsh" ]] || source "${ZDOTDIR:-$HOME}/.zsh/.p10k.zsh"
 
-    # シンタックスハイライト
-    zinit light zsh-users/zsh-syntax-highlighting
-    # オートサジェスチョン (入力補完)
-    zinit light zsh-users/zsh-autosuggestions
-    # コンプリーション (補完機能強化)
+    # コンプリーション (fpathに追加するため compinit より前に読み込む)
     zinit light zsh-users/zsh-completions
+
+    # 補完システムの初期化（Zinit のキャッシュ最適化版を使用）
+    autoload -Uz compinit
+    zicompinit
+
+    # オートサジェスチョン (compinit より後に読み込む)
+    zinit light zsh-users/zsh-autosuggestions
     # 複数単語での履歴検索
     zinit load zdharma-continuum/history-search-multi-word
-
-    # 補完システムの初期化
-    autoload -Uz compinit
-    compinit
+    # シンタックスハイライト (最後尾での読み込みが推奨)
+    zinit light zsh-users/zsh-syntax-highlighting
 else
     print -P "%F{160}Zinit が見つかりません。セットアップスクリプトを実行してください。%f"
 fi
