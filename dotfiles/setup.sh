@@ -57,7 +57,7 @@ echo "---------------------------------------------"
 # --- Zsh 設定ディレクトリの作成 ---
 ZSH_CONFIG_DIR="$HOME/.zsh"
 if [[ ! -d "$ZSH_CONFIG_DIR" ]]; then
-    if ! mkdir -p -m 700 "$ZSH_CONFIG_DIR"; then
+    if ! command mkdir -p -m 700 "$ZSH_CONFIG_DIR"; then
         print -P "%F{160}エラー: $ZSH_CONFIG_DIR の作成に失敗しました。%f" >&2
         exit 1
     fi
