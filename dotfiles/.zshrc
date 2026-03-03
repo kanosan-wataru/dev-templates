@@ -12,7 +12,7 @@ fi
 HISTFILE=~/.zsh/.zsh_history
 # フェールセーフ: ディレクトリが存在しなければ作成
 [[ -d "${HISTFILE:h}" ]] || mkdir -p -m 700 "${HISTFILE:h}"
-export HISTSIZE=10000
+export HISTSIZE=50000
 export SAVEHIST=50000
 # セッション間で履歴を即時共有
 setopt INC_APPEND_HISTORY SHARE_HISTORY
@@ -46,16 +46,24 @@ if (( $+functions[zinit] )); then
     # 補完システムの初期化（Zinit のキャッシュ最適化版を使用）
     autoload -Uz compinit
     zicompinit
+    # compinit 前に intercept された compdef をリプレイ
+    zicdreplay
 
     # zinit の補完を登録（compinit 後に行う必要がある）
     autoload -Uz _zinit
     compdef _zinit zinit
 
-    # オートサジェスチョン (compinit より後に読み込む)
+    # --- Turbo mode（遅延読み込み）---
+    # プロンプト表示後にバックグラウンドで読み込み、シェル起動を高速化
+
+    # オートサジェスチョン
+    zinit ice wait lucid
     zinit light zsh-users/zsh-autosuggestions
     # 複数単語での履歴検索
-    zinit load zdharma-continuum/history-search-multi-word
+    zinit ice wait lucid
+    zinit light zdharma-continuum/history-search-multi-word
     # シンタックスハイライト (最後尾での読み込みが推奨)
+    zinit ice wait lucid
     zinit light zsh-users/zsh-syntax-highlighting
 else
     print -P "%F{160}Zinit が見つからない、または読み込みに失敗しました。セットアップスクリプトを確認してください。%f"
