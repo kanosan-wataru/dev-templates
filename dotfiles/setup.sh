@@ -26,7 +26,7 @@ if ! command -v git >/dev/null 2>&1; then
     print -P "%F{160}エラー: git コマンドが見つかりません。インストールしてください。%f" >&2
     exit 1
 fi
-print -P "情報: git が利用可能です ($(git --version))"
+print -P "情報: git が利用可能です ($(command git --version))"
 print -P "---------------------------------------------"
 
 
@@ -55,7 +55,8 @@ print -P "---------------------------------------------"
 
 
 # --- Zsh 設定ディレクトリの作成 ---
-ZSH_CONFIG_DIR="${ZDOTDIR:-$HOME}/.zsh"
+ZSH_BASE_DIR="${ZDOTDIR:-$HOME}"
+ZSH_CONFIG_DIR="$ZSH_BASE_DIR/.zsh"
 if [[ ! -d "$ZSH_CONFIG_DIR" ]]; then
     if ! command mkdir -p -m 700 "$ZSH_CONFIG_DIR"; then
         print -P "%F{160}エラー: $ZSH_CONFIG_DIR の作成に失敗しました。%f" >&2
@@ -77,7 +78,7 @@ SCRIPT_DIR="${0:a:h}"
 BACKUP_SUFFIX=".backup.$(command date +%Y%m%d%H%M%S)"
 
 # .zshrc の配置（ZDOTDIR が設定されている場合はそちらに配置）
-ZSHRC_DEST="${ZDOTDIR:-$HOME}/.zshrc"
+ZSHRC_DEST="$ZSH_BASE_DIR/.zshrc"
 if [[ ! -f "$SCRIPT_DIR/.zshrc" ]]; then
     print -P "%F{160}エラー: 配布元の .zshrc が見つかりません: $SCRIPT_DIR/.zshrc%f" >&2
     exit 1
