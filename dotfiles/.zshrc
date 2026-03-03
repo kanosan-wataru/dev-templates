@@ -8,8 +8,8 @@ fi
 # ----------------------------
 # zsh_history (コマンド履歴)
 # ----------------------------
-# 履歴設定（~/.zsh ディレクトリは setup.sh で作成済みの前提）
-HISTFILE=~/.zsh/.zsh_history
+# 履歴設定（${ZDOTDIR:-$HOME}/.zsh ディレクトリは setup.sh で作成済みの前提）
+HISTFILE="${ZDOTDIR:-$HOME}/.zsh/.zsh_history"
 # フェールセーフ: ディレクトリが存在しなければ作成
 [[ -d "${HISTFILE:h}" ]] || command mkdir -p -m 700 "${HISTFILE:h}"
 export HISTSIZE=50000
