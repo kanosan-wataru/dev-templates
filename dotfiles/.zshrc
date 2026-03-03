@@ -27,42 +27,48 @@ setopt INC_APPEND_HISTORY SHARE_HISTORY
 setopt HIST_IGNORE_ALL_DUPS
 # 履歴保存時に重複を削除し、最新のタイムスタンプのものを残す
 setopt HIST_SAVE_NO_DUPS
+# スペース始まりのコマンドを履歴に残さない（機密情報の漏洩防止）
+setopt HIST_IGNORE_SPACE
 
 
 # ----------------------------
-# Zinit (プラグインマネージャー) の読み込み
+# Zinit (プラグインマネージャー) の読み込みとプラグイン設定
 # ----------------------------
-# Zinit スクリプトを source (setup.sh または手動でインストールされている前提)
-if [[ -f "$HOME/.local/share/zinit/zinit.git/zinit.zsh" ]]; then
-    source "$HOME/.local/share/zinit/zinit.git/zinit.zsh"
-    autoload -Uz _zinit
-    (( ${+_comps} )) && _comps[zinit]=_zinit
-else
-    print -P "%F{160}Zinit が見つかりません。セットアップスクリプトを実行するか、手動でインストールしてください。%f"
+ZINIT_HOME="$HOME/.local/share/zinit/zinit.git"
+if [[ -f "$ZINIT_HOME/zinit.zsh" ]]; then
+    source "$ZINIT_HOME/zinit.zsh"
 fi
 
-# ----------------------------
-# Zinit プラグイン (Zinit経由で読み込み)
-# ----------------------------
-# zinit 関数が存在するか確認してから使用
-if command -v zinit &> /dev/null; then
+# zinit 関数が正常に定義されている場合のみプラグインを読み込む
+if (( $+functions[zinit] )); then
 
     # Powerlevel10k テーマ
     zinit ice depth=1; zinit light romkatv/powerlevel10k
     # Powerlevel10k ユーザー設定ファイルが存在すれば source
     [[ ! -f "${ZDOTDIR:-$HOME}/.zsh/.p10k.zsh" ]] || source "${ZDOTDIR:-$HOME}/.zsh/.p10k.zsh"
 
-    # シンタックスハイライト
-    zinit light zsh-users/zsh-syntax-highlighting
-    # オートサジェスチョン (入力補完)
-    zinit light zsh-users/zsh-autosuggestions
-    # コンプリーション (補完機能強化)
+    # コンプリーション (fpathに追加するため compinit より前に読み込む)
     zinit light zsh-users/zsh-completions
+
+    # 補完システムの初期化（Zinit のキャッシュ最適化版を使用）
+    autoload -Uz compinit
+    zicompinit
+
+    # zinit の補完を登録（compinit 後に行う必要がある）
+    autoload -Uz _zinit
+    compdef _zinit zinit
+
+    # オートサジェスチョン (compinit より後に読み込む)
+    zinit light zsh-users/zsh-autosuggestions
     # 複数単語での履歴検索
     zinit load zdharma-continuum/history-search-multi-word
-
+    # シンタックスハイライト (最後尾での読み込みが推奨)
+    zinit light zsh-users/zsh-syntax-highlighting
 else
-    print -P "%F{160}zinit コマンドが利用できないため、Zinit プラグインを読み込めません。%f"
+    print -P "%F{160}Zinit が見つからない、または読み込みに失敗しました。セットアップスクリプトを確認してください。%f"
+    # Zinit が使えなくても標準の補完システムだけは初期化しておく
+    autoload -Uz compinit
+    compinit
 fi
 
 # ----------------------------
