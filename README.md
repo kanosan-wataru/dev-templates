@@ -38,8 +38,9 @@ zsh dotfiles/setup.sh
 |-----------|------|
 | [Powerlevel10k](https://github.com/romkatv/powerlevel10k) | 高速・高機能なプロンプトテーマ |
 | [zsh-completions](https://github.com/zsh-users/zsh-completions) | 追加の補完定義 |
+| [fzf](https://github.com/junegunn/fzf) | ファジーファインダー（Ctrl-R: 履歴検索, Ctrl-T: ファイル検索, Alt-C: ディレクトリ移動） |
+| [fzf-tab](https://github.com/Aloxaf/fzf-tab) | Tab 補完を fzf に置き換え（プレビュー付き補完メニュー） |
 | [zsh-autosuggestions](https://github.com/zsh-users/zsh-autosuggestions) | 履歴ベースのコマンド候補表示 |
-| [history-search-multi-word](https://github.com/zdharma-continuum/history-search-multi-word) | 複数単語での履歴検索 |
 | [zsh-syntax-highlighting](https://github.com/zsh-users/zsh-syntax-highlighting) | コマンドラインのシンタックスハイライト |
 
 ## ディレクトリ構成
