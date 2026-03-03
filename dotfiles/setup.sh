@@ -32,17 +32,17 @@ echo "---------------------------------------------"
 
 # --- Zinit (プラグインマネージャー) のインストール ---
 echo "Zinit の状態を確認・インストールします..."
-ZINIT_DIR="$HOME/.local/share/zinit/zinit.git"
-if [[ ! -f "$ZINIT_DIR/zinit.zsh" ]]; then
+ZINIT_HOME="${XDG_DATA_HOME:-$HOME/.local/share}/zinit/zinit.git"
+if [[ ! -f "$ZINIT_HOME/zinit.zsh" ]]; then
     print -P "%F{33} %F{220}Zinit (%F{33}zdharma-continuum/zinit%F{220}) をインストール中...%f"
-    # ディレクトリ作成と権限設定
-    if ! command mkdir -p "$(dirname "$ZINIT_DIR")"; then
+    # ディレクトリ作成
+    if ! command mkdir -p "$(dirname "$ZINIT_HOME")"; then
         print -P "%F{160}エラー: Zinit 用ディレクトリの作成に失敗しました。%f" >&2
         exit 1
     fi
     # git clone を実行（サプライチェーンリスク軽減のためタグをピン留め）
     ZINIT_VERSION="v3.14.0"
-    if command git clone --branch "$ZINIT_VERSION" --depth 1 https://github.com/zdharma-continuum/zinit "$ZINIT_DIR"; then
+    if command git clone --branch "$ZINIT_VERSION" --depth 1 https://github.com/zdharma-continuum/zinit "$ZINIT_HOME"; then
         print -P "%F{33} %F{34}Zinit ${ZINIT_VERSION} のインストールに成功しました。%f"
     else
         print -P "%F{160}エラー: Zinit の git clone に失敗しました。%f" >&2
@@ -57,12 +57,8 @@ echo "---------------------------------------------"
 # --- Zsh 設定ディレクトリの作成 ---
 ZSH_CONFIG_DIR="$HOME/.zsh"
 if [[ ! -d "$ZSH_CONFIG_DIR" ]]; then
-    if ! mkdir -p "$ZSH_CONFIG_DIR"; then
+    if ! mkdir -p -m 700 "$ZSH_CONFIG_DIR"; then
         print -P "%F{160}エラー: $ZSH_CONFIG_DIR の作成に失敗しました。%f" >&2
-        exit 1
-    fi
-    if ! chmod 700 "$ZSH_CONFIG_DIR"; then
-        print -P "%F{160}エラー: $ZSH_CONFIG_DIR のパーミッション設定に失敗しました。%f" >&2
         exit 1
     fi
     echo "情報: $ZSH_CONFIG_DIR を作成しました。"
