@@ -112,13 +112,17 @@ zsh dotfiles/setup.sh --uninstall
 `dotfiles/**` または `.github/workflows/**` に変更を含む Pull Request で、GitHub Actions によるチェックが自動実行されます:
 
 - **Zsh 構文チェック** (`zsh -n`): `dotfiles/` 配下の `.zsh`, `.sh`, `.zshrc` ファイル（`.p10k.zsh` を除く）の構文エラーを検出
+- **Setup Dry Run**: `setup.sh --all --dry-run` を実行し、セットアップスクリプトの動作を検証
+- **Shell Format Check**: `shfmt` による `.zsh/*.zsh` ファイルのフォーマットチェック
+
+構文チェックと dry-run は **Ubuntu** と **macOS** の両環境で実行されます。
 
 ## ディレクトリ構成
 
 ```
 dev-templates/
 ├── .github/workflows/
-│   └── ci.yml              # CI: zsh -n 構文チェック
+│   └── ci.yml              # CI: 構文チェック + dry-run テスト（Ubuntu/macOS）
 ├── dotfiles/
 │   ├── .zsh/
 │   │   ├── plugins.zsh    # Zinit プラグイン設定
