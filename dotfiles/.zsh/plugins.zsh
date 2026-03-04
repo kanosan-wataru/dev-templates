@@ -7,15 +7,18 @@ if [[ -f "$ZINIT_HOME/zinit.zsh" ]]; then
 fi
 
 # zinit 関数が正常に定義されている場合のみプラグインを読み込む
-if (( $+functions[zinit] )); then
+# NOTE: shfmt 互換のため $+functions[] ではなく ${functions[]} で存在チェック
+if [[ -n "${functions[zinit]}" ]]; then
 
     # Powerlevel10k テーマ (v1.9.1)
-    zinit ice depth=1 ver"v1.9.1"; zinit light romkatv/powerlevel10k
+    zinit ice depth=1 ver"v1.9.1"
+    zinit light romkatv/powerlevel10k
     # Powerlevel10k ユーザー設定ファイルが存在すれば source
     [[ ! -f "${ZDOTDIR:-$HOME}/.zsh/.p10k.zsh" ]] || source "${ZDOTDIR:-$HOME}/.zsh/.p10k.zsh"
 
     # コンプリーション (fpathに追加するため compinit より前に読み込む) (0.9.0)
-    zinit ice ver"0.9.0"; zinit light zsh-users/zsh-completions
+    zinit ice ver"0.9.0"
+    zinit light zsh-users/zsh-completions
 
     # 補完システムの初期化（Zinit のキャッシュ最適化版を使用）
     autoload -Uz compinit
