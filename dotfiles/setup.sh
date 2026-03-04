@@ -354,6 +354,9 @@ load_modules() {
     typeset -a _unsorted
 
     for module_file in "$modules_dir"/*.sh(N); do
+        # 前回ループの残留関数をクリーンアップ
+        unset 'functions[module_setup]' 'functions[module_uninstall]' 2>/dev/null
+
         # メタデータ変数をリセット
         local MODULE_ID="" MODULE_NAME="" MODULE_DESC="" MODULE_DEFAULT=0 MODULE_ORDER=50
 
@@ -508,7 +511,8 @@ if (( UNINSTALL )); then
 
     typeset -i uninstall_errors=0
 
-    for entry in "${MODULES[@]}"; do
+    # NOTE: セットアップと逆順（MODULE_ORDER 降順）でアンインストールする
+    for entry in "${(@Oa)MODULES}"; do
         typeset mod_id="${entry[(ws:|:)1]}"
         typeset mod_name="${entry[(ws:|:)2]}"
         print -P ""
@@ -552,8 +556,13 @@ print -P "---------------------------------------------"
 typeset -a selected_module_ids
 
 if (( ${#SELECT_MODULES[@]} > 0 )); then
-    # --select で明示指定された場合
-    selected_module_ids=("${SELECT_MODULES[@]}")
+    # --select で明示指定された場合（MODULE_ORDER 順に並べ替え）
+    for entry in "${MODULES[@]}"; do
+        typeset mod_id="${entry[(ws:|:)1]}"
+        if (( ${SELECT_MODULES[(I)$mod_id]} )); then
+            selected_module_ids+=("$mod_id")
+        fi
+    done
 
 elif (( ALL_FLAG )); then
     # --all の場合: 全モジュールを選択
@@ -629,7 +638,7 @@ done
 print -P "---------------------------------------------"
 
 # --- 選択されたモジュールを順次セットアップ ---
-typeset setup_errors=0
+typeset -i setup_errors=0
 for mod_id in "${selected_module_ids[@]}"; do
     if ! run_module_setup "$mod_id"; then
         (( setup_errors++ ))

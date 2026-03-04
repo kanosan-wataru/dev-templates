@@ -52,25 +52,23 @@ module_setup() {
 
 # --- アンインストール ---
 module_uninstall() {
-    if command -v claude >/dev/null 2>&1; then
-        if ! command -v npm >/dev/null 2>&1; then
-            print -P "%F{220}スキップ: npm が見つからないため Claude Code をアンインストールできません。%f"
-            return 1
+    # インストール状態を判定（コマンドの存在 or npm パッケージの存在）
+    if ! command -v claude >/dev/null 2>&1; then
+        if ! { command -v npm >/dev/null 2>&1 && npm ls -g @anthropic-ai/claude-code >/dev/null 2>&1 }; then
+            print -P "情報: Claude Code はインストールされていません。スキップします。"
+            return 0
         fi
-        print -P "Claude Code をアンインストールします..."
-        run_cmd npm uninstall -g @anthropic-ai/claude-code || {
-            print -P "%F{160}エラー: Claude Code のアンインストールに失敗しました。%f" >&2
-            return 1
-        }
-        print -P "%F{34}Claude Code をアンインストールしました。%f"
-    elif command -v npm >/dev/null 2>&1 && npm ls -g @anthropic-ai/claude-code >/dev/null 2>&1; then
-        print -P "Claude Code をアンインストールします..."
-        run_cmd npm uninstall -g @anthropic-ai/claude-code || {
-            print -P "%F{160}エラー: Claude Code のアンインストールに失敗しました。%f" >&2
-            return 1
-        }
-        print -P "%F{34}Claude Code をアンインストールしました。%f"
-    else
-        print -P "情報: Claude Code はインストールされていません。スキップします。"
     fi
+
+    if ! command -v npm >/dev/null 2>&1; then
+        print -P "%F{220}スキップ: npm が見つからないため Claude Code をアンインストールできません。%f"
+        return 1
+    fi
+
+    print -P "Claude Code をアンインストールします..."
+    run_cmd npm uninstall -g @anthropic-ai/claude-code || {
+        print -P "%F{160}エラー: Claude Code のアンインストールに失敗しました。%f" >&2
+        return 1
+    }
+    print -P "%F{34}Claude Code をアンインストールしました。%f"
 }

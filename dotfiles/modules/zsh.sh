@@ -11,7 +11,7 @@ MODULE_DEFAULT=1
 MODULE_ORDER=10
 
 # --- Zsh 固有変数 ---
-# NOTE: モジュール固有の変数には衝突回避のため ZSH_ プレフィックスを使用
+# NOTE: モジュール固有の変数には衝突回避のため ZSH_MOD_ プレフィックスを使用
 ZSH_MOD_BASE_DIR="${ZDOTDIR:-$HOME}"
 ZSH_MOD_CONFIG_DIR="$ZSH_MOD_BASE_DIR/.zsh"
 ZSH_MOD_ZINIT_HOME="${XDG_DATA_HOME:-$HOME/.local/share}/zinit/zinit.git"
@@ -52,9 +52,9 @@ module_setup() {
             return 1
         }
         if (( DRY_RUN )); then
-            print -P "情報: Zinit ${ZINIT_VERSION} をインストール予定です（dry-run）。"
+            print -P "情報: Zinit ${ZSH_MOD_ZINIT_VERSION} をインストール予定です（dry-run）。"
         else
-            print -P "%F{33} %F{34}Zinit ${ZINIT_VERSION} のインストールに成功しました。%f"
+            print -P "%F{33} %F{34}Zinit ${ZSH_MOD_ZINIT_VERSION} のインストールに成功しました。%f"
         fi
     else
         print -P "情報: Zinit は既にインストールされています。"
@@ -125,5 +125,5 @@ module_uninstall() {
         print -P "情報: Zsh 設定の復元・削除対象はありませんでした。"
     fi
     print -P "NOTE: Zinit 本体は削除されていません。不要な場合は以下を手動で削除してください:"
-    print -P "  rm -rf ${ZINIT_HOME:h}"
+    print -P "  rm -rf ${ZSH_MOD_ZINIT_HOME:h}"
 }

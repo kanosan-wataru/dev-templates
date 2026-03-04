@@ -52,25 +52,23 @@ module_setup() {
 
 # --- アンインストール ---
 module_uninstall() {
-    if command -v gemini >/dev/null 2>&1; then
-        if ! command -v npm >/dev/null 2>&1; then
-            print -P "%F{220}スキップ: npm が見つからないため Gemini CLI をアンインストールできません。%f"
-            return 1
+    # インストール状態を判定（コマンドの存在 or npm パッケージの存在）
+    if ! command -v gemini >/dev/null 2>&1; then
+        if ! { command -v npm >/dev/null 2>&1 && npm ls -g @google/gemini-cli >/dev/null 2>&1 }; then
+            print -P "情報: Gemini CLI はインストールされていません。スキップします。"
+            return 0
         fi
-        print -P "Gemini CLI をアンインストールします..."
-        run_cmd npm uninstall -g @google/gemini-cli || {
-            print -P "%F{160}エラー: Gemini CLI のアンインストールに失敗しました。%f" >&2
-            return 1
-        }
-        print -P "%F{34}Gemini CLI をアンインストールしました。%f"
-    elif command -v npm >/dev/null 2>&1 && npm ls -g @google/gemini-cli >/dev/null 2>&1; then
-        print -P "Gemini CLI をアンインストールします..."
-        run_cmd npm uninstall -g @google/gemini-cli || {
-            print -P "%F{160}エラー: Gemini CLI のアンインストールに失敗しました。%f" >&2
-            return 1
-        }
-        print -P "%F{34}Gemini CLI をアンインストールしました。%f"
-    else
-        print -P "情報: Gemini CLI はインストールされていません。スキップします。"
     fi
+
+    if ! command -v npm >/dev/null 2>&1; then
+        print -P "%F{220}スキップ: npm が見つからないため Gemini CLI をアンインストールできません。%f"
+        return 1
+    fi
+
+    print -P "Gemini CLI をアンインストールします..."
+    run_cmd npm uninstall -g @google/gemini-cli || {
+        print -P "%F{160}エラー: Gemini CLI のアンインストールに失敗しました。%f" >&2
+        return 1
+    }
+    print -P "%F{34}Gemini CLI をアンインストールしました。%f"
 }
