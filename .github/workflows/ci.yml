@@ -12,11 +12,15 @@ permissions:
 
 jobs:
   zsh-syntax:
-    name: Zsh Syntax Check
-    runs-on: ubuntu-latest
+    name: Zsh Syntax Check (${{ matrix.os }})
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
       - name: Install Zsh
+        if: runner.os == 'Linux'
         run: sudo apt-get update -qq && sudo apt-get install -y -qq zsh
       - name: Verify Zsh is available
         run: zsh --version
@@ -34,3 +38,19 @@ jobs:
             echo "::endgroup::"
           done < <(find dotfiles -type f \( -name '*.zsh' -o -name '*.sh' -o -name '.zshrc' \) ! -name '.p10k.zsh' -print0 | sort -z)
           exit $status
+
+  dry-run:
+    name: Setup Dry Run (${{ matrix.os }})
+    strategy:
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Zsh
+        if: runner.os == 'Linux'
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq zsh
+      - name: Verify Zsh is available
+        run: zsh --version
+      - name: Run setup.sh --all --dry-run
+        run: zsh dotfiles/setup.sh --all --dry-run
