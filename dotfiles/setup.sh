@@ -207,7 +207,7 @@ ensure_node() {
 
 # チェックボックスメニューを表示し、選択結果を返す
 # 引数: メニュー項目の配列（"表示名|説明|デフォルト選択(0/1)" 形式）
-# 出力: 選択されたインデックス（1始まり）をスペース区切りで stdout に出力
+# 出力: 選択されたインデックス（1始まり）をスペース区切りで REPLY 変数に設定
 # 戻り値: 0=正常終了, 1=キャンセル（q キー）
 checkbox_menu() {
     local -a items=("$@")
@@ -305,14 +305,13 @@ checkbox_menu() {
     tput cnorm 2>/dev/null  # カーソル表示復帰
     trap - INT TERM QUIT
 
-    # 選択されたインデックスを出力
-    local result=""
+    # 選択されたインデックスを REPLY 変数に設定
+    REPLY=""
     for i in {1..$item_count}; do
         if (( selected[$i] )); then
-            result+="$i "
+            REPLY+="$i "
         fi
     done
-    print -n "$result"
     return 0
 }
 
@@ -449,8 +448,8 @@ uninstall_zsh() {
         dst="${entry[(ws:|:)2]}"
         label="${entry[(ws:|:)3]}"
 
-        # Zsh Glob 限定子で最新のバックアップを検索
-        latest_backup=( "${dst}.backup."*(N.om[1].) )
+        # Zsh Glob 限定子で最新のバックアップを検索（シンボリックリンクも含む、ディレクトリは除外）
+        latest_backup=( "${dst}.backup."*(N^/om[1]) )
 
         if (( ${#latest_backup[@]} > 0 )); then
             print -P "復元: ${label} をバックアップ (${latest_backup[1]:t}) から戻します。"
@@ -523,6 +522,10 @@ setup_claude_code() {
 # Claude Code のアンインストール
 uninstall_claude_code() {
     if command -v claude >/dev/null 2>&1; then
+        if ! command -v npm >/dev/null 2>&1; then
+            print -P "%F{220}スキップ: npm が見つからないため Claude Code をアンインストールできません。%f"
+            return 1
+        fi
         print -P "Claude Code をアンインストールします..."
         run_cmd npm uninstall -g @anthropic-ai/claude-code || {
             print -P "%F{160}エラー: Claude Code のアンインストールに失敗しました。%f" >&2
@@ -584,6 +587,10 @@ setup_gemini_cli() {
 # Gemini CLI のアンインストール
 uninstall_gemini_cli() {
     if command -v gemini >/dev/null 2>&1; then
+        if ! command -v npm >/dev/null 2>&1; then
+            print -P "%F{220}スキップ: npm が見つからないため Gemini CLI をアンインストールできません。%f"
+            return 1
+        fi
         print -P "Gemini CLI をアンインストールします..."
         run_cmd npm uninstall -g @google/gemini-cli || {
             print -P "%F{160}エラー: Gemini CLI のアンインストールに失敗しました。%f" >&2
@@ -649,20 +656,30 @@ if (( UNINSTALL )); then
         print -P "---------------------------------------------"
     fi
 
+    typeset -i uninstall_errors=0
+
     for entry in "${MODULES[@]}"; do
         typeset mod_id="${entry[(ws:|:)1]}"
         typeset mod_name="${entry[(ws:|:)2]}"
         print -P ""
         print -P "%F{36}%B[${mod_name}]%b%f"
         print -P "---------------------------------------------"
-        run_module_uninstall "$mod_id"
+        if ! run_module_uninstall "$mod_id"; then
+            (( uninstall_errors++ ))
+        fi
     done
 
     print -P ""
     print -P "============================================="
-    print -P "%F{34}アンインストールが完了しました。%f"
-    print -P "============================================="
-    exit 0
+    if (( uninstall_errors > 0 )); then
+        print -P "%F{220}アンインストールが完了しましたが、${uninstall_errors} 件のモジュールでエラーが発生しました。%f"
+        print -P "============================================="
+        exit 1
+    else
+        print -P "%F{34}アンインストールが完了しました。%f"
+        print -P "============================================="
+        exit 0
+    fi
 fi
 
 
@@ -698,36 +715,46 @@ elif [[ -t 0 ]]; then
     # TTY 環境: インタラクティブ選択（チェックボックスUI）
     print -P ""
 
-    # チェックボックスメニュー用の項目を構築
-    typeset -a menu_items
-    for entry in "${MODULES[@]}"; do
-        typeset mod_name="${entry[(ws:|:)2]}"
-        typeset mod_desc="${entry[(ws:|:)3]}"
-        typeset mod_default="${entry[(ws:|:)4]}"
-        menu_items+=("${mod_name}|${mod_desc}|${mod_default}")
-    done
+    if ! command -v tput >/dev/null 2>&1; then
+        # tput が利用できない場合はデフォルト選択のモジュールのみインストール
+        print -P "%F{220}情報: tput が利用できないため、デフォルトのモジュールをインストールします。%f"
+        for entry in "${MODULES[@]}"; do
+            if (( ${entry[(ws:|:)4]} == 1 )); then
+                selected_module_ids+=("${entry[(ws:|:)1]}")
+            fi
+        done
+    else
+        # チェックボックスメニュー用の項目を構築
+        typeset -a menu_items
+        for entry in "${MODULES[@]}"; do
+            typeset mod_name="${entry[(ws:|:)2]}"
+            typeset mod_desc="${entry[(ws:|:)3]}"
+            typeset mod_default="${entry[(ws:|:)4]}"
+            menu_items+=("${mod_name}|${mod_desc}|${mod_default}")
+        done
 
-    # チェックボックスメニュー表示
-    typeset selection
-    selection=$(checkbox_menu "${menu_items[@]}")
-    typeset menu_status=$?
+        # チェックボックスメニュー表示
+        checkbox_menu "${menu_items[@]}"
+        typeset menu_status=$?
+        typeset selection="$REPLY"
 
-    if (( menu_status != 0 )); then
-        print -P ""
-        print -P "%F{220}キャンセルされました。%f"
-        exit 0
+        if (( menu_status != 0 )); then
+            print -P ""
+            print -P "%F{220}キャンセルされました。%f"
+            exit 0
+        fi
+
+        if [[ -z "$selection" ]]; then
+            print -P ""
+            print -P "%F{220}モジュールが選択されませんでした。終了します。%f"
+            exit 0
+        fi
+
+        # 選択されたインデックスからモジュール ID を取得
+        for idx in ${(s: :)selection}; do
+            selected_module_ids+=("${MODULES[$idx][(ws:|:)1]}")
+        done
     fi
-
-    if [[ -z "$selection" ]]; then
-        print -P ""
-        print -P "%F{220}モジュールが選択されませんでした。終了します。%f"
-        exit 0
-    fi
-
-    # 選択されたインデックスからモジュール ID を取得
-    for idx in ${(s: :)selection}; do
-        selected_module_ids+=("${MODULES[$idx][(ws:|:)1]}")
-    done
 
     print -P ""
 else

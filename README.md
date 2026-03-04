@@ -30,7 +30,7 @@ zsh dotfiles/setup.sh
 
 ```
 インストールするモジュールを選択してください:
-（↑↓/jk: 移動, スペース: 選択, a: 全選択, Enter: 確定）
+（↑↓/jk: 移動, スペース: 選択, a: 全選択, Enter: 確定, q: キャンセル）
 
 > [x] Zsh 設定一式    Zinit + プラグイン + テーマ + エイリアス
   [ ] Claude Code     Anthropic CLI (Node.js v18+ 必要)
