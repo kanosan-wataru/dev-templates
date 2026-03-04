@@ -57,7 +57,7 @@ while (( $# > 0 )); do
             print -P ""
             print -P "オプション:"
             print -P "  --dry-run          変更内容のプレビューのみ（実際には変更しない）"
-            print -P "  --uninstall        バックアップから元の状態に復元"
+            print -P "  --uninstall        全モジュールをアンインストール（バックアップから復元）"
             print -P "  --all              全モジュールを一括インストール"
             print -P "  --select MODULE    特定モジュールを指定（複数指定可）"
             print -P "  --help, -h         このヘルプを表示"
@@ -208,7 +208,7 @@ ensure_node() {
 # チェックボックスメニューを表示し、選択結果を返す
 # 引数: メニュー項目の配列（"表示名|説明|デフォルト選択(0/1)" 形式）
 # 出力: 選択されたインデックス（1始まり）をスペース区切りで stdout に出力
-# 戻り値: 0=確定, 1=キャンセル
+# 戻り値: 0=正常終了, 1=キャンセル（q キー）
 checkbox_menu() {
     local -a items=("$@")
     local item_count=${#items}
@@ -290,6 +290,11 @@ checkbox_menu() {
                     selected[$i]=$new_val
                 done
                 ;;
+            q) # キャンセル
+                tput cnorm 2>/dev/null
+                trap - INT TERM QUIT
+                return 1
+                ;;
             $'\n') # Enter: 確定
                 break
                 ;;
@@ -326,7 +331,7 @@ _checkbox_draw() {
     tput el
     print -P "%F{36}%B インストールするモジュールを選択してください:%b%f"
     tput el
-    print -P "%F{242} (↑↓/jk: 移動, スペース: 選択, a: 全選択, Enter: 確定)%f"
+    print -P "%F{242} (↑↓/jk: 移動, スペース: 選択, a: 全選択, Enter: 確定, q: キャンセル)%f"
 
     # メニュー項目
     for i in {1..$item_count}; do
@@ -524,7 +529,7 @@ uninstall_claude_code() {
             return 1
         }
         print -P "%F{34}Claude Code をアンインストールしました。%f"
-    elif npm ls -g @anthropic-ai/claude-code >/dev/null 2>&1; then
+    elif command -v npm >/dev/null 2>&1 && npm ls -g @anthropic-ai/claude-code >/dev/null 2>&1; then
         print -P "Claude Code をアンインストールします..."
         run_cmd npm uninstall -g @anthropic-ai/claude-code || {
             print -P "%F{160}エラー: Claude Code のアンインストールに失敗しました。%f" >&2
@@ -585,7 +590,7 @@ uninstall_gemini_cli() {
             return 1
         }
         print -P "%F{34}Gemini CLI をアンインストールしました。%f"
-    elif npm ls -g @google/gemini-cli >/dev/null 2>&1; then
+    elif command -v npm >/dev/null 2>&1 && npm ls -g @google/gemini-cli >/dev/null 2>&1; then
         print -P "Gemini CLI をアンインストールします..."
         run_cmd npm uninstall -g @google/gemini-cli || {
             print -P "%F{160}エラー: Gemini CLI のアンインストールに失敗しました。%f" >&2
@@ -633,9 +638,10 @@ run_module_uninstall() {
 
 # ==============================================
 # アンインストールモード
+# NOTE: --uninstall は常に全モジュールを対象にする
 # ==============================================
 if (( UNINSTALL )); then
-    print -P "アンインストール（復元）を開始します..."
+    print -P "全モジュールのアンインストール（復元）を開始します..."
     print -P "============================================="
 
     if (( DRY_RUN )); then
@@ -644,8 +650,8 @@ if (( UNINSTALL )); then
     fi
 
     for entry in "${MODULES[@]}"; do
-        local mod_id="${entry[(ws:|:)1]}"
-        local mod_name="${entry[(ws:|:)2]}"
+        typeset mod_id="${entry[(ws:|:)1]}"
+        typeset mod_name="${entry[(ws:|:)2]}"
         print -P ""
         print -P "%F{36}%B[${mod_name}]%b%f"
         print -P "---------------------------------------------"
@@ -695,15 +701,22 @@ elif [[ -t 0 ]]; then
     # チェックボックスメニュー用の項目を構築
     typeset -a menu_items
     for entry in "${MODULES[@]}"; do
-        local mod_name="${entry[(ws:|:)2]}"
-        local mod_desc="${entry[(ws:|:)3]}"
-        local mod_default="${entry[(ws:|:)4]}"
+        typeset mod_name="${entry[(ws:|:)2]}"
+        typeset mod_desc="${entry[(ws:|:)3]}"
+        typeset mod_default="${entry[(ws:|:)4]}"
         menu_items+=("${mod_name}|${mod_desc}|${mod_default}")
     done
 
     # チェックボックスメニュー表示
-    local selection
+    typeset selection
     selection=$(checkbox_menu "${menu_items[@]}")
+    typeset menu_status=$?
+
+    if (( menu_status != 0 )); then
+        print -P ""
+        print -P "%F{220}キャンセルされました。%f"
+        exit 0
+    fi
 
     if [[ -z "$selection" ]]; then
         print -P ""
@@ -739,8 +752,11 @@ done
 print -P "---------------------------------------------"
 
 # --- 選択されたモジュールを順次セットアップ ---
+typeset setup_errors=0
 for mod_id in "${selected_module_ids[@]}"; do
-    run_module_setup "$mod_id"
+    if ! run_module_setup "$mod_id"; then
+        (( setup_errors++ ))
+    fi
 done
 
 # --- 完了 ---
@@ -748,6 +764,8 @@ print -P ""
 print -P "============================================="
 if (( DRY_RUN )); then
     print -P "%F{33}[DRY-RUN] 上記が実行される変更内容です。実際に適用するには --dry-run を外して再実行してください。%f"
+elif (( setup_errors > 0 )); then
+    print -P "%F{220}セットアップが完了しましたが、${setup_errors} 件のモジュールでエラーが発生しました。%f"
 else
     print -P "%F{34}セットアップが正常に完了しました。%f"
 
@@ -762,4 +780,7 @@ else
 fi
 print -P "============================================="
 
+if (( setup_errors > 0 )); then
+    exit 1
+fi
 exit 0
