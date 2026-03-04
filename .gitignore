@@ -1,7 +1,28 @@
+# 環境変数
 *.env
+.env.local
 
 # ログファイル
 *.log
 
 # キャッシュ
 .cache/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# エディタ
+*.swp
+*.swo
+*~
+.vscode/
+.idea/
+
+# Node.js
+node_modules/
+
+# Python
+.venv/
+__pycache__/
+*.pyc
