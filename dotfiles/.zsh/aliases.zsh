@@ -29,11 +29,12 @@ alias dps='docker ps'
 # ----------------------------
 
 # git ブランチを fzf で検索してチェックアウト
-gco-fzf() {
+gco_fzf() {
     command -v fzf >/dev/null 2>&1 || { echo "fzf が必要です" >&2; return 1; }
+    git rev-parse --is-inside-work-tree >/dev/null 2>&1 || { echo "Git リポジトリ内で実行してください" >&2; return 1; }
     local branch
     branch=$(git branch --all --format='%(refname:short)' |
-        grep -v 'HEAD' |
+        grep -v '^origin/HEAD$' |
         fzf --height 40% --reverse --prompt="checkout> ") || return
     # リモートブランチの場合は origin/ プレフィックスを除去
     branch=${branch#origin/}
@@ -42,7 +43,7 @@ gco-fzf() {
 
 # ghq リポジトリを fzf で検索して移動
 if command -v ghq >/dev/null 2>&1 && command -v fzf >/dev/null 2>&1; then
-    ghq-fzf() {
+    ghq_fzf() {
         local dir
         dir=$(ghq list --full-path |
             fzf --height 40% --reverse --prompt="repo> ") || return
