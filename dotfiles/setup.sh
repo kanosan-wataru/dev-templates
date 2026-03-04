@@ -1,19 +1,20 @@
 #!/usr/bin/env zsh
 
 # ---------------------------------------------
-# Zsh 環境セットアップスクリプト
+# 開発環境セットアップスクリプト
 #
 # 使用法:
-#   zsh setup.sh              通常セットアップ（べき等）
-#   zsh setup.sh --dry-run    変更内容のプレビューのみ
-#   zsh setup.sh --uninstall  バックアップから復元
-#   zsh setup.sh --help       ヘルプ表示
+#   zsh setup.sh                  インタラクティブモード（モジュール選択）
+#   zsh setup.sh --all            全モジュール一括インストール
+#   zsh setup.sh --select zsh     特定モジュールを指定（複数可）
+#   zsh setup.sh --dry-run        変更内容のプレビューのみ
+#   zsh setup.sh --uninstall      バックアップから復元
+#   zsh setup.sh --help           ヘルプ表示
 #
-# 機能:
-# - 依存コマンドの確認 (git)
-# - Zinit (プラグインマネージャー) のインストール
-# - 設定ディレクトリの作成 (~/.zsh)
-# - 設定ファイルの配置 (.zshrc, plugins.zsh, aliases.zsh, .p10k.zsh)
+# モジュール:
+#   zsh          Zsh 設定一式 (Zinit + プラグイン + テーマ + エイリアス)
+#   claude-code  Claude Code (Anthropic CLI)
+#   gemini-cli   Gemini CLI (Google AI CLI)
 # ---------------------------------------------
 
 # --- Zsh実行確認 ---
@@ -29,6 +30,8 @@ fi
 # ==============================================
 DRY_RUN=0
 UNINSTALL=0
+ALL_FLAG=0
+typeset -a SELECT_MODULES
 
 while (( $# > 0 )); do
     case "$1" in
@@ -38,13 +41,37 @@ while (( $# > 0 )); do
         --uninstall)
             UNINSTALL=1
             ;;
+        --all)
+            ALL_FLAG=1
+            ;;
+        --select)
+            if (( $# < 2 )); then
+                print -P "%F{160}エラー: --select にはモジュール名が必要です%f" >&2
+                exit 1
+            fi
+            shift
+            SELECT_MODULES+=("$1")
+            ;;
         --help|-h)
             print -P "使用法: zsh $0 [オプション]"
             print -P ""
             print -P "オプション:"
-            print -P "  --dry-run    変更内容のプレビューのみ（実際には変更しない）"
-            print -P "  --uninstall  バックアップから元の状態に復元"
-            print -P "  --help, -h   このヘルプを表示"
+            print -P "  --dry-run          変更内容のプレビューのみ（実際には変更しない）"
+            print -P "  --uninstall        全モジュールをアンインストール（バックアップから復元）"
+            print -P "  --all              全モジュールを一括インストール"
+            print -P "  --select MODULE    特定モジュールを指定（複数指定可）"
+            print -P "  --help, -h         このヘルプを表示"
+            print -P ""
+            print -P "モジュール:"
+            print -P "  zsh          Zsh 設定一式 (Zinit + プラグイン + テーマ + エイリアス)"
+            print -P "  claude-code  Claude Code (Anthropic CLI)"
+            print -P "  gemini-cli   Gemini CLI (Google AI CLI)"
+            print -P ""
+            print -P "例:"
+            print -P "  zsh $0                              インタラクティブ選択"
+            print -P "  zsh $0 --all                        全モジュール一括"
+            print -P "  zsh $0 --select zsh --select claude-code  複数指定"
+            print -P "  zsh $0 --all --dry-run              全モジュールをプレビュー"
             exit 0
             ;;
         *)
@@ -74,6 +101,14 @@ MANAGED_FILES=(
     "$SCRIPT_DIR/.zsh/.p10k.zsh|$ZSH_CONFIG_DIR/.p10k.zsh|.p10k.zsh|Powerlevel10k のデフォルト設定が使用されます。"
     "$SCRIPT_DIR/.zsh/plugins.zsh|$ZSH_CONFIG_DIR/plugins.zsh|plugins.zsh|プラグインは手動で設定してください。"
     "$SCRIPT_DIR/.zsh/aliases.zsh|$ZSH_CONFIG_DIR/aliases.zsh|aliases.zsh|エイリアスは手動で設定してください。"
+)
+
+# モジュール定義（ID|表示名|説明|デフォルト選択）
+# NOTE: デフォルト選択 1=ON, 0=OFF
+MODULES=(
+    "zsh|Zsh 設定一式|Zinit + プラグイン + テーマ + エイリアス|1"
+    "claude-code|Claude Code|Anthropic CLI (Node.js v18+ 必要)|0"
+    "gemini-cli|Gemini CLI|Google AI CLI (Node.js v18+ 必要)|0"
 )
 
 
@@ -138,44 +173,296 @@ install_config() {
     fi
 }
 
-
-# ==============================================
-# アンインストールモード
-# ==============================================
-if (( UNINSTALL )); then
-    print -P "アンインストール（復元）を開始します..."
-    print -P "---------------------------------------------"
-
-    if (( DRY_RUN )); then
-        print -P "%F{33}[DRY-RUN モード] 実際には変更を行いません。%f"
-        print -P "---------------------------------------------"
+# Node.js v18+ と npm の存在を確認するヘルパー
+# 戻り値: 0=利用可能, 1=利用不可
+ensure_node() {
+    if ! command -v node >/dev/null 2>&1; then
+        print -P "%F{160}エラー: Node.js がインストールされていません。%f" >&2
+        print -P "  nvm, fnm, volta 等で Node.js v18 以上をインストールしてください。" >&2
+        print -P "  例: curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.1/install.sh | bash" >&2
+        return 1
     fi
 
-    restored=0
+    local node_ver
+    node_ver=$(node -v | sed 's/^v//' | cut -d. -f1)
+    if (( node_ver < 18 )); then
+        print -P "%F{160}エラー: Node.js v18 以上が必要です（現在: v${node_ver}）%f" >&2
+        print -P "  Node.js をアップグレードしてください。" >&2
+        return 1
+    fi
+
+    if ! command -v npm >/dev/null 2>&1; then
+        print -P "%F{160}エラー: npm がインストールされていません。%f" >&2
+        print -P "  Node.js に付属の npm が利用可能か確認してください。" >&2
+        return 1
+    fi
+
+    return 0
+}
+
+
+# ==============================================
+# チェックボックス選択UI（tput ベース + 再描画方式）
+# ==============================================
+
+# チェックボックスメニューを表示し、選択結果を返す
+# 引数: メニュー項目の配列（"表示名|説明|デフォルト選択(0/1)" 形式）
+# 出力: 選択されたインデックス（1始まり）をスペース区切りで REPLY 変数に設定
+# 戻り値: 0=正常終了, 1=キャンセル（q キー）
+checkbox_menu() {
+    local -a items=("$@")
+    local item_count=${#items}
+    local cursor=1
+    local -a selected
+    local -a labels
+    local -a descs
+    local redraw=0
+
+    # メニュー項目をパース
+    for i in {1..$item_count}; do
+        labels[$i]="${items[$i][(ws:|:)1]}"
+        descs[$i]="${items[$i][(ws:|:)2]}"
+        selected[$i]="${items[$i][(ws:|:)3]}"
+    done
+
+    # ヘッダー行数（操作説明 + 空行）
+    local header_lines=2
+    # 合計描画行数（ヘッダー + メニュー項目）
+    local total_lines=$(( header_lines + item_count ))
+
+    # 端末状態の保護: 異常終了時にカーソルとリセットを復帰
+    trap '_checkbox_cleanup' INT TERM QUIT
+    tput civis 2>/dev/null  # カーソル非表示
+
+    # 画面下部でのスクロールスペースを事前確保
+    for i in {1..$total_lines}; do print ""; done
+    for i in {1..$total_lines}; do tput cuu1; done
+
+    # 描画ループ
+    while true; do
+        _checkbox_draw "$item_count" "$cursor" "$header_lines" "$redraw"
+        redraw=1
+
+        # キー入力待ち
+        local key=""
+        read -k 1 key
+
+        case "$key" in
+            $'\e')
+                # ESC シーケンスの解析（矢印キー対応）
+                local key2="" key3=""
+                read -k 1 -t 0.05 key2 2>/dev/null
+                if [[ "$key2" == "[" || "$key2" == "O" ]]; then
+                    read -k 1 -t 0.05 key3 2>/dev/null
+                    case "$key3" in
+                        A) # 上矢印
+                            (( cursor > 1 )) && (( cursor-- ))
+                            ;;
+                        B) # 下矢印
+                            (( cursor < item_count )) && (( cursor++ ))
+                            ;;
+                    esac
+                fi
+                ;;
+            k) # vim: 上移動
+                (( cursor > 1 )) && (( cursor-- ))
+                ;;
+            j) # vim: 下移動
+                (( cursor < item_count )) && (( cursor++ ))
+                ;;
+            ' ') # スペース: 選択トグル
+                if (( selected[$cursor] )); then
+                    selected[$cursor]=0
+                else
+                    selected[$cursor]=1
+                fi
+                ;;
+            a) # 全選択/全解除トグル
+                local all_selected=1
+                for i in {1..$item_count}; do
+                    if (( ! selected[$i] )); then
+                        all_selected=0
+                        break
+                    fi
+                done
+                local new_val=$(( ! all_selected ))
+                for i in {1..$item_count}; do
+                    selected[$i]=$new_val
+                done
+                ;;
+            q) # キャンセル
+                tput cnorm 2>/dev/null
+                trap - INT TERM QUIT
+                return 1
+                ;;
+            $'\n') # Enter: 確定
+                break
+                ;;
+        esac
+    done
+
+    # クリーンアップ
+    tput cnorm 2>/dev/null  # カーソル表示復帰
+    trap - INT TERM QUIT
+
+    # 選択されたインデックスを REPLY 変数に設定
+    REPLY=""
+    for i in {1..$item_count}; do
+        if (( selected[$i] )); then
+            REPLY+="$i "
+        fi
+    done
+    return 0
+}
+
+# チェックボックスメニューの描画（内部関数）
+_checkbox_draw() {
+    local item_count=$1 cursor=$2 header_lines=$3 redraw=$4
+    local total_lines=$(( header_lines + item_count ))
+    local max_width=${COLUMNS:-80}
+
+    # 再描画時は描画開始位置に戻る
+    if (( redraw )); then
+        for i in {1..$total_lines}; do tput cuu1; done
+    fi
+
+    # ヘッダー
+    tput el
+    print -P "%F{36}%B インストールするモジュールを選択してください:%b%f"
+    tput el
+    print -P "%F{242} (↑↓/jk: 移動, スペース: 選択, a: 全選択, Enter: 確定, q: キャンセル)%f"
+
+    # メニュー項目
+    for i in {1..$item_count}; do
+        tput el  # 行末クリア（前回描画の残りを消す）
+
+        local prefix=" "
+        local check="[ ]"
+        local label_color=""
+        local reset=""
+
+        if (( selected[$i] )); then
+            check="[x]"
+        fi
+
+        if (( i == cursor )); then
+            # カーソル行: シアン太字
+            tput bold 2>/dev/null
+            tput setaf 6 2>/dev/null
+            prefix=">"
+        fi
+
+        # 表示文字列を組み立て、端末幅に収める
+        local line=" ${prefix} ${check} ${labels[$i]}  ${descs[$i]}"
+        if (( ${#line} > max_width )); then
+            line="${line[1,$((max_width - 1))]}"
+        fi
+        print "$line"
+
+        if (( i == cursor )); then
+            tput sgr0 2>/dev/null
+        fi
+    done
+}
+
+# チェックボックスUIの異常終了時クリーンアップ
+_checkbox_cleanup() {
+    tput cnorm 2>/dev/null  # カーソル表示復帰
+    tput sgr0 2>/dev/null   # 装飾リセット
+    print ""
+    exit 130
+}
+
+
+# ==============================================
+# モジュールセットアップ関数
+# ==============================================
+
+# --- Zsh 設定一式 ---
+setup_zsh() {
+    print -P ""
+    print -P "%F{36}%B[Zsh 設定一式]%b%f"
+    print -P "---------------------------------------------"
+
+    # 依存コマンドの確認
+    if ! command -v git >/dev/null 2>&1; then
+        print -P "%F{160}エラー: git コマンドが見つかりません。インストールしてください。%f" >&2
+        return 1
+    fi
+    print -P "情報: git が利用可能です ($(command git --version))"
+
+    # Zinit のインストール
+    print -P "Zinit の状態を確認・インストールします..."
+    if [[ ! -f "$ZINIT_HOME/zinit.zsh" ]]; then
+        print -P "%F{33} %F{220}Zinit (%F{33}zdharma-continuum/zinit%F{220}) をインストール中...%f"
+        run_cmd command mkdir -p -m 700 "$(dirname "$ZINIT_HOME")" || {
+            print -P "%F{160}エラー: Zinit 用ディレクトリの作成に失敗しました。%f" >&2
+            return 1
+        }
+        run_cmd command git clone --branch "$ZINIT_VERSION" --depth 1 https://github.com/zdharma-continuum/zinit "$ZINIT_HOME" || {
+            print -P "%F{160}エラー: Zinit の git clone に失敗しました。%f" >&2
+            return 1
+        }
+        if (( DRY_RUN )); then
+            print -P "情報: Zinit ${ZINIT_VERSION} をインストール予定です（dry-run）。"
+        else
+            print -P "%F{33} %F{34}Zinit ${ZINIT_VERSION} のインストールに成功しました。%f"
+        fi
+    else
+        print -P "情報: Zinit は既にインストールされています。"
+    fi
+
+    # 設定ディレクトリの作成
+    if [[ ! -d "$ZSH_CONFIG_DIR" ]]; then
+        run_cmd command mkdir -p -m 700 "$ZSH_CONFIG_DIR" || {
+            print -P "%F{160}エラー: $ZSH_CONFIG_DIR の作成に失敗しました。%f" >&2
+            return 1
+        }
+        if (( DRY_RUN )); then
+            print -P "情報: $ZSH_CONFIG_DIR を作成予定です（dry-run）。"
+        else
+            print -P "情報: $ZSH_CONFIG_DIR を作成しました。"
+        fi
+    else
+        print -P "情報: $ZSH_CONFIG_DIR は既に存在します。"
+    fi
+
+    # 設定ファイルの配置
+    print -P "設定ファイルを配置します..."
+    for entry in "${MANAGED_FILES[@]}"; do
+        src="${entry[(ws:|:)1]}"
+        dst="${entry[(ws:|:)2]}"
+        label="${entry[(ws:|:)3]}"
+        hint="${entry[(ws:|:)4]}"
+        install_config "$src" "$dst" "$label" "$hint"
+    done
+
+    print -P "%F{34}Zsh 設定一式のセットアップが完了しました。%f"
+}
+
+# Zsh 設定のアンインストール
+uninstall_zsh() {
+    local restored=0
 
     for entry in "${MANAGED_FILES[@]}"; do
-        # パイプ区切りでパース
         dst="${entry[(ws:|:)2]}"
         label="${entry[(ws:|:)3]}"
 
-        # Zsh Glob 限定子で最新のバックアップを検索
-        # (N): マッチなしでもエラーにしない, (.): 通常ファイル, (om): 更新日時の新しい順, [1]: 最初の1つ
-        latest_backup=( "${dst}.backup."*(N.om[1].) )
+        # Zsh Glob 限定子で最新のバックアップを検索（シンボリックリンクも含む、ディレクトリは除外）
+        latest_backup=( "${dst}.backup."*(N^/om[1]) )
 
         if (( ${#latest_backup[@]} > 0 )); then
-            # バックアップが存在する → 復元
             print -P "復元: ${label} をバックアップ (${latest_backup[1]:t}) から戻します。"
             run_cmd command mv "${latest_backup[1]}" "$dst" || {
                 print -P "%F{160}エラー: ${label} の復元に失敗しました。%f" >&2
-                exit 1
+                return 1
             }
             restored=1
         elif [[ -f "$dst" || -h "$dst" ]]; then
-            # バックアップなし＝セットアップ前に存在しなかったファイル → 削除
             print -P "削除: ${label} を削除します（セットアップ前の状態に復元）。"
             run_cmd command rm -f "$dst" || {
                 print -P "%F{160}エラー: ${label} の削除に失敗しました。%f" >&2
-                exit 1
+                return 1
             }
             restored=1
         else
@@ -183,24 +470,225 @@ if (( UNINSTALL )); then
         fi
     done
 
-    print -P "---------------------------------------------"
     if (( restored )); then
-        print -P "%F{34}アンインストールが完了しました。%f"
+        print -P "%F{34}Zsh 設定のアンインストールが完了しました。%f"
     else
-        print -P "情報: 復元・削除対象のファイルはありませんでした。"
+        print -P "情報: Zsh 設定の復元・削除対象はありませんでした。"
     fi
     print -P "NOTE: Zinit 本体は削除されていません。不要な場合は以下を手動で削除してください:"
     print -P "  rm -rf ${ZINIT_HOME:h}"
+}
+
+# --- Claude Code ---
+setup_claude_code() {
+    print -P ""
+    print -P "%F{36}%B[Claude Code]%b%f"
     print -P "---------------------------------------------"
-    exit 0
+
+    # べき等性チェック
+    if command -v claude >/dev/null 2>&1; then
+        local current_ver
+        current_ver=$(claude --version 2>/dev/null || print "unknown")
+        print -P "情報: Claude Code は既にインストールされています (${current_ver})。スキップします。"
+        return 0
+    fi
+
+    # Node.js / npm の確認
+    if ! ensure_node; then
+        print -P "%F{220}スキップ: Claude Code のインストールには Node.js v18+ が必要です。%f"
+        return 1
+    fi
+
+    print -P "Claude Code をインストールします..."
+    run_cmd npm install -g @anthropic-ai/claude-code || {
+        print -P "%F{160}エラー: Claude Code のインストールに失敗しました。%f" >&2
+        print -P "  npm install -g の権限エラーの場合:" >&2
+        print -P "    npm config set prefix ~/.local" >&2
+        print -P "  または nvm/fnm をお使いの場合は sudo 不要です。" >&2
+        return 1
+    }
+
+    if (( DRY_RUN )); then
+        print -P "情報: Claude Code をインストール予定です（dry-run）。"
+    else
+        print -P "%F{34}Claude Code のインストールが完了しました。%f"
+        print -P ""
+        print -P "初回セットアップ:"
+        print -P "  claude  # 対話的に API キーを設定"
+        print -P "  詳細: https://docs.anthropic.com/en/docs/claude-code"
+    fi
+}
+
+# Claude Code のアンインストール
+uninstall_claude_code() {
+    if command -v claude >/dev/null 2>&1; then
+        if ! command -v npm >/dev/null 2>&1; then
+            print -P "%F{220}スキップ: npm が見つからないため Claude Code をアンインストールできません。%f"
+            return 1
+        fi
+        print -P "Claude Code をアンインストールします..."
+        run_cmd npm uninstall -g @anthropic-ai/claude-code || {
+            print -P "%F{160}エラー: Claude Code のアンインストールに失敗しました。%f" >&2
+            return 1
+        }
+        print -P "%F{34}Claude Code をアンインストールしました。%f"
+    elif command -v npm >/dev/null 2>&1 && npm ls -g @anthropic-ai/claude-code >/dev/null 2>&1; then
+        print -P "Claude Code をアンインストールします..."
+        run_cmd npm uninstall -g @anthropic-ai/claude-code || {
+            print -P "%F{160}エラー: Claude Code のアンインストールに失敗しました。%f" >&2
+            return 1
+        }
+        print -P "%F{34}Claude Code をアンインストールしました。%f"
+    else
+        print -P "情報: Claude Code はインストールされていません。スキップします。"
+    fi
+}
+
+# --- Gemini CLI ---
+setup_gemini_cli() {
+    print -P ""
+    print -P "%F{36}%B[Gemini CLI]%b%f"
+    print -P "---------------------------------------------"
+
+    # べき等性チェック
+    if command -v gemini >/dev/null 2>&1; then
+        local current_ver
+        current_ver=$(gemini --version 2>/dev/null || print "unknown")
+        print -P "情報: Gemini CLI は既にインストールされています (${current_ver})。スキップします。"
+        return 0
+    fi
+
+    # Node.js / npm の確認
+    if ! ensure_node; then
+        print -P "%F{220}スキップ: Gemini CLI のインストールには Node.js v18+ が必要です。%f"
+        return 1
+    fi
+
+    print -P "Gemini CLI をインストールします..."
+    run_cmd npm install -g @google/gemini-cli || {
+        print -P "%F{160}エラー: Gemini CLI のインストールに失敗しました。%f" >&2
+        print -P "  npm install -g の権限エラーの場合:" >&2
+        print -P "    npm config set prefix ~/.local" >&2
+        print -P "  または nvm/fnm をお使いの場合は sudo 不要です。" >&2
+        return 1
+    }
+
+    if (( DRY_RUN )); then
+        print -P "情報: Gemini CLI をインストール予定です（dry-run）。"
+    else
+        print -P "%F{34}Gemini CLI のインストールが完了しました。%f"
+        print -P ""
+        print -P "初回セットアップ:"
+        print -P "  gemini  # Google アカウントで認証"
+        print -P "  詳細: https://github.com/google-gemini/gemini-cli"
+    fi
+}
+
+# Gemini CLI のアンインストール
+uninstall_gemini_cli() {
+    if command -v gemini >/dev/null 2>&1; then
+        if ! command -v npm >/dev/null 2>&1; then
+            print -P "%F{220}スキップ: npm が見つからないため Gemini CLI をアンインストールできません。%f"
+            return 1
+        fi
+        print -P "Gemini CLI をアンインストールします..."
+        run_cmd npm uninstall -g @google/gemini-cli || {
+            print -P "%F{160}エラー: Gemini CLI のアンインストールに失敗しました。%f" >&2
+            return 1
+        }
+        print -P "%F{34}Gemini CLI をアンインストールしました。%f"
+    elif command -v npm >/dev/null 2>&1 && npm ls -g @google/gemini-cli >/dev/null 2>&1; then
+        print -P "Gemini CLI をアンインストールします..."
+        run_cmd npm uninstall -g @google/gemini-cli || {
+            print -P "%F{160}エラー: Gemini CLI のアンインストールに失敗しました。%f" >&2
+            return 1
+        }
+        print -P "%F{34}Gemini CLI をアンインストールしました。%f"
+    else
+        print -P "情報: Gemini CLI はインストールされていません。スキップします。"
+    fi
+}
+
+
+# ==============================================
+# モジュール実行ディスパッチ
+# ==============================================
+
+# モジュール ID からセットアップ関数を実行
+run_module_setup() {
+    local module_id="$1"
+    case "$module_id" in
+        zsh)         setup_zsh ;;
+        claude-code) setup_claude_code ;;
+        gemini-cli)  setup_gemini_cli ;;
+        *)
+            print -P "%F{160}エラー: 不明なモジュール: ${module_id}%f" >&2
+            return 1
+            ;;
+    esac
+}
+
+# モジュール ID からアンインストール関数を実行
+run_module_uninstall() {
+    local module_id="$1"
+    case "$module_id" in
+        zsh)         uninstall_zsh ;;
+        claude-code) uninstall_claude_code ;;
+        gemini-cli)  uninstall_gemini_cli ;;
+        *)
+            print -P "%F{160}エラー: 不明なモジュール: ${module_id}%f" >&2
+            return 1
+            ;;
+    esac
+}
+
+
+# ==============================================
+# アンインストールモード
+# NOTE: --uninstall は常に全モジュールを対象にする
+# ==============================================
+if (( UNINSTALL )); then
+    print -P "全モジュールのアンインストール（復元）を開始します..."
+    print -P "============================================="
+
+    if (( DRY_RUN )); then
+        print -P "%F{33}[DRY-RUN モード] 実際には変更を行いません。%f"
+        print -P "---------------------------------------------"
+    fi
+
+    typeset -i uninstall_errors=0
+
+    for entry in "${MODULES[@]}"; do
+        typeset mod_id="${entry[(ws:|:)1]}"
+        typeset mod_name="${entry[(ws:|:)2]}"
+        print -P ""
+        print -P "%F{36}%B[${mod_name}]%b%f"
+        print -P "---------------------------------------------"
+        if ! run_module_uninstall "$mod_id"; then
+            (( uninstall_errors++ ))
+        fi
+    done
+
+    print -P ""
+    print -P "============================================="
+    if (( uninstall_errors > 0 )); then
+        print -P "%F{220}アンインストールが完了しましたが、${uninstall_errors} 件のモジュールでエラーが発生しました。%f"
+        print -P "============================================="
+        exit 1
+    else
+        print -P "%F{34}アンインストールが完了しました。%f"
+        print -P "============================================="
+        exit 0
+    fi
 fi
 
 
 # ==============================================
 # 通常セットアップモード
 # ==============================================
-print -P "Zsh環境のセットアップを開始します..."
-print -P "---------------------------------------------"
+print -P ""
+print -P "%F{36}%B 開発環境セットアップ%b%f"
+print -P "============================================="
 
 if (( DRY_RUN )); then
     print -P "%F{33}[DRY-RUN モード] 実際には変更を行いません。%f"
@@ -210,81 +698,116 @@ fi
 print -P "情報: Zsh で実行されています (バージョン: $ZSH_VERSION)"
 print -P "---------------------------------------------"
 
+# --- モジュール選択 ---
+typeset -a selected_module_ids
 
-# --- 依存コマンドの確認 ---
-if ! command -v git >/dev/null 2>&1; then
-    print -P "%F{160}エラー: git コマンドが見つかりません。インストールしてください。%f" >&2
-    exit 1
-fi
-print -P "情報: git が利用可能です ($(command git --version))"
-print -P "---------------------------------------------"
+if (( ${#SELECT_MODULES[@]} > 0 )); then
+    # --select で明示指定された場合
+    selected_module_ids=("${SELECT_MODULES[@]}")
 
+elif (( ALL_FLAG )); then
+    # --all の場合: 全モジュールを選択
+    for entry in "${MODULES[@]}"; do
+        selected_module_ids+=("${entry[(ws:|:)1]}")
+    done
 
-# --- Zinit (プラグインマネージャー) のインストール ---
-print -P "Zinit の状態を確認・インストールします..."
-if [[ ! -f "$ZINIT_HOME/zinit.zsh" ]]; then
-    print -P "%F{33} %F{220}Zinit (%F{33}zdharma-continuum/zinit%F{220}) をインストール中...%f"
-    # ディレクトリ作成（パーミッションは 700 に固定）
-    run_cmd command mkdir -p -m 700 "$(dirname "$ZINIT_HOME")" || {
-        print -P "%F{160}エラー: Zinit 用ディレクトリの作成に失敗しました。%f" >&2
-        exit 1
-    }
-    # git clone を実行（サプライチェーンリスク軽減のためタグをピン留め）
-    run_cmd command git clone --branch "$ZINIT_VERSION" --depth 1 https://github.com/zdharma-continuum/zinit "$ZINIT_HOME" || {
-        print -P "%F{160}エラー: Zinit の git clone に失敗しました。%f" >&2
-        exit 1
-    }
-    if (( DRY_RUN )); then
-        print -P "情報: Zinit ${ZINIT_VERSION} をインストール予定です（dry-run）。"
+elif [[ -t 0 ]]; then
+    # TTY 環境: インタラクティブ選択（チェックボックスUI）
+    print -P ""
+
+    if ! command -v tput >/dev/null 2>&1; then
+        # tput が利用できない場合はデフォルト選択のモジュールのみインストール
+        print -P "%F{220}情報: tput が利用できないため、デフォルトのモジュールをインストールします。%f"
+        for entry in "${MODULES[@]}"; do
+            if (( ${entry[(ws:|:)4]} == 1 )); then
+                selected_module_ids+=("${entry[(ws:|:)1]}")
+            fi
+        done
     else
-        print -P "%F{33} %F{34}Zinit ${ZINIT_VERSION} のインストールに成功しました。%f"
+        # チェックボックスメニュー用の項目を構築
+        typeset -a menu_items
+        for entry in "${MODULES[@]}"; do
+            typeset mod_name="${entry[(ws:|:)2]}"
+            typeset mod_desc="${entry[(ws:|:)3]}"
+            typeset mod_default="${entry[(ws:|:)4]}"
+            menu_items+=("${mod_name}|${mod_desc}|${mod_default}")
+        done
+
+        # チェックボックスメニュー表示
+        checkbox_menu "${menu_items[@]}"
+        typeset menu_status=$?
+        typeset selection="$REPLY"
+
+        if (( menu_status != 0 )); then
+            print -P ""
+            print -P "%F{220}キャンセルされました。%f"
+            exit 0
+        fi
+
+        if [[ -z "$selection" ]]; then
+            print -P ""
+            print -P "%F{220}モジュールが選択されませんでした。終了します。%f"
+            exit 0
+        fi
+
+        # 選択されたインデックスからモジュール ID を取得
+        for idx in ${(s: :)selection}; do
+            selected_module_ids+=("${MODULES[$idx][(ws:|:)1]}")
+        done
     fi
+
+    print -P ""
 else
-    print -P "情報: Zinit は既にインストールされています。"
+    # 非 TTY 環境（CI / パイプ）: --all と同等
+    print -P "情報: 非インタラクティブ環境を検出。全モジュールをインストールします。"
+    for entry in "${MODULES[@]}"; do
+        selected_module_ids+=("${entry[(ws:|:)1]}")
+    done
 fi
+
+# 選択されたモジュールを表示
+print -P ""
+print -P "%F{36}選択されたモジュール:%f"
+for mod_id in "${selected_module_ids[@]}"; do
+    for entry in "${MODULES[@]}"; do
+        if [[ "${entry[(ws:|:)1]}" == "$mod_id" ]]; then
+            print -P "  - ${entry[(ws:|:)2]} (${entry[(ws:|:)3]})"
+            break
+        fi
+    done
+done
 print -P "---------------------------------------------"
 
-
-# --- Zsh 設定ディレクトリの作成 ---
-if [[ ! -d "$ZSH_CONFIG_DIR" ]]; then
-    run_cmd command mkdir -p -m 700 "$ZSH_CONFIG_DIR" || {
-        print -P "%F{160}エラー: $ZSH_CONFIG_DIR の作成に失敗しました。%f" >&2
-        exit 1
-    }
-    if (( DRY_RUN )); then
-        print -P "情報: $ZSH_CONFIG_DIR を作成予定です（dry-run）。"
-    else
-        print -P "情報: $ZSH_CONFIG_DIR を作成しました。"
+# --- 選択されたモジュールを順次セットアップ ---
+typeset setup_errors=0
+for mod_id in "${selected_module_ids[@]}"; do
+    if ! run_module_setup "$mod_id"; then
+        (( setup_errors++ ))
     fi
-else
-    print -P "情報: $ZSH_CONFIG_DIR は既に存在します。"
-fi
-print -P "---------------------------------------------"
-
-
-# --- 設定ファイルの配置 ---
-print -P "設定ファイルを配置します..."
-
-for entry in "${MANAGED_FILES[@]}"; do
-    # パイプ区切りでパース
-    src="${entry[(ws:|:)1]}"
-    dst="${entry[(ws:|:)2]}"
-    label="${entry[(ws:|:)3]}"
-    hint="${entry[(ws:|:)4]}"
-    install_config "$src" "$dst" "$label" "$hint"
 done
 
-print -P "---------------------------------------------"
-
-
 # --- 完了 ---
+print -P ""
+print -P "============================================="
 if (( DRY_RUN )); then
     print -P "%F{33}[DRY-RUN] 上記が実行される変更内容です。実際に適用するには --dry-run を外して再実行してください。%f"
+elif (( setup_errors > 0 )); then
+    print -P "%F{220}セットアップが完了しましたが、${setup_errors} 件のモジュールでエラーが発生しました。%f"
 else
-    print -P "%F{34}セットアップスクリプトが正常に完了しました。%f"
-    print -P "全ての変更を有効にするために、Zsh シェルを%B再起動%bするか '%Bexec zsh%b' を実行してください。"
-    print -P "(source ~/.zshrc は環境が汚れる場合があるため、exec zsh を推奨します)"
-fi
-print -P "---------------------------------------------"
+    print -P "%F{34}セットアップが正常に完了しました。%f"
 
+    # Zsh が選択されていた場合のみシェル再起動を案内
+    for mod_id in "${selected_module_ids[@]}"; do
+        if [[ "$mod_id" == "zsh" ]]; then
+            print -P "全ての変更を有効にするために、Zsh シェルを%B再起動%bするか '%Bexec zsh%b' を実行してください。"
+            print -P "(source ~/.zshrc は環境が汚れる場合があるため、exec zsh を推奨します)"
+            break
+        fi
+    done
+fi
+print -P "============================================="
+
+if (( setup_errors > 0 )); then
+    exit 1
+fi
 exit 0
