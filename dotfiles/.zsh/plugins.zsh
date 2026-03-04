@@ -8,7 +8,7 @@ fi
 
 # zinit 関数が正常に定義されている場合のみプラグインを読み込む
 # NOTE: shfmt 互換のため $+functions[] ではなく ${functions[]} で存在チェック
-if [[ -n ${functions[zinit]} ]]; then
+if [[ -n "${functions[zinit]}" ]]; then
 
     # Powerlevel10k テーマ (v1.9.1)
     zinit ice depth=1 ver"v1.9.1"
