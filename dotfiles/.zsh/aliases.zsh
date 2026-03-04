@@ -30,8 +30,14 @@ alias dps='docker ps'
 
 # git ブランチを fzf で検索してチェックアウト
 gco_fzf() {
-    command -v fzf >/dev/null 2>&1 || { echo "fzf が必要です" >&2; return 1; }
-    git rev-parse --is-inside-work-tree >/dev/null 2>&1 || { echo "Git リポジトリ内で実行してください" >&2; return 1; }
+    command -v fzf >/dev/null 2>&1 || {
+        echo "fzf が必要です" >&2
+        return 1
+    }
+    git rev-parse --is-inside-work-tree >/dev/null 2>&1 || {
+        echo "Git リポジトリ内で実行してください" >&2
+        return 1
+    }
     local branch
     branch=$(git branch --all --format='%(refname:short)' |
         grep -v '^origin/HEAD$' |
