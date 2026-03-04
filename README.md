@@ -11,6 +11,7 @@
 | `dotfiles/.zsh/aliases.zsh` | エイリアス定義 |
 | `dotfiles/.zsh/.p10k.zsh` | Powerlevel10k テーマ設定 |
 | `dotfiles/setup.sh` | セットアップスクリプト（インタラクティブ選択・自動インストール） |
+| `dotfiles/modules/*.sh` | モジュール定義ファイル（各モジュールのセットアップ・アンインストール処理） |
 
 ## 動作要件
 
@@ -128,8 +129,12 @@ dev-templates/
 │   │   ├── plugins.zsh    # Zinit プラグイン設定
 │   │   ├── aliases.zsh    # エイリアス定義
 │   │   └── .p10k.zsh      # Powerlevel10k 設定
+│   ├── modules/
+│   │   ├── zsh.sh          # モジュール: Zsh 設定一式
+│   │   ├── claude-code.sh  # モジュール: Claude Code
+│   │   └── gemini-cli.sh   # モジュール: Gemini CLI
 │   ├── .zshrc              # エントリーポイント（履歴設定 + モジュール読み込み）
-│   └── setup.sh            # セットアップスクリプト（インタラクティブ選択対応）
+│   └── setup.sh            # セットアップコア（UI + 共通関数 + モジュール動的読み込み）
 ├── .editorconfig              # エディタ設定（インデント・改行コード統一）
 ├── .gitignore
 └── README.md
