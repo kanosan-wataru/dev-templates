@@ -126,6 +126,7 @@ dev-templates/
 │   │   └── .p10k.zsh      # Powerlevel10k 設定
 │   ├── .zshrc              # エントリーポイント（履歴設定 + モジュール読み込み）
 │   └── setup.sh            # セットアップスクリプト（インタラクティブ選択対応）
+├── .editorconfig              # エディタ設定（インデント・改行コード統一）
 ├── .gitignore
 └── README.md
 ```
