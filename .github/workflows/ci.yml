@@ -14,6 +14,7 @@ jobs:
   zsh-syntax:
     name: Zsh Syntax Check (${{ matrix.os }})
     strategy:
+      fail-fast: false
       matrix:
         os: [ubuntu-latest, macos-latest]
     runs-on: ${{ matrix.os }}
@@ -42,6 +43,7 @@ jobs:
   dry-run:
     name: Setup Dry Run (${{ matrix.os }})
     strategy:
+      fail-fast: false
       matrix:
         os: [ubuntu-latest, macos-latest]
     runs-on: ${{ matrix.os }}
@@ -54,3 +56,29 @@ jobs:
         run: zsh --version
       - name: Run setup.sh --all --dry-run
         run: zsh dotfiles/setup.sh --all --dry-run
+
+  shell-format:
+    name: Shell Format Check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install shfmt
+        run: |
+          curl -fL https://github.com/mvdan/sh/releases/download/v3.8.0/shfmt_v3.8.0_linux_amd64 -o shfmt
+          chmod +x shfmt
+          sudo mv shfmt /usr/local/bin/
+      - name: Check shell format
+        run: |
+          status=0
+          # .zsh/*.zsh ファイルのみチェック（Zsh特有構文を含む .zshrc と setup.sh は除外）
+          while IFS= read -r -d '' f; do
+            echo "::group::$f"
+            if shfmt -d "$f"; then
+              echo "OK: $f"
+            else
+              echo "::error file=$f::Format check failed for $f"
+              status=1
+            fi
+            echo "::endgroup::"
+          done < <(find dotfiles/.zsh -type f -name '*.zsh' ! -name '.p10k.zsh' -print0 | sort -z)
+          exit $status

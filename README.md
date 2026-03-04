@@ -113,8 +113,9 @@ zsh dotfiles/setup.sh --uninstall
 
 - **Zsh 構文チェック** (`zsh -n`): `dotfiles/` 配下の `.zsh`, `.sh`, `.zshrc` ファイル（`.p10k.zsh` を除く）の構文エラーを検出
 - **Setup Dry Run**: `setup.sh --all --dry-run` を実行し、セットアップスクリプトの動作を検証
+- **Shell Format Check**: `shfmt` による `.zsh/*.zsh` ファイルのフォーマットチェック
 
-各チェックは **Ubuntu** と **macOS** の両環境で実行されます。
+構文チェックと dry-run は **Ubuntu** と **macOS** の両環境で実行されます。
 
 ## ディレクトリ構成
 
