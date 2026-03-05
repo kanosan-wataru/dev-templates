@@ -1,0 +1,20 @@
+# グローバル gitignore（全リポジトリ共通の除外パターン）
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# エディタ
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# 環境変数
+.env
+.env.local
+
+# ログ
+*.log
