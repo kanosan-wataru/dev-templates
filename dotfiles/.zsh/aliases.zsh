@@ -5,6 +5,33 @@ alias ls='ls --color=auto'
 alias la='ls -a'
 
 # ----------------------------
+# モダン CLI エイリアス（条件付き）
+# NOTE: ツール未インストール時は自動スキップ
+# ----------------------------
+
+# eza → ls 系の上書き
+if command -v eza >/dev/null 2>&1; then
+    alias ls='eza --icons'
+    alias ll='eza -l --icons --git'
+    alias la='eza -la --icons --git'
+    alias tree='eza --tree --icons'
+fi
+
+# bat → cat の上書き
+# NOTE: Ubuntu では bat が batcat として提供される
+if command -v batcat >/dev/null 2>&1 && ! command -v bat >/dev/null 2>&1; then
+    alias bat='batcat'
+fi
+if command -v bat >/dev/null 2>&1 || command -v batcat >/dev/null 2>&1; then
+    alias cat='bat --paging=never'
+fi
+
+# fd (Ubuntu では fdfind として提供)
+if command -v fdfind >/dev/null 2>&1 && ! command -v fd >/dev/null 2>&1; then
+    alias fd='fdfind'
+fi
+
+# ----------------------------
 # git エイリアス
 # ----------------------------
 alias gs='git status'
