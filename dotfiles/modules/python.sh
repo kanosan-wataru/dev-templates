@@ -70,10 +70,10 @@ module_setup() {
 
     case "$os" in
         macos)
-            _py_setup_macos
+            _py_setup_macos || return 1
             ;;
         linux)
-            _py_setup_linux
+            _py_setup_linux || return 1
             ;;
         *)
             print -P "%F{160}エラー: 未対応の OS です (OSTYPE=${OSTYPE})。%f" >&2
@@ -131,7 +131,7 @@ _py_setup_linux() {
     # ビルド依存パッケージのインストール
     print -P "Python ビルド依存パッケージをインストールします..."
     run_cmd sudo apt-get update -qq || {
-        print -P "%F{220}警告: apt update に失敗しました。%f"
+        print -P "%F{220}警告: apt update に失敗しました。後続のパッケージインストールに失敗する可能性があります。%f"
     }
     run_cmd sudo apt-get install -y "${PY_MOD_DEPS[@]}" || {
         print -P "%F{160}エラー: ビルド依存パッケージのインストールに失敗しました。%f" >&2
@@ -140,8 +140,19 @@ _py_setup_linux() {
 
     # pyenv のインストール（git clone）
     if [[ -d "$PY_MOD_PYENV_ROOT" ]]; then
-        print -P "情報: $PY_MOD_PYENV_ROOT は既に存在します。スキップします。"
-    else
+        # 不完全なクローンの検出（前回の git clone が途中で失敗した場合）
+        if [[ ! -x "$PY_MOD_PYENV_ROOT/bin/pyenv" && ! -x "$PY_MOD_PYENV_ROOT/libexec/pyenv" ]]; then
+            print -P "%F{220}警告: $PY_MOD_PYENV_ROOT は存在しますが不完全です。再インストールします。%f"
+            run_cmd command rm -rf "$PY_MOD_PYENV_ROOT" || {
+                print -P "%F{160}エラー: 不完全な pyenv ディレクトリの削除に失敗しました。%f" >&2
+                print -P "  手動で削除してください: rm -rf $PY_MOD_PYENV_ROOT" >&2
+                return 1
+            }
+        else
+            print -P "情報: $PY_MOD_PYENV_ROOT は既に存在します。スキップします。"
+        fi
+    fi
+    if [[ ! -d "$PY_MOD_PYENV_ROOT" ]]; then
         print -P "pyenv を git clone でインストールします..."
         run_cmd git clone --depth 1 "$PY_MOD_PYENV_REPO" "$PY_MOD_PYENV_ROOT" || {
             print -P "%F{160}エラー: pyenv の git clone に失敗しました。%f" >&2
