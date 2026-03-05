@@ -45,5 +45,8 @@ fi
 # エイリアス定義
 [[ -f "$ZSH_CONFIG_DIR/aliases.zsh" ]] && source "$ZSH_CONFIG_DIR/aliases.zsh"
 
+# Node.js 環境（fnm）
+[[ -f "$ZSH_CONFIG_DIR/node.zsh" ]] && source "$ZSH_CONFIG_DIR/node.zsh"
+
 # Python 環境（pyenv）
 [[ -f "$ZSH_CONFIG_DIR/python.zsh" ]] && source "$ZSH_CONFIG_DIR/python.zsh"
