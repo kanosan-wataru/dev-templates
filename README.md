@@ -33,9 +33,10 @@ zsh dotfiles/setup.sh
 インストールするモジュールを選択してください:
 （↑↓/jk: 移動, スペース: 選択, a: 全選択, Enter: 確定, q: キャンセル）
 
-> [x] Zsh 設定一式    Zinit + プラグイン + テーマ + エイリアス
-  [ ] Claude Code     Anthropic CLI (Node.js v18+ 必要)
-  [ ] Gemini CLI      Google AI CLI (Node.js v18+ 必要)
+> [x] Zsh 設定一式       Zinit + プラグイン + テーマ + エイリアス
+  [ ] モダン CLI ツール  eza / bat / fd / ripgrep
+  [ ] Claude Code        Anthropic CLI (Node.js v18+ 必要)
+  [ ] Gemini CLI         Google AI CLI (Node.js v18+ 必要)
 ```
 
 ### モジュール
@@ -43,6 +44,7 @@ zsh dotfiles/setup.sh
 | モジュール | 説明 | 依存 |
 |-----------|------|------|
 | **Zsh 設定一式** | Zinit + プラグイン + テーマ + エイリアス | Git |
+| **モダン CLI ツール** | eza / bat / fd / ripgrep | Homebrew (macOS) / apt + wget + gpg (Linux) |
 | **Claude Code** | Anthropic の AI コーディングアシスタント CLI | Node.js v18+ |
 | **Gemini CLI** | Google の AI CLI | Node.js v18+ |
 
@@ -86,6 +88,11 @@ zsh dotfiles/setup.sh --uninstall
 5. 設定ファイルの配置（`.zshrc`, `plugins.zsh`, `aliases.zsh`, `.p10k.zsh`）
    - 既存ファイルと内容が同一の場合はスキップ（べき等）
    - 内容が異なる場合はタイムスタンプ付きでバックアップ後に配置
+
+#### モダン CLI ツール
+1. OS 判定（macOS: Homebrew / Linux: apt）
+2. 各ツール（eza, bat, fd, ripgrep）を順次インストール（既にインストール済みならスキップ）
+3. エイリアス（`ls` → eza, `cat` → bat 等）は `aliases.zsh` で条件付き設定済み
 
 #### Claude Code
 1. Node.js v18+ / npm の存在確認
@@ -131,6 +138,7 @@ dev-templates/
 │   │   └── .p10k.zsh      # Powerlevel10k 設定
 │   ├── modules/
 │   │   ├── zsh.sh          # モジュール: Zsh 設定一式
+│   │   ├── modern-cli.sh   # モジュール: モダン CLI ツール
 │   │   ├── claude-code.sh  # モジュール: Claude Code
 │   │   └── gemini-cli.sh   # モジュール: Gemini CLI
 │   ├── .zshrc              # エントリーポイント（履歴設定 + モジュール読み込み）
