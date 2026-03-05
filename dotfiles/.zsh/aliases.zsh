@@ -19,11 +19,11 @@ fi
 
 # bat → cat の上書き
 # NOTE: Ubuntu では bat が batcat として提供される
-if command -v batcat >/dev/null 2>&1 && ! command -v bat >/dev/null 2>&1; then
-    alias bat='batcat'
-fi
-if command -v bat >/dev/null 2>&1 || command -v batcat >/dev/null 2>&1; then
+if command -v bat >/dev/null 2>&1; then
     alias cat='bat --paging=never'
+elif command -v batcat >/dev/null 2>&1; then
+    alias bat='batcat'
+    alias cat='batcat --paging=never'
 fi
 
 # fd (Ubuntu では fdfind として提供)

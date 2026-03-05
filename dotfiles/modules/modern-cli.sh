@@ -32,9 +32,22 @@ _mcli_detect_os() {
 }
 
 # --- ヘルパー: eza の Linux (Debian/Ubuntu) インストール ---
+# NOTE: DRY_RUN 時はパイプライン処理をスキップし、プレビュー表示のみ行う
 _mcli_install_eza_apt() {
     # 公式手順: https://github.com/eza-community/eza/blob/main/INSTALL.md
     print -P "  eza の apt リポジトリを設定します..."
+
+    # 前提コマンドの確認
+    if ! command -v wget >/dev/null 2>&1; then
+        print -P "%F{160}エラー: wget がインストールされていません。%f" >&2
+        print -P "  sudo apt install wget で先にインストールしてください。" >&2
+        return 1
+    fi
+    if ! command -v gpg >/dev/null 2>&1; then
+        print -P "%F{160}エラー: gpg がインストールされていません。%f" >&2
+        print -P "  sudo apt install gnupg で先にインストールしてください。" >&2
+        return 1
+    fi
 
     run_cmd sudo mkdir -p /etc/apt/keyrings || {
         print -P "%F{160}エラー: /etc/apt/keyrings の作成に失敗しました。%f" >&2
@@ -42,26 +55,58 @@ _mcli_install_eza_apt() {
     }
 
     if (( ! DRY_RUN )); then
-        wget -qO- https://raw.githubusercontent.com/eza-community/eza/main/deb.asc \
-            | sudo gpg --dearmor -o /etc/apt/keyrings/gierens.gpg 2>/dev/null || {
-            print -P "%F{160}エラー: eza の GPG キー取得に失敗しました。%f" >&2
+        # GPG キーのダウンロードと変換を分離して個別にエラーチェック
+        local tmp_key
+        tmp_key=$(mktemp) || {
+            print -P "%F{160}エラー: 一時ファイルの作成に失敗しました。%f" >&2
             return 1
         }
-        sudo chmod 644 /etc/apt/keyrings/gierens.gpg
 
-        echo "deb [signed-by=/etc/apt/keyrings/gierens.gpg] http://deb.gierens.de stable main" \
+        if ! wget -qO "$tmp_key" https://raw.githubusercontent.com/eza-community/eza/main/deb.asc; then
+            print -P "%F{160}エラー: eza の GPG キーのダウンロードに失敗しました。%f" >&2
+            print -P "  ネットワーク接続と URL の有効性を確認してください。" >&2
+            rm -f "$tmp_key"
+            return 1
+        fi
+
+        # 既存キーファイルがあれば事前に削除（再実行時のべき等性）
+        [[ -f /etc/apt/keyrings/gierens.gpg ]] && sudo rm -f /etc/apt/keyrings/gierens.gpg
+
+        local gpg_err
+        gpg_err=$(sudo gpg --dearmor -o /etc/apt/keyrings/gierens.gpg "$tmp_key" 2>&1) || {
+            print -P "%F{160}エラー: eza の GPG キー変換に失敗しました。%f" >&2
+            [[ -n "$gpg_err" ]] && print -P "  詳細: ${gpg_err}" >&2
+            rm -f "$tmp_key"
+            return 1
+        }
+        rm -f "$tmp_key"
+
+        run_cmd sudo chmod 644 /etc/apt/keyrings/gierens.gpg || {
+            print -P "%F{160}エラー: GPG キーファイルの権限設定に失敗しました。%f" >&2
+            return 1
+        }
+
+        # apt ソースの追加
+        print "deb [signed-by=/etc/apt/keyrings/gierens.gpg] http://deb.gierens.de stable main" \
             | sudo tee /etc/apt/sources.list.d/gierens.list >/dev/null || {
             print -P "%F{160}エラー: eza の apt ソース追加に失敗しました。%f" >&2
             return 1
         }
-        sudo chmod 644 /etc/apt/sources.list.d/gierens.list
+        run_cmd sudo chmod 644 /etc/apt/sources.list.d/gierens.list || {
+            print -P "%F{160}エラー: apt ソースファイルの権限設定に失敗しました。%f" >&2
+            return 1
+        }
     else
-        print -P "%F{242}  [DRY-RUN] wget ... | sudo gpg --dearmor -o /etc/apt/keyrings/gierens.gpg%f"
+        print -P "%F{242}  [DRY-RUN] wget -qO /tmp/... https://...eza.../deb.asc%f"
+        print -P "%F{242}  [DRY-RUN] sudo gpg --dearmor -o /etc/apt/keyrings/gierens.gpg /tmp/...%f"
+        print -P "%F{242}  [DRY-RUN] sudo chmod 644 /etc/apt/keyrings/gierens.gpg%f"
         print -P "%F{242}  [DRY-RUN] echo 'deb ...' | sudo tee /etc/apt/sources.list.d/gierens.list%f"
+        print -P "%F{242}  [DRY-RUN] sudo chmod 644 /etc/apt/sources.list.d/gierens.list%f"
     fi
 
     run_cmd sudo apt update -qq || {
-        print -P "%F{220}警告: apt update に失敗しました。eza のインストールを続行します。%f"
+        print -P "%F{220}警告: apt update に失敗しました。%f"
+        print -P "  新しい apt リポジトリの情報を取得できなかったため、eza のインストールに失敗する可能性があります。" >&2
     }
     run_cmd sudo apt install -y eza || {
         print -P "%F{160}エラー: eza のインストールに失敗しました。%f" >&2
@@ -173,6 +218,7 @@ module_setup() {
 }
 
 # --- アンインストール ---
+# NOTE: システムパッケージの自動削除は意図しない依存破壊のリスクがあるため、手順の表示のみとする
 module_uninstall() {
     print -P "モダン CLI ツールのアンインストール手順:"
     print -P ""
