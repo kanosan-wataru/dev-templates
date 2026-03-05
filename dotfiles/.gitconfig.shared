@@ -1,0 +1,32 @@
+# Git 共有設定（include.path 経由で読み込まれる）
+# NOTE: user.name / user.email はここに含めない（ユーザー固有のため）
+
+[init]
+    defaultBranch = main
+
+[pull]
+    rebase = true
+
+[push]
+    autoSetupRemote = true
+
+[rebase]
+    autoStash = true
+
+[fetch]
+    prune = true
+
+[core]
+    quotepath = false
+
+[diff]
+    colorMoved = default
+
+[merge]
+    conflictStyle = diff3
+
+[alias]
+    st = status
+    co = checkout
+    br = branch
+    lg = log --graph --pretty=format:'%Cred%h%Creset -%C(yellow)%d%Creset %s %Cgreen(%cr) %C(bold blue)<%an>%Creset' --abbrev-commit
