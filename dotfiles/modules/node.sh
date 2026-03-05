@@ -13,7 +13,9 @@ MODULE_ORDER=18
 # NOTE: モジュール固有の変数には衝突回避のため NODE_MOD_ プレフィックスを使用
 
 NODE_MOD_FNM_BIN_DIR="$HOME/.local/bin"
-NODE_MOD_FNM_REPO="https://github.com/Schniz/fnm/releases/latest/download"
+# NOTE: バージョンを固定して予期せぬ変更を防止。更新時はこの値を変更する
+NODE_MOD_FNM_VERSION="v1.38.1"
+NODE_MOD_FNM_REPO="https://github.com/Schniz/fnm/releases/download/${NODE_MOD_FNM_VERSION}"
 
 # 管理対象ファイル（配布元パス, 配置先パス, 表示名, 未検出時メッセージ）
 NODE_MOD_MANAGED_FILES=(
@@ -125,24 +127,29 @@ _node_setup_macos() {
 
 # --- Linux セットアップ ---
 _node_setup_linux() {
-    # 依存コマンドの確認
+    # 依存コマンドの確認（未導入コマンドをまとめて1回でインストール）
+    local -a missing_cmds=()
     for cmd in curl unzip; do
         if ! command -v "$cmd" >/dev/null 2>&1; then
-            print -P "${cmd} をインストールします..."
-            if command -v apt-get >/dev/null 2>&1; then
-                run_cmd sudo apt-get update -qq || {
-                    print -P "%F{220}警告: apt update に失敗しました。後続のインストールに失敗する可能性があります。%f"
-                }
-                run_cmd sudo apt-get install -y "$cmd" || {
-                    print -P "%F{160}エラー: ${cmd} のインストールに失敗しました。%f" >&2
-                    return 1
-                }
-            else
-                print -P "%F{160}エラー: ${cmd} がインストールされていません。手動でインストールしてください。%f" >&2
-                return 1
-            fi
+            missing_cmds+=("$cmd")
         fi
     done
+
+    if (( ${#missing_cmds[@]} > 0 )); then
+        print -P "${missing_cmds[*]} をインストールします..."
+        if command -v apt-get >/dev/null 2>&1; then
+            run_cmd sudo apt-get update -qq || {
+                print -P "%F{220}警告: apt update に失敗しました。後続のインストールに失敗する可能性があります。%f"
+            }
+            run_cmd sudo apt-get install -y "${missing_cmds[@]}" || {
+                print -P "%F{160}エラー: ${missing_cmds[*]} のインストールに失敗しました。%f" >&2
+                return 1
+            }
+        else
+            print -P "%F{160}エラー: ${missing_cmds[*]} がインストールされていません。手動でインストールしてください。%f" >&2
+            return 1
+        fi
+    fi
 
     # アーキテクチャ判定
     local arch
@@ -224,10 +231,24 @@ _node_install_lts() {
         return 0
     fi
 
-    # 既に Node.js がインストール済みか確認
+    # 既に Node.js がインストール済みか確認（バージョンも検証）
     if command -v node >/dev/null 2>&1; then
-        print -P "情報: Node.js は既にインストールされています ($(node -v 2>/dev/null || print 'unknown'))。スキップします。"
-        return 0
+        local node_ver node_major
+        node_ver="$(node -v 2>/dev/null || true)"
+
+        if [[ -n "$node_ver" ]]; then
+            node_major="${node_ver#v}"
+            node_major="${node_major%%.*}"
+        fi
+
+        if [[ "$node_major" == <-> ]] && (( node_major >= 18 )); then
+            print -P "情報: Node.js は既にインストールされています (${node_ver})。スキップします。"
+            return 0
+        elif [[ "$node_major" == <-> ]] && (( node_major < 18 )); then
+            print -P "%F{220}警告: 既存の Node.js (${node_ver}) は推奨バージョン (v18 以上) 未満です。fnm で LTS をインストールします。%f"
+        else
+            print -P "%F{220}警告: Node.js のバージョンを特定できません (${node_ver:-unknown})。fnm で LTS をインストールします。%f"
+        fi
     fi
 
     print -P "Node.js LTS をインストールします..."
@@ -296,11 +317,15 @@ module_uninstall() {
 
     print -P ""
     print -P "NOTE: fnm 本体と Node.js バージョンは削除されていません。不要な場合は以下を手動で削除してください:"
-    if command -v brew >/dev/null 2>&1; then
-        print -P "  # macOS の場合:"
-        print -P "  brew uninstall fnm"
-    else
-        print -P "  rm -f ${NODE_MOD_FNM_BIN_DIR}/fnm"
-    fi
+    local os
+    os=$(_node_detect_os)
+    case "$os" in
+        macos)
+            print -P "  brew uninstall fnm"
+            ;;
+        *)
+            print -P "  rm -f ${NODE_MOD_FNM_BIN_DIR}/fnm"
+            ;;
+    esac
     print -P "  rm -rf ${XDG_DATA_HOME:-$HOME/.local/share}/fnm"
 }
