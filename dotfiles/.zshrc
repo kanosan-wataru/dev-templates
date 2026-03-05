@@ -42,11 +42,12 @@ else
     autoload -Uz compinit && compinit
 fi
 
-# エイリアス定義
-[[ -f "$ZSH_CONFIG_DIR/aliases.zsh" ]] && source "$ZSH_CONFIG_DIR/aliases.zsh"
-
-# Node.js 環境（fnm）
-[[ -f "$ZSH_CONFIG_DIR/node.zsh" ]] && source "$ZSH_CONFIG_DIR/node.zsh"
-
-# Python 環境（pyenv）
-[[ -f "$ZSH_CONFIG_DIR/python.zsh" ]] && source "$ZSH_CONFIG_DIR/python.zsh"
+# モジュール設定の自動読み込み
+# plugins.zsh は上で読み込み済み、.p10k.zsh は Zinit 経由で読み込み
+for _zsh_config_file in "$ZSH_CONFIG_DIR"/*.zsh(N); do
+    case "${_zsh_config_file:t}" in
+        plugins.zsh|.p10k.zsh) continue ;;
+        *) source "$_zsh_config_file" ;;
+    esac
+done
+unset _zsh_config_file
