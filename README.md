@@ -1,6 +1,7 @@
 # dev-templates
 
-開発環境の設定ファイル（dotfiles）と AI ツールを管理するリポジトリです。
+開発環境の設定ファイル（dotfiles）と開発ツールを管理するリポジトリです。
+Zsh ベースのモジュラー構成で、macOS / Linux に対応しています。
 
 ## 含まれる設定
 
@@ -8,8 +9,11 @@
 |---------|------|
 | `dotfiles/.zshrc` | Zsh エントリーポイント（履歴設定、モジュール読み込み） |
 | `dotfiles/.zsh/plugins.zsh` | Zinit プラグイン設定 |
-| `dotfiles/.zsh/aliases.zsh` | エイリアス定義 |
-| `dotfiles/.zsh/.p10k.zsh` | Powerlevel10k テーマ設定 |
+| `dotfiles/.zsh/aliases.zsh` | エイリアス定義（git/docker エイリアス、fzf 連携関数） |
+| `dotfiles/.zsh/node.zsh` | fnm (Fast Node Manager) 初期化 |
+| `dotfiles/.zsh/python.zsh` | pyenv / pyenv-virtualenv 初期化 |
+| `dotfiles/.gitconfig.shared` | Git 共有設定（include.path 経由で読み込み） |
+| `dotfiles/.gitignore_global` | グローバル gitignore |
 | `dotfiles/setup.sh` | セットアップスクリプト（インタラクティブ選択・自動インストール） |
 | `dotfiles/modules/*.sh` | モジュール定義ファイル（各モジュールのセットアップ・アンインストール処理） |
 
@@ -17,7 +21,6 @@
 
 - **Zsh** (v5.0 以上)
 - **Git**
-- **Node.js** v18+ / **npm**（Claude Code / Gemini CLI を利用する場合）
 
 ## セットアップ
 
@@ -27,16 +30,19 @@ cd dev-templates
 zsh dotfiles/setup.sh
 ```
 
-実行すると、チェックボックスUIでインストールするモジュールを選択できます:
+実行すると、チェックボックス UI でインストールするモジュールを選択できます:
 
 ```
 インストールするモジュールを選択してください:
 （↑↓/jk: 移動, スペース: 選択, a: 全選択, Enter: 確定, q: キャンセル）
 
-> [x] Zsh 設定一式       Zinit + プラグイン + テーマ + エイリアス
-  [ ] モダン CLI ツール  eza / bat / fd / ripgrep
-  [ ] Claude Code        Anthropic CLI (Node.js v18+ 必要)
-  [ ] Gemini CLI         Google AI CLI (Node.js v18+ 必要)
+> [x] Zsh 設定一式         Zinit + プラグイン + テーマ + エイリアス
+  [ ] Git グローバル設定    .gitconfig.shared + .gitignore_global
+  [ ] モダン CLI ツール     eza / bat / fd / ripgrep
+  [ ] Node.js 開発環境      fnm + Node.js LTS (バージョン管理)
+  [ ] Claude Code           Anthropic CLI (Node.js v18+ 必要)
+  [ ] Python 開発環境       pyenv + virtualenv (Python バージョン管理)
+  [ ] Gemini CLI            Google AI CLI (Node.js v18+ 必要)
 ```
 
 ### モジュール
@@ -44,8 +50,11 @@ zsh dotfiles/setup.sh
 | モジュール | 説明 | 依存 |
 |-----------|------|------|
 | **Zsh 設定一式** | Zinit + プラグイン + テーマ + エイリアス | Git |
+| **Git グローバル設定** | 共有 gitconfig + グローバル gitignore | Git |
 | **モダン CLI ツール** | eza / bat / fd / ripgrep | Homebrew (macOS) / apt + wget + gpg (Linux) |
+| **Node.js 開発環境** | fnm + Node.js LTS 自動インストール | Homebrew (macOS) / curl + unzip (Linux) |
 | **Claude Code** | Anthropic の AI コーディングアシスタント CLI | Node.js v18+ |
+| **Python 開発環境** | pyenv + pyenv-virtualenv | Git + ビルド依存パッケージ |
 | **Gemini CLI** | Google の AI CLI | Node.js v18+ |
 
 ### オプション
@@ -66,7 +75,7 @@ zsh dotfiles/setup.sh
 zsh dotfiles/setup.sh --all
 
 # 特定モジュールのみインストール
-zsh dotfiles/setup.sh --select zsh --select claude-code
+zsh dotfiles/setup.sh --select zsh --select node
 
 # 変更内容を事前に確認
 zsh dotfiles/setup.sh --all --dry-run
@@ -89,10 +98,28 @@ zsh dotfiles/setup.sh --uninstall
    - 既存ファイルと内容が同一の場合はスキップ（べき等）
    - 内容が異なる場合はタイムスタンプ付きでバックアップ後に配置
 
+#### Git グローバル設定
+1. Git の存在確認
+2. `.gitconfig.shared` と `.gitignore_global` を `$HOME` に配置
+3. `include.path` で共有設定をリンク（既存の `.gitconfig` を上書きしない）
+4. `core.excludesFile` でグローバル gitignore を紐付け
+5. `user.name` / `user.email` の設定ガイドを表示
+
 #### モダン CLI ツール
 1. OS 判定（macOS: Homebrew / Linux: apt）
 2. 各ツール（eza, bat, fd, ripgrep）を順次インストール（既にインストール済みならスキップ）
 3. エイリアス（`ls` → eza, `cat` → bat 等）は `aliases.zsh` で条件付き設定済み
+
+#### Node.js 開発環境
+1. [fnm](https://github.com/Schniz/fnm) (Fast Node Manager) のインストール（macOS: Homebrew / Linux: GitHub Releases）
+2. Node.js LTS の自動インストール + デフォルト設定
+3. `node.zsh` の配置（fnm 初期化・`--use-on-cd` 対応）
+
+#### Python 開発環境
+1. ビルド依存パッケージのインストール（macOS: Homebrew / Linux: apt）
+2. [pyenv](https://github.com/pyenv/pyenv) のインストール（macOS: Homebrew / Linux: git clone）
+3. [pyenv-virtualenv](https://github.com/pyenv/pyenv-virtualenv) プラグインのインストール
+4. `python.zsh` の配置（pyenv 初期化）
 
 #### Claude Code
 1. Node.js v18+ / npm の存在確認
@@ -130,19 +157,25 @@ zsh dotfiles/setup.sh --uninstall
 ```
 dev-templates/
 ├── .github/workflows/
-│   └── ci.yml              # CI: 構文チェック + dry-run テスト（Ubuntu/macOS）
+│   └── ci.yml                # CI: 構文チェック + dry-run テスト（Ubuntu/macOS）
 ├── dotfiles/
 │   ├── .zsh/
-│   │   ├── plugins.zsh    # Zinit プラグイン設定
-│   │   ├── aliases.zsh    # エイリアス定義
-│   │   └── .p10k.zsh      # Powerlevel10k 設定
+│   │   ├── plugins.zsh      # Zinit プラグイン設定
+│   │   ├── aliases.zsh      # エイリアス定義
+│   │   ├── node.zsh         # fnm 初期化
+│   │   └── python.zsh       # pyenv 初期化
 │   ├── modules/
-│   │   ├── zsh.sh          # モジュール: Zsh 設定一式
-│   │   ├── modern-cli.sh   # モジュール: モダン CLI ツール
-│   │   ├── claude-code.sh  # モジュール: Claude Code
-│   │   └── gemini-cli.sh   # モジュール: Gemini CLI
-│   ├── .zshrc              # エントリーポイント（履歴設定 + モジュール読み込み）
-│   └── setup.sh            # セットアップコア（UI + 共通関数 + モジュール動的読み込み）
+│   │   ├── zsh.sh            # モジュール: Zsh 設定一式
+│   │   ├── git.sh            # モジュール: Git グローバル設定
+│   │   ├── modern-cli.sh     # モジュール: モダン CLI ツール
+│   │   ├── node.sh           # モジュール: Node.js 開発環境
+│   │   ├── claude-code.sh    # モジュール: Claude Code
+│   │   ├── python.sh         # モジュール: Python 開発環境
+│   │   └── gemini-cli.sh     # モジュール: Gemini CLI
+│   ├── .gitconfig.shared     # Git 共有設定（include.path 経由）
+│   ├── .gitignore_global     # グローバル gitignore
+│   ├── .zshrc                # エントリーポイント（履歴設定 + モジュール読み込み）
+│   └── setup.sh              # セットアップコア（UI + 共通関数 + モジュール動的読み込み）
 ├── .editorconfig              # エディタ設定（インデント・改行コード統一）
 ├── .gitignore
 └── README.md
