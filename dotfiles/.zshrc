@@ -44,3 +44,6 @@ fi
 
 # エイリアス定義
 [[ -f "$ZSH_CONFIG_DIR/aliases.zsh" ]] && source "$ZSH_CONFIG_DIR/aliases.zsh"
+
+# Python 環境（pyenv）
+[[ -f "$ZSH_CONFIG_DIR/python.zsh" ]] && source "$ZSH_CONFIG_DIR/python.zsh"
