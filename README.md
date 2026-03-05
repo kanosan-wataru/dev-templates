@@ -44,7 +44,7 @@ zsh dotfiles/setup.sh
 | モジュール | 説明 | 依存 |
 |-----------|------|------|
 | **Zsh 設定一式** | Zinit + プラグイン + テーマ + エイリアス | Git |
-| **モダン CLI ツール** | eza / bat / fd / ripgrep | Homebrew (macOS) or apt (Linux) |
+| **モダン CLI ツール** | eza / bat / fd / ripgrep | Homebrew (macOS) / apt + wget + gpg (Linux) |
 | **Claude Code** | Anthropic の AI コーディングアシスタント CLI | Node.js v18+ |
 | **Gemini CLI** | Google の AI CLI | Node.js v18+ |
 

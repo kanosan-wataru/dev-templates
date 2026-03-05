@@ -40,12 +40,12 @@ _mcli_install_eza_apt() {
     # 前提コマンドの確認
     if ! command -v wget >/dev/null 2>&1; then
         print -P "%F{160}エラー: wget がインストールされていません。%f" >&2
-        print -P "  sudo apt install wget で先にインストールしてください。" >&2
+        print -P "  sudo apt-get install wget で先にインストールしてください。" >&2
         return 1
     fi
     if ! command -v gpg >/dev/null 2>&1; then
         print -P "%F{160}エラー: gpg がインストールされていません。%f" >&2
-        print -P "  sudo apt install gnupg で先にインストールしてください。" >&2
+        print -P "  sudo apt-get install gnupg で先にインストールしてください。" >&2
         return 1
     fi
 
@@ -70,10 +70,10 @@ _mcli_install_eza_apt() {
         fi
 
         # 既存キーファイルがあれば事前に削除（再実行時のべき等性）
-        [[ -f /etc/apt/keyrings/gierens.gpg ]] && sudo rm -f /etc/apt/keyrings/gierens.gpg
+        [[ -f /etc/apt/keyrings/eza.gpg ]] && sudo rm -f /etc/apt/keyrings/eza.gpg
 
         local gpg_err
-        gpg_err=$(sudo gpg --dearmor -o /etc/apt/keyrings/gierens.gpg "$tmp_key" 2>&1) || {
+        gpg_err=$(sudo gpg --dearmor -o /etc/apt/keyrings/eza.gpg "$tmp_key" 2>&1) || {
             print -P "%F{160}エラー: eza の GPG キー変換に失敗しました。%f" >&2
             [[ -n "$gpg_err" ]] && print -P "  詳細: ${gpg_err}" >&2
             rm -f "$tmp_key"
@@ -81,38 +81,38 @@ _mcli_install_eza_apt() {
         }
         rm -f "$tmp_key"
 
-        run_cmd sudo chmod 644 /etc/apt/keyrings/gierens.gpg || {
+        run_cmd sudo chmod 644 /etc/apt/keyrings/eza.gpg || {
             print -P "%F{160}エラー: GPG キーファイルの権限設定に失敗しました。%f" >&2
             return 1
         }
 
         # apt ソースの追加
-        print "deb [signed-by=/etc/apt/keyrings/gierens.gpg] http://deb.gierens.de stable main" \
-            | sudo tee /etc/apt/sources.list.d/gierens.list >/dev/null || {
+        # NOTE: 公式リポジトリが HTTPS 未提供のため http を使用（GPG 署名で検証済み）
+        print "deb [signed-by=/etc/apt/keyrings/eza.gpg] http://deb.gierens.de stable main" \
+            | sudo tee /etc/apt/sources.list.d/eza.list >/dev/null || {
             print -P "%F{160}エラー: eza の apt ソース追加に失敗しました。%f" >&2
             return 1
         }
-        run_cmd sudo chmod 644 /etc/apt/sources.list.d/gierens.list || {
+        run_cmd sudo chmod 644 /etc/apt/sources.list.d/eza.list || {
             print -P "%F{160}エラー: apt ソースファイルの権限設定に失敗しました。%f" >&2
             return 1
         }
     else
         print -P "%F{242}  [DRY-RUN] wget -qO /tmp/... https://...eza.../deb.asc%f"
-        print -P "%F{242}  [DRY-RUN] sudo gpg --dearmor -o /etc/apt/keyrings/gierens.gpg /tmp/...%f"
-        print -P "%F{242}  [DRY-RUN] sudo chmod 644 /etc/apt/keyrings/gierens.gpg%f"
-        print -P "%F{242}  [DRY-RUN] echo 'deb ...' | sudo tee /etc/apt/sources.list.d/gierens.list%f"
-        print -P "%F{242}  [DRY-RUN] sudo chmod 644 /etc/apt/sources.list.d/gierens.list%f"
+        print -P "%F{242}  [DRY-RUN] sudo gpg --dearmor -o /etc/apt/keyrings/eza.gpg /tmp/...%f"
+        print -P "%F{242}  [DRY-RUN] sudo chmod 644 /etc/apt/keyrings/eza.gpg%f"
+        print -P "%F{242}  [DRY-RUN] echo 'deb ...' | sudo tee /etc/apt/sources.list.d/eza.list%f"
+        print -P "%F{242}  [DRY-RUN] sudo chmod 644 /etc/apt/sources.list.d/eza.list%f"
     fi
 
-    run_cmd sudo apt update -qq || {
+    run_cmd sudo apt-get update -qq || {
         print -P "%F{220}警告: apt update に失敗しました。%f"
-        print -P "  新しい apt リポジトリの情報を取得できなかったため、eza のインストールに失敗する可能性があります。" >&2
+        print -P "  新しい apt リポジトリの情報を取得できなかったため、eza のインストールに失敗する可能性があります。"
     }
-    run_cmd sudo apt install -y eza || {
+    run_cmd sudo apt-get install -y eza || {
         print -P "%F{160}エラー: eza のインストールに失敗しました。%f" >&2
         return 1
     }
-    return 0
 }
 
 # --- セットアップ ---
@@ -134,8 +134,8 @@ module_setup() {
             fi
             ;;
         linux)
-            if ! command -v apt >/dev/null 2>&1; then
-                print -P "%F{160}エラー: apt が見つかりません。Debian/Ubuntu 系のみ対応しています。%f" >&2
+            if ! command -v apt-get >/dev/null 2>&1; then
+                print -P "%F{160}エラー: apt-get が見つかりません。Debian/Ubuntu 系のみ対応しています。%f" >&2
                 return 1
             fi
             ;;
@@ -188,7 +188,7 @@ module_setup() {
                         continue
                     }
                 else
-                    run_cmd sudo apt install -y "$apt_pkg" || {
+                    run_cmd sudo apt-get install -y "$apt_pkg" || {
                         print -P "%F{160}エラー: ${cmd_name} (${apt_pkg}) のインストールに失敗しました。%f" >&2
                         (( failed++ ))
                         continue
@@ -231,10 +231,10 @@ module_uninstall() {
             print -P "  brew uninstall eza bat fd ripgrep"
             ;;
         linux)
-            print -P "  sudo apt remove eza bat fd-find ripgrep"
+            print -P "  sudo apt-get remove eza bat fd-find ripgrep"
             print -P "  # eza の apt ソースも削除する場合:"
-            print -P "  sudo rm -f /etc/apt/sources.list.d/gierens.list"
-            print -P "  sudo rm -f /etc/apt/keyrings/gierens.gpg"
+            print -P "  sudo rm -f /etc/apt/sources.list.d/eza.list"
+            print -P "  sudo rm -f /etc/apt/keyrings/eza.gpg"
             ;;
         *)
             print -P "  OS に応じたパッケージマネージャーで削除してください。"
