@@ -13,7 +13,8 @@ desktop.ini
 *~
 
 # 環境変数
-.env*
+.env
+.env.local
 
 # ログ
 *.log

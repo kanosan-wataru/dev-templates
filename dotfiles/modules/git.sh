@@ -12,7 +12,7 @@ MODULE_ORDER=12
 
 # NOTE: モジュール固有の変数には衝突回避のため GIT_MOD_ プレフィックスを使用
 
-GIT_MOD_BASE_DIR="${ZDOTDIR:-$HOME}"
+GIT_MOD_BASE_DIR="$HOME"
 
 # 管理対象ファイル（配布元パス, 配置先パス, 表示名, 未検出時メッセージ）
 # NOTE: .gitconfig.shared は include.path 経由で読み込まれる（既存 .gitconfig を上書きしない）
@@ -144,9 +144,9 @@ module_uninstall() {
         local shared_path="$GIT_MOD_BASE_DIR/.gitconfig.shared"
         if git config --global --get-all include.path 2>/dev/null | grep -qF "$shared_path"; then
             if (( DRY_RUN )); then
-                print -P "%F{242}  [DRY-RUN] git config --global --unset-all include.path ${shared_path}%f"
+                print -P "%F{242}  [DRY-RUN] git config --global --fixed-value --unset-all include.path ${shared_path}%f"
             else
-                if git config --global --unset-all include.path "$shared_path" --fixed-value 2>/dev/null; then
+                if git config --global --fixed-value --unset-all include.path "$shared_path" 2>/dev/null; then
                     print -P "情報: include.path から ${shared_path} を削除しました。"
                 else
                     print -P "%F{220}警告: include.path の解除に失敗しました。手動で確認してください:%f"
