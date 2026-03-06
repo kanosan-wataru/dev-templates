@@ -6,7 +6,7 @@
 FROM ubuntu:24.04
 
 # 対話的プロンプトを抑制
-ENV DEBIAN_FRONTEND=noninteractive
+ARG DEBIAN_FRONTEND=noninteractive
 ENV TZ=Asia/Tokyo
 
 # 全モジュールの前提パッケージを一括インストール
