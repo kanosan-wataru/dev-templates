@@ -1,0 +1,16 @@
+{
+    "name": "dev-templates",
+    "dockerComposeFile": "../docker-compose.yml",
+    "service": "devcontainer",
+    "workspaceFolder": "/workspaces/dev-templates",
+    "remoteUser": "dev",
+    "customizations": {
+        "vscode": {
+            "extensions": [
+                "timonwong.shellcheck",
+                "foxundermoon.shell-format",
+                "ms-azuretools.vscode-docker"
+            ]
+        }
+    }
+}
