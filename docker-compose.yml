@@ -5,6 +5,8 @@ services:
       dockerfile: Dockerfile
     volumes:
       - .:/workspaces/dev-templates
+      - ~/.ssh:/home/dev/.ssh:ro
+      - ~/.gitconfig:/home/dev/.gitconfig:ro
     working_dir: /workspaces/dev-templates
     env_file:
       - path: .env
