@@ -146,6 +146,8 @@ zsh dotfiles/setup.sh --uninstall
 
 Docker Compose + VS Code Dev Containers でコンテナ内に開発環境を構築できます。
 
+- **Docker Compose v2.24+** が必要です（`env_file` の `required` オプションを使用）
+
 ### セットアップ
 
 ```bash

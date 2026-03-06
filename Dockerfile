@@ -55,13 +55,16 @@ RUN userdel -r ubuntu 2>/dev/null || true \
     && chmod 0440 /etc/sudoers.d/$USERNAME
 
 # fnm + Node.js LTS を事前インストール
-# NOTE: Docker ビルド内では GitHub リダイレクトが不安定なため、
-#       setup.sh の node モジュールに頼らず直接インストールする
+# NOTE: ピン留めされたバージョンの公式バイナリを GitHub Releases から直接取得する
+ARG FNM_VERSION=v1.38.1
 USER $USERNAME
 ENV FNM_DIR="/home/${USERNAME}/.local/share/fnm"
 RUN mkdir -p /home/${USERNAME}/.local/bin \
-    && curl -fsSL https://fnm.vercel.app/install \
-       | bash -s -- --install-dir /home/${USERNAME}/.local/bin --skip-shell \
+    && curl -fsSL "https://github.com/Schniz/fnm/releases/download/${FNM_VERSION}/fnm-linux.zip" \
+       -o /tmp/fnm.zip \
+    && unzip -o /tmp/fnm.zip -d /home/${USERNAME}/.local/bin \
+    && chmod +x /home/${USERNAME}/.local/bin/fnm \
+    && rm /tmp/fnm.zip \
     && export PATH="/home/${USERNAME}/.local/bin:$PATH" \
     && eval "$(fnm env)" \
     && fnm install --lts \

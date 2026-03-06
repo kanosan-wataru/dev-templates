@@ -5,6 +5,7 @@ services:
       dockerfile: Dockerfile
     volumes:
       - .:/workspaces/dev-templates
+    working_dir: /workspaces/dev-templates
     env_file:
       - path: .env
         required: false
