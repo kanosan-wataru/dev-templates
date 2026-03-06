@@ -165,6 +165,15 @@ docker compose exec devcontainer zsh
 
 VS Code / Cursor から Dev Containers として接続する場合は、コマンドパレットから「Dev Containers: Reopen in Container」を実行してください。
 
+### ホストファイルのマウント
+
+コンテナ起動時にホストの設定ファイルが read-only でマウントされます:
+
+| ホスト | コンテナ | 用途 |
+|--------|----------|------|
+| `~/.ssh` | `/home/dev/.ssh` | SSH 鍵（Git の SSH 接続等） |
+| `~/.gitconfig` | `/home/dev/.gitconfig` | Git ユーザー設定 |
+
 ### 含まれるツール
 
 コンテナイメージには `setup.sh --all` で全モジュールがプリインストールされています:
@@ -206,6 +215,7 @@ dev-templates/
 │   └── ci.yml                # CI: 構文チェック + dry-run テスト（Ubuntu/macOS）
 ├── Dockerfile                 # 開発環境コンテナ定義
 ├── docker-compose.yml         # Docker Compose 設定
+├── .dockerignore               # Docker ビルドコンテキスト除外設定
 ├── .env.example               # 環境変数テンプレート（API キー等）
 ├── dotfiles/
 │   ├── .zsh/
