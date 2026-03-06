@@ -142,6 +142,48 @@ zsh dotfiles/setup.sh --uninstall
 | [zsh-autosuggestions](https://github.com/zsh-users/zsh-autosuggestions) | 履歴ベースのコマンド候補表示 |
 | [zsh-syntax-highlighting](https://github.com/zsh-users/zsh-syntax-highlighting) | コマンドラインのシンタックスハイライト |
 
+## Docker (Dev Containers)
+
+Docker Compose + VS Code Dev Containers でコンテナ内に開発環境を構築できます。
+
+### セットアップ
+
+```bash
+# .env ファイルを作成して API キーを設定
+cp .env.example .env
+# .env を編集して ANTHROPIC_API_KEY 等を設定
+
+# コンテナをビルド
+docker compose build
+
+# コンテナを起動
+docker compose up -d
+docker compose exec devcontainer zsh
+```
+
+VS Code / Cursor から Dev Containers として接続する場合は、コマンドパレットから「Dev Containers: Reopen in Container」を実行してください。
+
+### 含まれるツール
+
+コンテナイメージには `setup.sh --all` で全モジュールがプリインストールされています:
+
+- Zsh + Zinit + Powerlevel10k
+- Git グローバル設定
+- モダン CLI ツール (eza, bat, fd, ripgrep)
+- Node.js (fnm + LTS)
+- Claude Code
+- Python (pyenv)
+- Gemini CLI
+
+### API キーの設定
+
+`.env` ファイルに API キーを記述すると、コンテナ内の環境変数として利用できます:
+
+```bash
+ANTHROPIC_API_KEY=sk-ant-...
+GEMINI_API_KEY=...
+```
+
 ## CI
 
 `dotfiles/**` または `.github/workflows/**` に変更を含む Pull Request で、GitHub Actions によるチェックが自動実行されます:
@@ -156,8 +198,13 @@ zsh dotfiles/setup.sh --uninstall
 
 ```
 dev-templates/
+├── .devcontainer/
+│   └── devcontainer.json     # VS Code Dev Containers 設定
 ├── .github/workflows/
 │   └── ci.yml                # CI: 構文チェック + dry-run テスト（Ubuntu/macOS）
+├── Dockerfile                 # 開発環境コンテナ定義
+├── docker-compose.yml         # Docker Compose 設定
+├── .env.example               # 環境変数テンプレート（API キー等）
 ├── dotfiles/
 │   ├── .zsh/
 │   │   ├── plugins.zsh      # Zinit プラグイン設定

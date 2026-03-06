@@ -1,0 +1,12 @@
+services:
+  devcontainer:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    volumes:
+      - .:/workspaces/dev-templates
+    env_file:
+      - path: .env
+        required: false
+    tty: true
+    stdin_open: true
