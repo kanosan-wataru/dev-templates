@@ -43,6 +43,8 @@ CLAUDE_MOD_MANAGED_FILES=(
     "$SCRIPT_DIR/.claude/skills/start-work/SKILL.md|$CLAUDE_MOD_SKILLS_DIR/start-work/SKILL.md|skills/start-work/SKILL.md|"
     # スキル: test
     "$SCRIPT_DIR/.claude/skills/test/SKILL.md|$CLAUDE_MOD_SKILLS_DIR/test/SKILL.md|skills/test/SKILL.md|"
+    # zsh モジュール: .env 読み込み（MCP サーバー用環境変数）
+    "$SCRIPT_DIR/.zsh/env.zsh|${ZSH_CONFIG_DIR:-$HOME/.zsh}/env.zsh|.zsh/env.zsh|"
 )
 
 # 配置先ディレクトリのリスト（スキルのサブディレクトリを事前作成するため）
