@@ -14,6 +14,8 @@ MODULE_ORDER=20
 # NOTE: モジュール固有の変数には衝突回避のため CLAUDE_MOD_ プレフィックスを使用
 CLAUDE_MOD_CONFIG_DIR="$HOME/.claude"
 CLAUDE_MOD_SKILLS_DIR="$CLAUDE_MOD_CONFIG_DIR/skills"
+CLAUDE_MOD_MCP_TEMPLATE="$SCRIPT_DIR/.claude/mcp-servers.json"
+CLAUDE_MOD_CLAUDE_JSON="$HOME/.claude.json"
 
 # 管理対象ファイルのリスト（配布元パス, 配置先パス, 表示名, 未検出時メッセージ）
 # NOTE: 配列の各要素は "src|dst|label|hint" の形式
@@ -55,6 +57,216 @@ CLAUDE_MOD_REQUIRED_DIRS=(
     "$CLAUDE_MOD_SKILLS_DIR/start-work"
     "$CLAUDE_MOD_SKILLS_DIR/test"
 )
+
+# --- MCP サーバー設定のマージ ---
+# テンプレートの mcpServers を ~/.claude.json にマージする（既存設定を保持）
+# jq が必要。未インストールの場合は警告してスキップする。
+_claude_mod_merge_mcp_servers() {
+    local template="$CLAUDE_MOD_MCP_TEMPLATE"
+    local target="$CLAUDE_MOD_CLAUDE_JSON"
+
+    # テンプレートファイルの存在確認
+    if [[ ! -f "$template" ]]; then
+        print -P "%F{220}警告: MCP サーバーテンプレートが見つかりません: ${template}%f"
+        print -P "  MCP サーバー設定のマージをスキップします。"
+        return 0
+    fi
+
+    # jq の存在確認
+    if ! command -v jq >/dev/null 2>&1; then
+        print -P "%F{220}警告: jq がインストールされていないため、MCP サーバー設定のマージをスキップします。%f"
+        print -P "  手動で設定するか、jq をインストールして再実行してください:"
+        print -P "    sudo apt install jq  # Debian/Ubuntu"
+        print -P "    brew install jq      # macOS"
+        return 0
+    fi
+
+    # テンプレートの JSON バリデーション
+    if ! jq empty "$template" 2>/dev/null; then
+        print -P "%F{160}エラー: MCP サーバーテンプレートの JSON が不正です: ${template}%f" >&2
+        return 1
+    fi
+
+    # ターゲットファイルが存在しない場合: テンプレートの内容でそのまま作成
+    if [[ ! -f "$target" ]]; then
+        if (( DRY_RUN )); then
+            print -P "情報: ${target} を新規作成予定です（dry-run）。"
+        else
+            # NOTE: jq でフォーマットしてから書き出す
+            jq '.' "$template" > "$target" || {
+                print -P "%F{160}エラー: ${target} の作成に失敗しました。%f" >&2
+                return 1
+            }
+            print -P "情報: ${target} を新規作成しました（MCP サーバー設定）。"
+        fi
+        return 0
+    fi
+
+    # 既存ファイルの JSON バリデーション
+    if ! jq empty "$target" 2>/dev/null; then
+        print -P "%F{160}エラー: ${target} の JSON が不正です。手動で修正してください。%f" >&2
+        return 1
+    fi
+
+    # べき等性チェック: テンプレートの mcpServers が既に全て同一内容で存在するかを確認
+    local needs_update
+    needs_update=$(jq --slurpfile tmpl "$template" '
+        # テンプレートの mcpServers を取得
+        ($tmpl[0].mcpServers // {}) as $new_servers |
+        # 既存の mcpServers を取得
+        (.mcpServers // {}) as $existing |
+        # 全てのテンプレートキーが既存に同一内容で存在するか判定
+        [
+            $new_servers | to_entries[] |
+            select(
+                ($existing[.key] // null) != .value
+            )
+        ] | length > 0
+    ' "$target" 2>/dev/null) || {
+        print -P "%F{160}エラー: MCP サーバー設定の比較に失敗しました。%f" >&2
+        return 1
+    }
+
+    if [[ "$needs_update" == "false" ]]; then
+        print -P "情報: MCP サーバー設定は既に最新の状態です。スキップします。"
+        return 0
+    fi
+
+    # バックアップを作成してからマージ
+    run_cmd command cp -p "$target" "${target}${BACKUP_SUFFIX}" || {
+        print -P "%F{160}エラー: ${target} のバックアップに失敗しました。%f" >&2
+        return 1
+    }
+    if (( DRY_RUN )); then
+        print -P "情報: ${target} を ${target}${BACKUP_SUFFIX} にバックアップ予定です（dry-run）。"
+        print -P "情報: MCP サーバー設定をマージ予定です（dry-run）。"
+        return 0
+    fi
+    print -P "情報: ${target} を ${target}${BACKUP_SUFFIX} にバックアップしました。"
+
+    # jq の再帰マージ (*) で mcpServers をマージ
+    # NOTE: * 演算子はオブジェクトを再帰的にマージし、右辺（テンプレート）で上書きする
+    local merged
+    merged=$(jq --slurpfile tmpl "$template" '
+        .mcpServers = ((.mcpServers // {}) * ($tmpl[0].mcpServers // {}))
+    ' "$target" 2>/dev/null) || {
+        print -P "%F{160}エラー: MCP サーバー設定のマージに失敗しました。%f" >&2
+        print -P "  バックアップから復元するには: mv '${target}${BACKUP_SUFFIX}' '${target}'" >&2
+        return 1
+    }
+
+    # マージ結果を書き出し
+    printf '%s\n' "$merged" > "$target" || {
+        print -P "%F{160}エラー: ${target} への書き込みに失敗しました。%f" >&2
+        print -P "  バックアップから復元するには: mv '${target}${BACKUP_SUFFIX}' '${target}'" >&2
+        return 1
+    }
+
+    print -P "情報: MCP サーバー設定をマージしました。"
+}
+
+# --- MCP サーバー設定の削除 ---
+# テンプレートに定義されたサーバー名を ~/.claude.json から削除する
+# NOTE: ~/.claude.json 自体は削除しない（他の設定が含まれるため）
+_claude_mod_remove_mcp_servers() {
+    local template="$CLAUDE_MOD_MCP_TEMPLATE"
+    local target="$CLAUDE_MOD_CLAUDE_JSON"
+
+    # ターゲットファイルが存在しない場合はスキップ
+    if [[ ! -f "$target" ]]; then
+        print -P "情報: ${target} が存在しません。MCP サーバー設定の削除をスキップします。"
+        return 0
+    fi
+
+    # jq の存在確認
+    if ! command -v jq >/dev/null 2>&1; then
+        print -P "%F{220}警告: jq がインストールされていないため、MCP サーバー設定の削除をスキップします。%f"
+        return 0
+    fi
+
+    # テンプレートが存在しない場合はスキップ
+    if [[ ! -f "$template" ]]; then
+        print -P "%F{220}警告: MCP サーバーテンプレートが見つかりません。MCP サーバー設定の削除をスキップします。%f"
+        return 0
+    fi
+
+    # 既存ファイルの JSON バリデーション
+    if ! jq empty "$target" 2>/dev/null; then
+        print -P "%F{220}警告: ${target} の JSON が不正です。MCP サーバー設定の削除をスキップします。%f"
+        return 0
+    fi
+
+    # mcpServers キーが存在しない場合はスキップ
+    local has_mcp_servers
+    has_mcp_servers=$(jq 'has("mcpServers")' "$target" 2>/dev/null)
+    if [[ "$has_mcp_servers" != "true" ]]; then
+        print -P "情報: ${target} に mcpServers が存在しません。スキップします。"
+        return 0
+    fi
+
+    # テンプレートからサーバー名のリストを取得
+    local -a server_names
+    server_names=( $(jq -r '.mcpServers | keys[]' "$template" 2>/dev/null) ) || {
+        print -P "%F{160}エラー: テンプレートからサーバー名を取得できませんでした。%f" >&2
+        return 1
+    }
+
+    if (( ${#server_names[@]} == 0 )); then
+        print -P "情報: 削除対象の MCP サーバーがありません。スキップします。"
+        return 0
+    fi
+
+    # 削除対象のサーバーが一つも存在しないか確認
+    local has_any=0
+    for name in "${server_names[@]}"; do
+        local exists
+        exists=$(jq --arg n "$name" '.mcpServers | has($n)' "$target" 2>/dev/null)
+        if [[ "$exists" == "true" ]]; then
+            has_any=1
+            break
+        fi
+    done
+
+    if (( ! has_any )); then
+        print -P "情報: 削除対象の MCP サーバーは存在しません。スキップします。"
+        return 0
+    fi
+
+    # バックアップ
+    run_cmd command cp -p "$target" "${target}${BACKUP_SUFFIX}" || {
+        print -P "%F{160}エラー: ${target} のバックアップに失敗しました。%f" >&2
+        return 1
+    }
+    if (( DRY_RUN )); then
+        print -P "情報: ${target} を ${target}${BACKUP_SUFFIX} にバックアップ予定です（dry-run）。"
+        print -P "情報: MCP サーバー設定を削除予定です（dry-run）: ${server_names[*]}"
+        return 0
+    fi
+    print -P "情報: ${target} を ${target}${BACKUP_SUFFIX} にバックアップしました。"
+
+    # jq でテンプレートに定義されたサーバーを一括削除
+    # NOTE: jq の del() でキーを削除。サーバー名リストを JSON 配列として渡す
+    local names_json
+    names_json=$(printf '%s\n' "${server_names[@]}" | jq -R . | jq -s .)
+
+    local result
+    result=$(jq --argjson names "$names_json" '
+        .mcpServers |= (. // {} | to_entries | map(select(.key as $k | $names | index($k) | not)) | from_entries)
+    ' "$target" 2>/dev/null) || {
+        print -P "%F{160}エラー: MCP サーバー設定の削除に失敗しました。%f" >&2
+        print -P "  バックアップから復元するには: mv '${target}${BACKUP_SUFFIX}' '${target}'" >&2
+        return 1
+    }
+
+    # 結果を書き出し
+    printf '%s\n' "$result" > "$target" || {
+        print -P "%F{160}エラー: ${target} への書き込みに失敗しました。%f" >&2
+        print -P "  バックアップから復元するには: mv '${target}${BACKUP_SUFFIX}' '${target}'" >&2
+        return 1
+    }
+
+    print -P "情報: MCP サーバー設定を削除しました: ${server_names[*]}"
+}
 
 # --- セットアップ ---
 module_setup() {
@@ -128,12 +340,20 @@ module_setup() {
         install_config "$src" "$dst" "$label" "$hint"
     done
 
+    # MCP サーバー設定のマージ（~/.claude.json に追加）
+    _claude_mod_merge_mcp_servers
+
     print -P "%F{34}Claude Code 設定ファイルの配置が完了しました。%f"
 }
 
 # --- アンインストール ---
 module_uninstall() {
     local restored=0
+
+    # =========================================
+    # MCP サーバー設定の削除（~/.claude.json から除去）
+    # =========================================
+    _claude_mod_remove_mcp_servers
 
     # =========================================
     # 設定ファイルの復元・削除
