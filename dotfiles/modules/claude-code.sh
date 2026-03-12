@@ -94,11 +94,24 @@ _claude_mod_merge_mcp_servers() {
         if (( DRY_RUN )); then
             print -P "情報: ${target} を新規作成予定です（dry-run）。"
         else
-            # NOTE: jq でフォーマットしてから書き出す
-            jq '.' "$template" > "$target" || {
+            # NOTE: jq でフォーマットしてから書き出す（一時ファイル経由でアトミックに書き込む）
+            local tmpfile
+            tmpfile=$(mktemp "${target}.tmp.XXXXXX") || {
+                print -P "%F{160}エラー: 一時ファイルの作成に失敗しました。%f" >&2
+                return 1
+            }
+            jq '.' "$template" > "$tmpfile" || {
+                command rm -f "$tmpfile"
                 print -P "%F{160}エラー: ${target} の作成に失敗しました。%f" >&2
                 return 1
             }
+            command mv "$tmpfile" "$target" || {
+                command rm -f "$tmpfile"
+                print -P "%F{160}エラー: ${target} への移動に失敗しました。%f" >&2
+                return 1
+            }
+            # NOTE: このモジュールで新規作成したことを記録するマーカーファイル
+            touch "${target}.created-by-claude-mod"
             print -P "情報: ${target} を新規作成しました（MCP サーバー設定）。"
         fi
         return 0
@@ -157,9 +170,21 @@ _claude_mod_merge_mcp_servers() {
         return 1
     }
 
-    # マージ結果を書き出し
-    printf '%s\n' "$merged" > "$target" || {
+    # マージ結果を書き出し（一時ファイル経由でアトミックに書き込む）
+    local tmpfile
+    tmpfile=$(mktemp "${target}.tmp.XXXXXX") || {
+        print -P "%F{160}エラー: 一時ファイルの作成に失敗しました。%f" >&2
+        return 1
+    }
+    printf '%s\n' "$merged" > "$tmpfile" || {
+        command rm -f "$tmpfile"
         print -P "%F{160}エラー: ${target} への書き込みに失敗しました。%f" >&2
+        print -P "  バックアップから復元するには: mv '${target}${BACKUP_SUFFIX}' '${target}'" >&2
+        return 1
+    }
+    command mv "$tmpfile" "$target" || {
+        command rm -f "$tmpfile"
+        print -P "%F{160}エラー: ${target} への移動に失敗しました。%f" >&2
         print -P "  バックアップから復元するには: mv '${target}${BACKUP_SUFFIX}' '${target}'" >&2
         return 1
     }
@@ -208,11 +233,9 @@ _claude_mod_remove_mcp_servers() {
 
     # テンプレートからサーバー名のリストを取得
     local -a server_names
-    server_names=( $(jq -r '.mcpServers | keys[]' "$template" 2>/dev/null) ) || {
-        print -P "%F{160}エラー: テンプレートからサーバー名を取得できませんでした。%f" >&2
-        return 1
-    }
-
+    while IFS= read -r name; do
+        server_names+=("$name")
+    done < <(jq -r '.mcpServers | keys[]' "$template" 2>/dev/null)
     if (( ${#server_names[@]} == 0 )); then
         print -P "情報: 削除対象の MCP サーバーがありません。スキップします。"
         return 0
@@ -260,14 +283,34 @@ _claude_mod_remove_mcp_servers() {
         return 1
     }
 
-    # 結果を書き出し
-    printf '%s\n' "$result" > "$target" || {
+    # 結果を書き出し（一時ファイル経由でアトミックに書き込む）
+    local tmpfile
+    tmpfile=$(mktemp "${target}.tmp.XXXXXX") || {
+        print -P "%F{160}エラー: 一時ファイルの作成に失敗しました。%f" >&2
+        return 1
+    }
+    printf '%s\n' "$result" > "$tmpfile" || {
+        command rm -f "$tmpfile"
         print -P "%F{160}エラー: ${target} への書き込みに失敗しました。%f" >&2
+        print -P "  バックアップから復元するには: mv '${target}${BACKUP_SUFFIX}' '${target}'" >&2
+        return 1
+    }
+    command mv "$tmpfile" "$target" || {
+        command rm -f "$tmpfile"
+        print -P "%F{160}エラー: ${target} への移動に失敗しました。%f" >&2
         print -P "  バックアップから復元するには: mv '${target}${BACKUP_SUFFIX}' '${target}'" >&2
         return 1
     }
 
     print -P "情報: MCP サーバー設定を削除しました: ${server_names[*]}"
+
+    # このモジュールで作成したファイルで、mcpServers が空になった場合はファイルごと削除
+    local remaining
+    remaining=$(jq '.mcpServers | length' "$target" 2>/dev/null)
+    if [[ -f "${target}.created-by-claude-mod" ]] && [[ "$remaining" == "0" ]]; then
+        command rm -f "$target" "${target}.created-by-claude-mod"
+        print -P "情報: ${target} はこのモジュールで作成されたため削除しました。"
+    fi
 }
 
 # --- セットアップ ---
@@ -343,7 +386,7 @@ module_setup() {
     done
 
     # MCP サーバー設定のマージ（~/.claude.json に追加）
-    _claude_mod_merge_mcp_servers
+    _claude_mod_merge_mcp_servers || return 1
 
     print -P "%F{34}Claude Code 設定ファイルの配置が完了しました。%f"
 }
@@ -355,7 +398,7 @@ module_uninstall() {
     # =========================================
     # MCP サーバー設定の削除（~/.claude.json から除去）
     # =========================================
-    _claude_mod_remove_mcp_servers
+    _claude_mod_remove_mcp_servers || return 1
 
     # =========================================
     # 設定ファイルの復元・削除
@@ -376,12 +419,7 @@ module_uninstall() {
             }
             restored=1
         elif [[ -f "$dst" || -h "$dst" ]]; then
-            print -P "削除: ${label} を削除します（セットアップ前の状態に復元）。"
-            run_cmd command rm -f "$dst" || {
-                print -P "%F{160}エラー: ${label} の削除に失敗しました。%f" >&2
-                return 1
-            }
-            restored=1
+            print -P "%F{220}警告: ${label} のバックアップが見つかりません。手動で確認してください: ${dst}%f"
         else
             print -P "情報: ${label} は配置されていません。スキップします。"
         fi
