@@ -45,6 +45,10 @@ CLAUDE_MOD_MANAGED_FILES=(
     "$SCRIPT_DIR/.claude/skills/test/SKILL.md|$CLAUDE_MOD_SKILLS_DIR/test/SKILL.md|skills/test/SKILL.md|"
     # zsh モジュール: .env 読み込み（MCP サーバー用環境変数）
     "$SCRIPT_DIR/.zsh/env.zsh|${ZSH_CONFIG_DIR:-$HOME/.zsh}/env.zsh|.zsh/env.zsh|"
+    # エージェント定義
+    "$SCRIPT_DIR/.claude/agents/general-purpose.md|$CLAUDE_MOD_CONFIG_DIR/agents/general-purpose.md|agents/general-purpose.md|"
+    "$SCRIPT_DIR/.claude/agents/gemini-explore.md|$CLAUDE_MOD_CONFIG_DIR/agents/gemini-explore.md|agents/gemini-explore.md|"
+    "$SCRIPT_DIR/.claude/agents/codex-debugger.md|$CLAUDE_MOD_CONFIG_DIR/agents/codex-debugger.md|agents/codex-debugger.md|"
 )
 
 # 配置先ディレクトリのリスト（スキルのサブディレクトリを事前作成するため）
@@ -58,6 +62,8 @@ CLAUDE_MOD_REQUIRED_DIRS=(
     "$CLAUDE_MOD_SKILLS_DIR/git-cleanup"
     "$CLAUDE_MOD_SKILLS_DIR/start-work"
     "$CLAUDE_MOD_SKILLS_DIR/test"
+    "$CLAUDE_MOD_CONFIG_DIR/agents"
+    "${ZSH_CONFIG_DIR:-$HOME/.zsh}"
 )
 
 # --- MCP サーバー設定のマージ ---
@@ -304,12 +310,20 @@ _claude_mod_remove_mcp_servers() {
 
     print -P "情報: MCP サーバー設定を削除しました: ${server_names[*]}"
 
-    # このモジュールで作成したファイルで、mcpServers が空になった場合はファイルごと削除
-    local remaining
-    remaining=$(jq '.mcpServers | length' "$target" 2>/dev/null)
-    if [[ -f "${target}.created-by-claude-mod" ]] && [[ "$remaining" == "0" ]]; then
-        command rm -f "$target" "${target}.created-by-claude-mod"
-        print -P "情報: ${target} はこのモジュールで作成されたため削除しました。"
+    # このモジュールで作成したファイルで、mcpServers 以外のキーがなく mcpServers が空の場合のみ削除
+    if [[ -f "${target}.created-by-claude-mod" ]]; then
+        local total_keys remaining_servers
+        total_keys=$(jq 'keys | length' "$target" 2>/dev/null)
+        remaining_servers=$(jq '.mcpServers | length' "$target" 2>/dev/null)
+        # mcpServers のみ（キー数1）かつ中身が空の場合のみファイル削除
+        if [[ "$total_keys" == "1" ]] && [[ "$remaining_servers" == "0" ]]; then
+            command rm -f "$target" "${target}.created-by-claude-mod"
+            print -P "情報: ${target} はこのモジュールで作成されたため削除しました。"
+        elif [[ "$remaining_servers" == "0" ]]; then
+            # mcpServers は空だが他のキーが存在する場合はマーカーのみ削除
+            command rm -f "${target}.created-by-claude-mod"
+            print -P "情報: ${target} の mcpServers は空ですが、他の設定が存在するためファイルは保持します。"
+        fi
     fi
 }
 
@@ -407,9 +421,9 @@ module_uninstall() {
         local dst="${entry[(ws:|:)2]}"
         local label="${entry[(ws:|:)3]}"
 
-        # Zsh Glob 限定子で最新のバックアップを検索（シンボリックリンクも含む、ディレクトリは除外）
+        # Zsh Glob 限定子で最新のバックアップを検索（Om: 更新日時の降順、[1]: 最初の1件）
         local -a latest_backup
-        latest_backup=( "${dst}.backup."*(N^/om[1]) )
+        latest_backup=( "${dst}.backup."*(N^/Om[1]) )
 
         if (( ${#latest_backup[@]} > 0 )); then
             print -P "復元: ${label} をバックアップ (${latest_backup[1]:t}) から戻します。"
