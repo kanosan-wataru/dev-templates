@@ -19,6 +19,7 @@
       "env": {}
     },
     "brave-search": {
+      "type": "stdio",
       "command": "npx",
       "args": ["-y", "@modelcontextprotocol/server-brave-search"],
       "env": {

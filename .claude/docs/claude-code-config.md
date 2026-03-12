@@ -31,7 +31,7 @@
 | `dotfiles/.claude/agents/*.md` | `~/.claude/agents/` | サブエージェント定義（3 エージェント） |
 | `.claude/rules/*.md` | プロジェクトルート | コーディング・開発ルール（7 ファイル） |
 | `dotfiles/.zsh/env.zsh` | `~/.zsh/env.zsh` | `.env` ファイルからの環境変数読み込み |
-| `dotfiles/.zsh/ssh.zsh` | `~/.zsh/ssh.zsh` | 1Password SSH エージェント（WSL 用） |
+| `dotfiles/.zsh/ssh.zsh` | `~/.zsh/ssh.zsh` | 1Password SSH エージェント（WSL 用）※ `claude-code.sh` の管理対象外（手動配置） |
 | `dotfiles/modules/claude-code.sh` | setup.sh モジュール | インストール・アンインストール自動化 |
 
 ---
@@ -165,7 +165,7 @@ MCP サーバー設定は `~/.claude.json` の `mcpServers` キーにマージ�
 
 環境変数は `~/.claude/.env` に定義し、`env.zsh` によってシェル起動時に自動読み込みされる。
 
-環境変数のテンプレートとして `dotfiles/.claude/.env.example` が用意されている（`GITHUB_COPILOT_TOKEN`、`BRAVE_API_KEY`、`GOOGLE_CLOUD_PROJECT`）。`cp .env.example ~/.claude/.env` でコピーし、値を設定して使用する。
+環境変数のテンプレートとして `dotfiles/.claude/.env.example` が用意されている（`GITHUB_COPILOT_TOKEN`、`BRAVE_API_KEY`、`GOOGLE_CLOUD_PROJECT`）。セットアップ後、`cp ~/.claude/.env.example ~/.claude/.env` でコピーし、値を設定して使用する。
 
 ---
 
@@ -178,7 +178,7 @@ MCP サーバー設定は `~/.claude.json` の `mcpServers` キーにマージ�
 | カテゴリ | 許可内容 |
 |---------|---------|
 | MCP: Gemini | `mcp__gemini`（全操作） |
-| MCP: GitHub | 読み取り系（issue_read, list_issues, pull_request_read, search_* 等）+ 書き込み系（issue_write, add_issue_comment, add_reply_to_pull_request_comment, request_copilot_review 等） |
+| MCP: GitHub | 読み取り系（issue_read, list_issues, pull_request_read, search_* 等）+ 書き込み系（issue_write, add_issue_comment, add_reply_to_pull_request_comment, add_comment_to_pending_review, request_copilot_review 等） |
 | MCP: Context7 | `resolve-library-id`, `query-docs` |
 | Bash: Git | `git *`, `gh *` |
 | Bash: Docker | `docker compose run/up/build/down/logs/ps`, `docker ps/images/build/run/exec/logs/stop/rm` |
@@ -254,7 +254,7 @@ MCP サーバー設定は `~/.claude.json` の `mcpServers` キーにマージ�
 
 - **目的**: CI ゲート + PR 作成 + Copilot レビュー要求 + レビュー対応の統合ワークフロー
 - **引数**: `<base>`（デフォルト: `main`）
-- **フロー**: CI ゲート → pr-review-toolkit 品質チェック → PR 作成 → Copilot レビュー → レビュー対応 → Gemini クロスチェック → 完了報告
+- **フロー**: CI ゲート → code-simplifier によるコード整理 → pr-review-toolkit 品質チェック → PR 作成 → Copilot レビュー → レビュー対応 → Gemini クロスチェック → 完了報告
 - **制約**: Co-Authored-By / Generated with クレジット行は**禁止**
 
 ### /commit -- コミットメッセージ生成
@@ -284,6 +284,16 @@ MCP サーバー設定は `~/.claude.json` の `mcpServers` キーにマージ�
 - **目的**: マージ済みブランチの削除、リモート追跡ブランチの剪定、ターゲットブランチへの切り替え
 - **引数**: `<target-branch>`（デフォルト: `main`）
 - **安全策**: `-D`（強制削除）禁止。保護ブランチ（main/master/develop 等）の削除禁止
+
+### チーム開発フロー（プロジェクト CLAUDE.md 定義）
+
+プロジェクト CLAUDE.md で定義されたマルチエージェント協調フロー。グローバルスキルではなくプロジェクトレベルの設定。
+
+| コマンド | 目的 |
+|---------|------|
+| `/startproject` | Gemini 分析 + 要件収集 → Agent Teams による並列調査・設計 → 実装計画 |
+| `/team-implement` | Agent Teams によるモジュール単位の並列実装 |
+| `/team-review` | Agent Teams による並列レビュー（セキュリティ・品質・テスト） |
 
 ---
 
@@ -419,6 +429,7 @@ MCP サーバー設定は `~/.claude.json` の `mcpServers` キーにマージ�
 - バックアップ作成後にマージ/削除
 - dry-run モード対応
 - `~/.claude.json` 自体の削除はモジュール作成時のみ（他の設定保護）
+- `jq` 未インストール時は MCP マージをスキップ（警告を表示）
 
 ---
 

@@ -39,7 +39,7 @@ Runs 5-stage checks in a single pass to verify code quality.
 
 | Language | lint | typecheck | test | security | coverage |
 |---|---|---|---|---|---|
-| Python | `ruff check .` | `mypy .` | `pytest` | `bandit -r .` | `pytest --cov` |
+| Python | `ruff check .` | `ty check src/` | `pytest` | `bandit -r .` | `pytest --cov` |
 | Node.js/TS | `npm run lint` | `npx tsc --noEmit` | `npm test` | `npm audit` | `npx c8 npm test` |
 | Rust | `cargo clippy` | `cargo check` | `cargo test` | `cargo audit` | `cargo tarpaulin` |
 | Go | `golangci-lint run` | `go vet ./...` | `go test ./...` | `govulncheck ./...` | `go test -cover ./...` |

@@ -2,7 +2,7 @@
 
 ## 1. Core Principles
 
-* **Language**: All responses to the user must be in **Japanese**. Code comments should also be in **Japanese**.
+* **Language**: All responses to the user must be in **Japanese**. Code should be written in **English** (variable names, comments, docstrings). See `rules/language.md` for details.
 * **Research first**: Always read the target file and related code before making changes. Understand existing conventions and context before editing.
 * **Security**: Never read, edit, or commit credential files (`.env`, `credentials.json`, `*.pem`, etc.).
 * **Autonomy and confirmation**: Work autonomously as much as possible. Ask the user for confirmation before destructive changes or when requirements are ambiguous.
