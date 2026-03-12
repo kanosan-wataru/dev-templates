@@ -12,6 +12,9 @@ Zsh ベースのモジュラー構成で、macOS / Linux に対応していま�
 | `dotfiles/.zsh/aliases.zsh` | エイリアス定義（git/docker エイリアス、fzf 連携関数） |
 | `dotfiles/.zsh/node.zsh` | fnm (Fast Node Manager) 初期化 |
 | `dotfiles/.zsh/python.zsh` | pyenv / pyenv-virtualenv 初期化 |
+| `dotfiles/.zsh/ssh.zsh` | 1Password SSH エージェント設定（WSL 用） |
+| `dotfiles/.zsh/env.zsh` | 環境変数読み込み（`~/.claude/.env` から MCP サーバー用等） |
+| `dotfiles/.claude/` | Claude Code 設定テンプレート一式（CLAUDE.md, スキル, エージェント等） |
 | `dotfiles/.gitconfig.shared` | Git 共有設定（include.path 経由で読み込み） |
 | `dotfiles/.gitignore_global` | グローバル gitignore |
 | `dotfiles/setup.sh` | セットアップスクリプト（インタラクティブ選択・自動インストール） |
@@ -53,7 +56,7 @@ zsh dotfiles/setup.sh
 | **Git グローバル設定** | 共有 gitconfig + グローバル gitignore | Git |
 | **モダン CLI ツール** | eza / bat / fd / ripgrep | Homebrew (macOS) / apt + wget + gpg (Linux) |
 | **Node.js 開発環境** | fnm + Node.js LTS 自動インストール | Homebrew (macOS) / curl + unzip (Linux) |
-| **Claude Code** | Anthropic の AI コーディングアシスタント CLI | Node.js v18+ |
+| **Claude Code** | Anthropic の AI コーディングアシスタント CLI + 設定テンプレート | Node.js v18+ / jq（MCP マージ用、任意） |
 | **Python 開発環境** | pyenv + pyenv-virtualenv | Git + ビルド依存パッケージ |
 | **Gemini CLI** | Google の AI CLI | Node.js v18+ |
 
@@ -124,6 +127,10 @@ zsh dotfiles/setup.sh --uninstall
 #### Claude Code
 1. Node.js v18+ / npm の存在確認
 2. `npm install -g @anthropic-ai/claude-code`（既にインストール済みならスキップ）
+3. 設定ファイルの配置（CLAUDE.md, settings.json, hookify ルール, スキル, エージェント）
+4. `env.zsh` の配置（`~/.claude/.env` からの環境変数読み込み）
+5. MCP サーバー設定の `~/.claude.json` へのマージ（jq 使用、べき等。jq 未インストール時はスキップ）
+6. `~/.claude/.env` に環境変数を設定するよう案内表示
 
 #### Gemini CLI
 1. Node.js v18+ / npm の存在確認
@@ -209,6 +216,10 @@ GEMINI_API_KEY=...
 
 ```
 dev-templates/
+├── .claude/
+│   ├── docs/
+│   │   └── claude-code-config.md  # Claude Code 設定リファレンス
+│   └── rules/                     # コーディング・開発ルール
 ├── .devcontainer/
 │   └── devcontainer.json     # VS Code Dev Containers 設定
 ├── .github/workflows/
@@ -218,11 +229,20 @@ dev-templates/
 ├── .dockerignore               # Docker ビルドコンテキスト除外設定
 ├── .env.example               # 環境変数テンプレート（API キー等）
 ├── dotfiles/
+│   ├── .claude/
+│   │   ├── CLAUDE.md            # グローバル Claude 設定
+│   │   ├── settings.json        # 許可ツール・プラグイン設定
+│   │   ├── mcp-servers.json     # MCP サーバー設定テンプレート
+│   │   ├── hookify.*.local.md   # hookify ガードレール（3 ファイル）
+│   │   ├── skills/              # スキル定義（7 スキル）
+│   │   └── agents/              # エージェント定義（3 エージェント）
 │   ├── .zsh/
 │   │   ├── plugins.zsh      # Zinit プラグイン設定
 │   │   ├── aliases.zsh      # エイリアス定義
 │   │   ├── node.zsh         # fnm 初期化
-│   │   └── python.zsh       # pyenv 初期化
+│   │   ├── python.zsh       # pyenv 初期化
+│   │   ├── ssh.zsh          # 1Password SSH エージェント（WSL 用）
+│   │   └── env.zsh          # 環境変数読み込み（~/.claude/.env）
 │   ├── modules/
 │   │   ├── zsh.sh            # モジュール: Zsh 設定一式
 │   │   ├── git.sh            # モジュール: Git グローバル設定
