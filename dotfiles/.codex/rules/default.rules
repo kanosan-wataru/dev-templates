@@ -1,0 +1,7 @@
+# Codex CLI sandbox rules
+# Format: prefix_rule(pattern=["cmd", "arg", ...], decision="allow"|"deny")
+# These rules control which commands Codex can execute in sandbox mode.
+# See: https://codex.openai.com/docs/sandbox
+
+prefix_rule(pattern=["gh", "issue", "view"], decision="allow")
+prefix_rule(pattern=["uv", "run", "pytest"], decision="allow")
