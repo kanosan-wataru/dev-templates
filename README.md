@@ -16,6 +16,7 @@ Zsh ベースのモジュラー構成で、macOS / Linux に対応していま�
 | `dotfiles/.zsh/env.zsh` | 環境変数読み込み（`~/.claude/.env` から MCP サーバー用等） |
 | `dotfiles/.claude/` | Claude Code 設定テンプレート一式（CLAUDE.md, スキル, エージェント等） |
 | `dotfiles/.codex/` | Codex CLI 設定テンプレート（モデル設定、サンドボックスルール） |
+| `dotfiles/.gemini/` | Gemini CLI 設定テンプレート（セッション設定、カスタム指示） |
 | `dotfiles/.gitconfig.shared` | Git 共有設定（include.path 経由で読み込み） |
 | `dotfiles/.gitignore_global` | グローバル gitignore |
 | `dotfiles/setup.sh` | セットアップスクリプト（インタラクティブ選択・自動インストール） |
@@ -138,6 +139,7 @@ zsh dotfiles/setup.sh --uninstall
 #### Gemini CLI
 1. Node.js v18+ / npm の存在確認
 2. `npm install -g @google/gemini-cli`（既にインストール済みならスキップ）
+3. 設定ファイルの配置（settings.json, GEMINI.md）
 
 #### Codex CLI
 1. Node.js v18+ / npm の存在確認
@@ -250,6 +252,9 @@ dev-templates/
 │   │   ├── config.toml          # Codex CLI モデル設定テンプレート
 │   │   └── rules/
 │   │       └── default.rules    # サンドボックス許可ルール
+│   ├── .gemini/
+│   │   ├── settings.json        # Gemini CLI セッション設定
+│   │   └── GEMINI.md            # グローバルカスタム指示テンプレート
 │   ├── .zsh/
 │   │   ├── plugins.zsh      # Zinit プラグイン設定
 │   │   ├── aliases.zsh      # エイリアス定義
