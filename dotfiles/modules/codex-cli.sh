@@ -16,6 +16,7 @@ MODULE_DEPS="node"
 # NOTE: モジュール固有の変数には衝突回避のため CODEX_MOD_ プレフィックスを使用
 CODEX_MOD_CONFIG_DIR="$HOME/.codex"
 CODEX_MOD_RULES_DIR="$CODEX_MOD_CONFIG_DIR/rules"
+CODEX_MOD_SKILLS_DIR="$CODEX_MOD_CONFIG_DIR/skills"
 
 # 管理対象ファイルのリスト（配布元パス, 配置先パス, 表示名, 未検出時メッセージ）
 # NOTE: 配列の各要素は "src|dst|label|hint" の形式
@@ -24,6 +25,10 @@ CODEX_MOD_MANAGED_FILES=(
     "$SCRIPT_DIR/.codex/config.toml|$CODEX_MOD_CONFIG_DIR/config.toml|config.toml|"
     # rules/default.rules (sandbox allow/deny rules)
     "$SCRIPT_DIR/.codex/rules/default.rules|$CODEX_MOD_RULES_DIR/default.rules|rules/default.rules|"
+    # AGENTS.md (agent identity and capabilities)
+    "$SCRIPT_DIR/.codex/AGENTS.md|$CODEX_MOD_CONFIG_DIR/AGENTS.md|AGENTS.md|"
+    # skills/context-loader (project context loading skill)
+    "$SCRIPT_DIR/.codex/skills/context-loader/SKILL.md|$CODEX_MOD_SKILLS_DIR/context-loader/SKILL.md|skills/context-loader/SKILL.md|"
 )
 
 # 配置先ディレクトリのリスト（サブディレクトリを事前作成するため）
@@ -31,6 +36,8 @@ CODEX_MOD_MANAGED_FILES=(
 CODEX_MOD_REQUIRED_DIRS=(
     "$CODEX_MOD_CONFIG_DIR"
     "$CODEX_MOD_RULES_DIR"
+    "$CODEX_MOD_SKILLS_DIR"
+    "$CODEX_MOD_SKILLS_DIR/context-loader"
 )
 
 # --- セットアップ ---
