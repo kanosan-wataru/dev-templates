@@ -1,12 +1,12 @@
 # ---------------------------------------------
 # モジュール: Gemini CLI
-# Google AI CLI (Node.js v18+ 必要)
+# Google AI CLI (Node.js v20+ 必要)
 # ---------------------------------------------
 
 # --- メタデータ ---
 MODULE_ID="gemini-cli"
 MODULE_NAME="Gemini CLI"
-MODULE_DESC="Google AI CLI (Node.js v18+ 必要)"
+MODULE_DESC="Google AI CLI (Node.js v20+ 必要)"
 MODULE_DEFAULT=0
 MODULE_ORDER=30
 # TODO: MODULE_DEPS is not yet consumed by setup.sh -- kept for future dependency resolution
@@ -49,7 +49,7 @@ module_setup() {
     else
         # Node.js / npm の確認
         if ! ensure_node; then
-            print -P "%F{220}スキップ: Gemini CLI のインストールには Node.js v18+ が必要です。%f"
+            print -P "%F{220}スキップ: Gemini CLI のインストールには Node.js v20+ が必要です。%f"
             return 1
         fi
 
