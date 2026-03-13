@@ -15,6 +15,7 @@ MODULE_DEPS="node"
 # --- Gemini CLI 固有変数 ---
 # NOTE: モジュール固有の変数には衝突回避のため GEMINI_MOD_ プレフィックスを使用
 GEMINI_MOD_CONFIG_DIR="$HOME/.gemini"
+GEMINI_MOD_SKILLS_DIR="$GEMINI_MOD_CONFIG_DIR/skills"
 
 # 管理対象ファイルのリスト（配布元パス, 配置先パス, 表示名, 未検出時メッセージ）
 # NOTE: 配列の各要素は "src|dst|label|hint" の形式
@@ -23,12 +24,16 @@ GEMINI_MOD_MANAGED_FILES=(
     "$SCRIPT_DIR/.gemini/settings.json|$GEMINI_MOD_CONFIG_DIR/settings.json|settings.json|"
     # GEMINI.md (global custom instructions)
     "$SCRIPT_DIR/.gemini/GEMINI.md|$GEMINI_MOD_CONFIG_DIR/GEMINI.md|GEMINI.md|"
+    # skills/context-loader (project context loading skill)
+    "$SCRIPT_DIR/.gemini/skills/context-loader/SKILL.md|$GEMINI_MOD_SKILLS_DIR/context-loader/SKILL.md|skills/context-loader/SKILL.md|"
 )
 
 # 配置先ディレクトリのリスト（サブディレクトリを事前作成するため）
 # NOTE: install_config は親ディレクトリの自動作成を行わないため、ここで明示的に列挙する
 GEMINI_MOD_REQUIRED_DIRS=(
     "$GEMINI_MOD_CONFIG_DIR"
+    "$GEMINI_MOD_SKILLS_DIR"
+    "$GEMINI_MOD_SKILLS_DIR/context-loader"
 )
 
 # --- セットアップ ---
