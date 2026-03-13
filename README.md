@@ -47,7 +47,7 @@ zsh dotfiles/setup.sh
   [ ] Node.js 開発環境      fnm + Node.js LTS (バージョン管理)
   [ ] Claude Code           Anthropic CLI (Node.js v18+ 必要)
   [ ] Python 開発環境       pyenv + virtualenv (Python バージョン管理)
-  [ ] Gemini CLI            Google AI CLI (Node.js v18+ 必要)
+  [ ] Gemini CLI            Google AI CLI (Node.js v20+ 必要)
   [ ] Codex CLI              OpenAI CLI (Node.js v18+ 必要)
 ```
 
@@ -61,7 +61,7 @@ zsh dotfiles/setup.sh
 | **Node.js 開発環境** | fnm + Node.js LTS 自動インストール | Homebrew (macOS) / curl + unzip (Linux) |
 | **Claude Code** | Anthropic の AI コーディングアシスタント CLI + 設定テンプレート | Node.js v18+ / jq（MCP マージ用、任意） |
 | **Python 開発環境** | pyenv + pyenv-virtualenv | Git + ビルド依存パッケージ |
-| **Gemini CLI** | Google の AI CLI | Node.js v18+ |
+| **Gemini CLI** | Google の AI CLI | Node.js v20+ |
 | **Codex CLI** | OpenAI の AI コーディングアシスタント CLI + 設定テンプレート | Node.js v18+ |
 
 ### オプション
@@ -137,7 +137,7 @@ zsh dotfiles/setup.sh --uninstall
 6. `~/.claude/.env` に環境変数を設定するよう案内表示
 
 #### Gemini CLI
-1. Node.js v18+ / npm の存在確認
+1. Node.js v20+ / npm の存在確認
 2. `npm install -g @google/gemini-cli`（既にインストール済みならスキップ）
 3. 設定ファイルの配置（settings.json, GEMINI.md）
 
