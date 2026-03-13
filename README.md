@@ -15,6 +15,7 @@ Zsh ベースのモジュラー構成で、macOS / Linux に対応していま�
 | `dotfiles/.zsh/ssh.zsh` | 1Password SSH エージェント設定（WSL 用） |
 | `dotfiles/.zsh/env.zsh` | 環境変数読み込み（`~/.claude/.env` から MCP サーバー用等） |
 | `dotfiles/.claude/` | Claude Code 設定テンプレート一式（CLAUDE.md, スキル, エージェント等） |
+| `dotfiles/.codex/` | Codex CLI 設定テンプレート（モデル設定、サンドボックスルール） |
 | `dotfiles/.gitconfig.shared` | Git 共有設定（include.path 経由で読み込み） |
 | `dotfiles/.gitignore_global` | グローバル gitignore |
 | `dotfiles/setup.sh` | セットアップスクリプト（インタラクティブ選択・自動インストール） |
@@ -46,6 +47,7 @@ zsh dotfiles/setup.sh
   [ ] Claude Code           Anthropic CLI (Node.js v18+ 必要)
   [ ] Python 開発環境       pyenv + virtualenv (Python バージョン管理)
   [ ] Gemini CLI            Google AI CLI (Node.js v18+ 必要)
+  [ ] Codex CLI              OpenAI CLI (Node.js v18+ 必要)
 ```
 
 ### モジュール
@@ -59,6 +61,7 @@ zsh dotfiles/setup.sh
 | **Claude Code** | Anthropic の AI コーディングアシスタント CLI + 設定テンプレート | Node.js v18+ / jq（MCP マージ用、任意） |
 | **Python 開発環境** | pyenv + pyenv-virtualenv | Git + ビルド依存パッケージ |
 | **Gemini CLI** | Google の AI CLI | Node.js v18+ |
+| **Codex CLI** | OpenAI の AI コーディングアシスタント CLI + 設定テンプレート | Node.js v18+ |
 
 ### オプション
 
@@ -136,6 +139,11 @@ zsh dotfiles/setup.sh --uninstall
 1. Node.js v18+ / npm の存在確認
 2. `npm install -g @google/gemini-cli`（既にインストール済みならスキップ）
 
+#### Codex CLI
+1. Node.js v18+ / npm の存在確認
+2. `npm install -g @openai/codex`（既にインストール済みならスキップ）
+3. 設定ファイルの配置（config.toml, rules/default.rules）
+
 完了後、`exec zsh` でシェルを再起動してください。
 
 ## インストールされるプラグイン
@@ -192,6 +200,7 @@ VS Code / Cursor から Dev Containers として接続する場合は、コマ�
 - Claude Code
 - Python (pyenv)
 - Gemini CLI
+- Codex CLI
 
 ### API キーの設定
 
@@ -200,6 +209,7 @@ VS Code / Cursor から Dev Containers として接続する場合は、コマ�
 ```bash
 ANTHROPIC_API_KEY=sk-ant-...
 GEMINI_API_KEY=...
+OPENAI_API_KEY=sk-...
 ```
 
 ## CI
@@ -236,6 +246,10 @@ dev-templates/
 │   │   ├── hookify.*.local.md   # hookify ガードレール（3 ファイル）
 │   │   ├── skills/              # スキル定義（7 スキル）
 │   │   └── agents/              # エージェント定義（3 エージェント）
+│   ├── .codex/
+│   │   ├── config.toml          # Codex CLI モデル設定テンプレート
+│   │   └── rules/
+│   │       └── default.rules    # サンドボックス許可ルール
 │   ├── .zsh/
 │   │   ├── plugins.zsh      # Zinit プラグイン設定
 │   │   ├── aliases.zsh      # エイリアス定義
@@ -249,6 +263,7 @@ dev-templates/
 │   │   ├── modern-cli.sh     # モジュール: モダン CLI ツール
 │   │   ├── node.sh           # モジュール: Node.js 開発環境
 │   │   ├── claude-code.sh    # モジュール: Claude Code
+│   │   ├── codex-cli.sh      # モジュール: Codex CLI
 │   │   ├── python.sh         # モジュール: Python 開発環境
 │   │   └── gemini-cli.sh     # モジュール: Gemini CLI
 │   ├── .gitconfig.shared     # Git 共有設定（include.path 経由）

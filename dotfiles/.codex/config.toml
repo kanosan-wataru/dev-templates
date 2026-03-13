@@ -1,0 +1,9 @@
+# Codex CLI configuration
+# See: https://codex.openai.com/docs/configuration
+
+# Default model to use for code generation and analysis
+model = "gpt-5.4"
+
+# Reasoning effort level: "low", "medium", "high", "xhigh"
+# Higher values produce more thorough analysis at the cost of latency
+model_reasoning_effort = "xhigh"
