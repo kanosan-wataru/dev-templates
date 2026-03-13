@@ -145,4 +145,4 @@ gemini -p "Brief question about {topic}" 2>/dev/null
 1. Ask Gemini in **English**
 2. Receive response in **English**
 3. Execute based on findings
-4. Report to user in **English**
+4. Report to user in **Japanese**

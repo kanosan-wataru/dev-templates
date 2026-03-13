@@ -109,4 +109,4 @@ Files to create/modify:
 1. Ask Codex in **English**
 2. Receive response in **English**
 3. Execute based on advice
-4. Report to user in **English**
+4. Report to user in **Japanese**
