@@ -31,3 +31,7 @@ __pycache__/
 # Claude Code
 # NOTE: ルート直下の CLAUDE.md のみ除外（dotfiles/.claude/CLAUDE.md はテンプレートとして管理する）
 /CLAUDE.md
+.claude/logs/
+.claude/checkpoints/
+.claude/docs/research/*.md
+!.claude/docs/research/.gitkeep
