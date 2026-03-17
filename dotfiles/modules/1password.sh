@@ -523,7 +523,7 @@ module_uninstall() {
         local label="${entry[(ws:|:)3]}"
 
         local -a latest_backup
-        latest_backup=( "${dst}.backup."*(N^/om[1]) )
+        latest_backup=( "${dst}.backup."*(N^/Om[1]) )
 
         if (( ${#latest_backup[@]} > 0 )); then
             print -P "復元: ${label} をバックアップ (${latest_backup[1]:t}) から戻します。"

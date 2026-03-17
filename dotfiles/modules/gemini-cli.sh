@@ -53,7 +53,7 @@ module_setup() {
         print -P "情報: Gemini CLI は既にインストールされています (${current_ver})。スキップします。"
     else
         # Node.js / npm の確認
-        if ! ensure_node; then
+        if ! ensure_node 20; then
             print -P "%F{220}スキップ: Gemini CLI のインストールには Node.js v20+ が必要です。%f"
             return 1
         fi
