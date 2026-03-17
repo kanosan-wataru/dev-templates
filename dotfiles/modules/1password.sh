@@ -56,10 +56,25 @@ _1password_install_op_apt() {
     }
 
     if (( ! DRY_RUN )); then
-        # GPG キーのダウンロード
-        curl -sS https://downloads.1password.com/linux/keys/1password.asc \
-            | sudo gpg --dearmor --output /etc/apt/keyrings/1password-archive-keyring.gpg 2>/dev/null || {
+        # GPG キーのダウンロードと変換を分離して個別にエラーチェック
+        local tmp_key
+        tmp_key=$(mktemp) || {
+            print -P "%F{160}エラー: 一時ファイルの作成に失敗しました。%f" >&2
+            return 1
+        }
+
+        if ! curl -sS -o "$tmp_key" https://downloads.1password.com/linux/keys/1password.asc; then
             print -P "%F{160}エラー: 1Password の GPG キー取得に失敗しました。%f" >&2
+            rm -f "$tmp_key"
+            return 1
+        fi
+
+        # 既存キーファイルがあれば事前に削除（再実行時のべき等性）
+        [[ -f /etc/apt/keyrings/1password-archive-keyring.gpg ]] && sudo rm -f /etc/apt/keyrings/1password-archive-keyring.gpg
+
+        sudo gpg --dearmor --output /etc/apt/keyrings/1password-archive-keyring.gpg "$tmp_key" 2>/dev/null || {
+            print -P "%F{160}エラー: GPG キー変換に失敗しました。%f" >&2
+            rm -f "$tmp_key"
             return 1
         }
 
@@ -67,21 +82,31 @@ _1password_install_op_apt() {
         echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/1password-archive-keyring.gpg] https://downloads.1password.com/linux/debian/$(dpkg --print-architecture) stable main" \
             | sudo tee /etc/apt/sources.list.d/1password.list >/dev/null || {
             print -P "%F{160}エラー: 1Password の apt ソース追加に失敗しました。%f" >&2
+            rm -f "$tmp_key"
             return 1
         }
 
         # debsig ポリシーの設定
         sudo mkdir -p /etc/debsig/policies/AC2D62742012EA22/ 2>/dev/null
-        curl -sS https://downloads.1password.com/linux/debian/debsig/1password.pol \
-            | sudo tee /etc/debsig/policies/AC2D62742012EA22/1password.pol >/dev/null || {
-            print -P "%F{220}警告: debsig ポリシーの設定に失敗しました（インストールは継続します）。%f"
-        }
+        if ! curl -sS -o "$tmp_key" https://downloads.1password.com/linux/debian/debsig/1password.pol; then
+            print -P "%F{220}警告: debsig ポリシーのダウンロードに失敗しました（インストールは継続します）。%f"
+        else
+            sudo tee /etc/debsig/policies/AC2D62742012EA22/1password.pol < "$tmp_key" >/dev/null || {
+                print -P "%F{220}警告: debsig ポリシーの設定に失敗しました（インストールは継続します）。%f"
+            }
+        fi
 
         sudo mkdir -p /usr/share/debsig/keyrings/AC2D62742012EA22 2>/dev/null
-        curl -sS https://downloads.1password.com/linux/keys/1password.asc \
-            | sudo gpg --dearmor --output /usr/share/debsig/keyrings/AC2D62742012EA22/debsig.gpg 2>/dev/null || {
-            print -P "%F{220}警告: debsig キーリングの設定に失敗しました（インストールは継続します）。%f"
-        }
+        [[ -f /usr/share/debsig/keyrings/AC2D62742012EA22/debsig.gpg ]] && sudo rm -f /usr/share/debsig/keyrings/AC2D62742012EA22/debsig.gpg
+        if ! curl -sS -o "$tmp_key" https://downloads.1password.com/linux/keys/1password.asc; then
+            print -P "%F{220}警告: debsig キーリング用キーの取得に失敗しました（インストールは継続します）。%f"
+        else
+            sudo gpg --dearmor --output /usr/share/debsig/keyrings/AC2D62742012EA22/debsig.gpg "$tmp_key" 2>/dev/null || {
+                print -P "%F{220}警告: debsig キーリングの設定に失敗しました（インストールは継続します）。%f"
+            }
+        fi
+
+        rm -f "$tmp_key"
     else
         print -P "%F{242}  [DRY-RUN] curl ... | sudo gpg --dearmor -o /etc/apt/keyrings/1password-archive-keyring.gpg%f"
         print -P "%F{242}  [DRY-RUN] echo 'deb ...' | sudo tee /etc/apt/sources.list.d/1password.list%f"
@@ -185,8 +210,16 @@ _1password_setup_git_signing() {
     local sign_program=""
     case "$env" in
         wsl)
-            # WSL: Windows 側の op-ssh-sign.exe を使用
-            sign_program="/mnt/c/Users/\${WINDOWS_USER}/AppData/Local/1Password/app/8/op-ssh-sign.exe"
+            # WSL: Windows ユーザー名を自動検出して op-ssh-sign.exe のパスを決定
+            local win_user
+            win_user=$(cmd.exe /c "echo %USERNAME%" 2>/dev/null | tr -d '\r')
+            if [[ -z "$win_user" ]]; then
+                print -P "  %F{220}警告: Windows ユーザー名を検出できませんでした。%f"
+                print -P "  手動で設定してください:"
+                print -P "    git config --global gpg.ssh.program '/mnt/c/Users/<ユーザー名>/AppData/Local/1Password/app/8/op-ssh-sign.exe'"
+                return 0
+            fi
+            sign_program="/mnt/c/Users/${win_user}/AppData/Local/1Password/app/8/op-ssh-sign.exe"
             ;;
         linux)
             sign_program="/opt/1Password/op-ssh-sign"
@@ -331,6 +364,12 @@ module_uninstall() {
                 git config --global --unset gpg.ssh.program 2>/dev/null
                 git config --global --unset commit.gpgsign 2>/dev/null
                 print -P "情報: Git 署名設定を解除しました。"
+                local remaining_key
+                remaining_key=$(git config --global user.signingkey 2>/dev/null || true)
+                if [[ -n "$remaining_key" ]]; then
+                    print -P "  NOTE: user.signingkey ('${remaining_key}') は残っています。"
+                    print -P "  不要な場合は: git config --global --unset user.signingkey"
+                fi
             fi
             restored=1
         fi

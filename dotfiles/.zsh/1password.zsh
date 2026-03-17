@@ -21,8 +21,12 @@ if _1password_is_wsl; then
     # -------------------------------------------------
     # WSL: Windows 側の 1Password SSH エージェントを利用
     # -------------------------------------------------
-    alias ssh='ssh.exe'
-    alias ssh-add='ssh-add.exe'
+    if command -v ssh.exe >/dev/null 2>&1; then
+        alias ssh='ssh.exe'
+    fi
+    if command -v ssh-add.exe >/dev/null 2>&1; then
+        alias ssh-add='ssh-add.exe'
+    fi
 
 elif [[ "$OSTYPE" == darwin* ]]; then
     # -------------------------------------------------
