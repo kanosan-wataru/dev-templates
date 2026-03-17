@@ -151,6 +151,17 @@ ensure_node() {
 
     local node_ver
     node_ver=$(node -v | sed 's/^v//' | cut -d. -f1)
+
+    # Validate numeric values
+    if [[ ! "$min_version" =~ ^[0-9]+$ ]]; then
+        print -P "%F{160}エラー: ensure_node に不正な引数が渡されました: ${min_version}%f" >&2
+        return 1
+    fi
+    if [[ ! "$node_ver" =~ ^[0-9]+$ ]]; then
+        print -P "%F{160}エラー: Node.js のバージョンを取得できませんでした。%f" >&2
+        return 1
+    fi
+
     if (( node_ver < min_version )); then
         print -P "%F{160}エラー: Node.js v${min_version} 以上が必要です（現在: v${node_ver}）%f" >&2
         print -P "  Node.js をアップグレードしてください。" >&2
