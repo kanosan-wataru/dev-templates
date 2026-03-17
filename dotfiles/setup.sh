@@ -32,6 +32,7 @@ ALL_FLAG=0
 HELP_FLAG=0
 typeset -a SELECT_MODULES
 typeset -A MODULE_DEPS_MAP
+typeset -A MODULE_ID_SET
 
 while (( $# > 0 )); do
     case "$1" in
@@ -413,6 +414,7 @@ load_modules() {
 
         # Save dependency mapping
         MODULE_DEPS_MAP[$MODULE_ID]="$MODULE_DEPS"
+        MODULE_ID_SET[$MODULE_ID]=1
 
         # ORDER 付きで一時配列に格納（後でソート）
         _unsorted+=("$(printf '%03d' "$MODULE_ORDER")|${MODULE_ID}|${MODULE_NAME}|${MODULE_DESC}|${MODULE_DEFAULT}")
@@ -531,22 +533,13 @@ resolve_module_deps() {
             for dep in ${(s: :)deps}; do
                 # Check if dep is already selected
                 if ! (( ${selected_module_ids[(Ie)$dep]} )); then
-                    # Verify the dep module actually exists in MODULES
-                    local dep_exists=0
-                    for entry in "${MODULES[@]}"; do
-                        local entry_id="${entry%%|*}"
-                        if [[ "$entry_id" == "$dep" ]]; then
-                            dep_exists=1
-                            break
-                        fi
-                    done
-
-                    if (( dep_exists )); then
+                    # O(1) existence check
+                    if [[ -n "${MODULE_ID_SET[$dep]}" ]]; then
                         selected_module_ids+=("$dep")
                         added_deps+=("$dep")
                         changed=1
                     else
-                        print -P "%F{220}警告: モジュール '${mod_id}' の依存先 '${dep}' が見つかりません。%f"
+                        print -P "%F{220}警告: モジュール '${mod_id}' の依存先 '${dep}' が見つかりません。%f" >&2
                     fi
                 fi
             done
