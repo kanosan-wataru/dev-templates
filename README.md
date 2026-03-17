@@ -13,6 +13,7 @@ Zsh ベースのモジュラー構成で、macOS / Linux に対応していま�
 | `dotfiles/.zsh/node.zsh` | fnm (Fast Node Manager) 初期化 |
 | `dotfiles/.zsh/python.zsh` | pyenv / pyenv-virtualenv 初期化 |
 | `dotfiles/.zsh/1password.zsh` | 1Password SSH エージェント設定（WSL/Linux/macOS 自動判定） |
+| `dotfiles/.zsh/.p10k.zsh` | Powerlevel10k テーマ設定 |
 | `dotfiles/.zsh/env.zsh` | 環境変数読み込み（`~/.claude/.env` から MCP サーバー用等） |
 | `dotfiles/.claude/` | Claude Code 設定テンプレート一式（CLAUDE.md, スキル, エージェント等） |
 | `dotfiles/.codex/` | Codex CLI 設定テンプレート（モデル設定、サンドボックスルール） |
@@ -43,6 +44,7 @@ zsh dotfiles/setup.sh
 
 > [x] Zsh 設定一式         Zinit + プラグイン + テーマ + エイリアス
   [ ] Git グローバル設定    .gitconfig.shared + .gitignore_global
+  [ ] 1Password            CLI + SSH エージェント + Git 署名
   [ ] モダン CLI ツール     eza / bat / fd / ripgrep
   [ ] Node.js 開発環境      fnm + Node.js LTS (バージョン管理)
   [ ] Claude Code           Anthropic CLI (Node.js v18+ 必要)
@@ -57,6 +59,7 @@ zsh dotfiles/setup.sh
 |-----------|------|------|
 | **Zsh 設定一式** | Zinit + プラグイン + テーマ + エイリアス | Git |
 | **Git グローバル設定** | 共有 gitconfig + グローバル gitignore | Git |
+| **1Password** | 1Password CLI + SSH エージェント + Git 署名設定 | — |
 | **モダン CLI ツール** | eza / bat / fd / ripgrep | Homebrew (macOS) / apt + wget + gpg (Linux) |
 | **Node.js 開発環境** | fnm + Node.js LTS 自動インストール | Homebrew (macOS) / curl + unzip (Linux) |
 | **Claude Code** | Anthropic の AI コーディングアシスタント CLI + 設定テンプレート | Node.js v18+ / jq（MCP マージ用、任意） |
@@ -112,6 +115,13 @@ zsh dotfiles/setup.sh --uninstall
 4. `core.excludesFile` でグローバル gitignore を紐付け
 5. `user.name` / `user.email` の設定ガイドを表示
 
+#### 1Password
+1. 環境の自動判定（WSL / ネイティブ Linux / macOS）
+2. 1Password CLI (`op`) のインストール（macOS: Homebrew / Linux: apt + GPG キー設定）
+3. `1password.zsh` の配置（SSH エージェント設定・WSL リダイレクト対応）
+4. SSH エージェントの設定案内（環境に応じたガイド表示）
+5. Git コミット署名設定（`gpg.format=ssh` + `op-ssh-sign` の自動設定）
+
 #### モダン CLI ツール
 1. OS 判定（macOS: Homebrew / Linux: apt）
 2. 各ツール（eza, bat, fd, ripgrep）を順次インストール（既にインストール済みならスキップ）
@@ -139,12 +149,12 @@ zsh dotfiles/setup.sh --uninstall
 #### Gemini CLI
 1. Node.js v20+ / npm の存在確認
 2. `npm install -g @google/gemini-cli`（既にインストール済みならスキップ）
-3. 設定ファイルの配置（settings.json, GEMINI.md）
+3. 設定ファイルの配置（settings.json, GEMINI.md, skills/）
 
 #### Codex CLI
 1. Node.js v18+ / npm の存在確認
 2. `npm install -g @openai/codex`（既にインストール済みならスキップ）
-3. 設定ファイルの配置（config.toml, rules/default.rules）
+3. 設定ファイルの配置（config.toml, rules/default.rules, AGENTS.md, skills/）
 
 完了後、`exec zsh` でシェルを再起動してください。
 
@@ -197,6 +207,7 @@ VS Code / Cursor から Dev Containers として接続する場合は、コマ�
 
 - Zsh + Zinit + Powerlevel10k
 - Git グローバル設定
+- 1Password CLI + SSH エージェント + Git 署名
 - モダン CLI ツール (eza, bat, fd, ripgrep)
 - Node.js (fnm + LTS)
 - Claude Code
@@ -249,13 +260,19 @@ dev-templates/
 │   │   ├── skills/              # スキル定義（7 スキル）
 │   │   └── agents/              # エージェント定義（3 エージェント）
 │   ├── .codex/
+│   │   ├── AGENTS.md            # Codex CLI エージェント設定
 │   │   ├── config.toml          # Codex CLI モデル設定テンプレート
-│   │   └── rules/
-│   │       └── default.rules    # サンドボックス許可ルール
+│   │   ├── rules/
+│   │   │   └── default.rules    # サンドボックス許可ルール
+│   │   └── skills/
+│   │       └── context-loader/  # コンテキストローダースキル
 │   ├── .gemini/
+│   │   ├── GEMINI.md            # グローバルカスタム指示テンプレート
 │   │   ├── settings.json        # Gemini CLI セッション設定
-│   │   └── GEMINI.md            # グローバルカスタム指示テンプレート
+│   │   └── skills/
+│   │       └── context-loader/  # コンテキストローダースキル
 │   ├── .zsh/
+│   │   ├── .p10k.zsh        # Powerlevel10k テーマ設定
 │   │   ├── plugins.zsh      # Zinit プラグイン設定
 │   │   ├── aliases.zsh      # エイリアス定義
 │   │   ├── node.zsh         # fnm 初期化
