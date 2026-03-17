@@ -31,7 +31,7 @@
 | `dotfiles/.claude/agents/*.md` | `~/.claude/agents/` | サブエージェント定義（3 エージェント） |
 | `.claude/rules/*.md` | プロジェクトルート | コーディング・開発ルール（7 ファイル） |
 | `dotfiles/.zsh/env.zsh` | `~/.zsh/env.zsh` | `.env` ファイルからの環境変数読み込み |
-| `dotfiles/.zsh/ssh.zsh` | `~/.zsh/ssh.zsh` | 1Password SSH エージェント（WSL 用）※ `claude-code.sh` の管理対象外（手動配置） |
+| `dotfiles/.zsh/1password.zsh` | `~/.zsh/1password.zsh` | 1Password SSH エージェント（WSL/Linux/macOS 自動判定）※ `1password.sh` モジュールの管理対象 |
 | `dotfiles/modules/claude-code.sh` | setup.sh モジュール | インストール・アンインストール自動化 |
 
 ---
@@ -443,14 +443,16 @@ MCP サーバー設定は `~/.claude.json` の `mcpServers` キーにマージ�
 - MCP サーバーが必要とする環境変数（`GITHUB_COPILOT_TOKEN`、`BRAVE_API_KEY`、`GOOGLE_CLOUD_PROJECT` 等）の供給源
 - 無効化: `export DISABLE_DOTENV=1` を `.zshenv` 等で設定
 
-### ssh.zsh
+### 1password.zsh
 
-**ファイル**: `dotfiles/.zsh/ssh.zsh` → `~/.zsh/ssh.zsh`
+**ファイル**: `dotfiles/.zsh/1password.zsh` → `~/.zsh/1password.zsh`
 
-- Windows 側の 1Password SSH エージェントを WSL から利用するための設定
+- 1Password SSH エージェントを環境に応じて自動設定
+- WSL: `ssh` / `ssh-add` を `.exe` 版にエイリアス
+- ネイティブ Linux: `~/.1password/agent.sock` を `SSH_AUTH_SOCK` に設定
+- macOS: `~/Library/Group Containers/2BUA8C4S2C.com.1password/t/agent.sock` を `SSH_AUTH_SOCK` に設定
 - デフォルト: OFF
 - 有効化: `export ENABLE_SSH_1PASSWORD=1` を `.zshenv` 等で設定
-- `ssh` / `ssh-add` を `.exe` 版にエイリアス
 
 ---
 
