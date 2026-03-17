@@ -136,20 +136,23 @@ install_config() {
     fi
 }
 
-# Node.js v18+ と npm の存在を確認するヘルパー
+# Node.js と npm の存在を確認するヘルパー
+# 引数: $1=最低メジャーバージョン（省略時: 18）
 # 戻り値: 0=利用可能, 1=利用不可
 ensure_node() {
+    local min_version="${1:-18}"
+
     if ! command -v node >/dev/null 2>&1; then
         print -P "%F{160}エラー: Node.js がインストールされていません。%f" >&2
-        print -P "  nvm, fnm, volta 等で Node.js v18 以上をインストールしてください。" >&2
+        print -P "  nvm, fnm, volta 等で Node.js v${min_version} 以上をインストールしてください。" >&2
         print -P "  例: curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.1/install.sh | bash" >&2
         return 1
     fi
 
     local node_ver
     node_ver=$(node -v | sed 's/^v//' | cut -d. -f1)
-    if (( node_ver < 18 )); then
-        print -P "%F{160}エラー: Node.js v18 以上が必要です（現在: v${node_ver}）%f" >&2
+    if (( node_ver < min_version )); then
+        print -P "%F{160}エラー: Node.js v${min_version} 以上が必要です（現在: v${node_ver}）%f" >&2
         print -P "  Node.js をアップグレードしてください。" >&2
         return 1
     fi
