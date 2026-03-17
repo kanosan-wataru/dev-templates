@@ -54,6 +54,17 @@ _docker_install_apt() {
         return 1
     fi
 
+    # Detect distro (ubuntu or debian)
+    local distro
+    distro=$(. /etc/os-release && echo "$ID")
+    case "$distro" in
+        ubuntu|debian) ;;
+        *)
+            print -P "%F{160}エラー: 未対応のディストリビューションです (${distro})。Ubuntu または Debian が必要です。%f" >&2
+            return 1
+            ;;
+    esac
+
     # Step 1: Remove conflicting old packages
     if (( ! DRY_RUN )); then
         local -a old_pkgs
@@ -85,7 +96,7 @@ _docker_install_apt() {
     }
 
     if (( ! DRY_RUN )); then
-        sudo curl -fsSL https://download.docker.com/linux/ubuntu/gpg \
+        sudo curl -fsSL "https://download.docker.com/linux/${distro}/gpg" \
             -o "$DOCKER_MOD_GPG_KEY" || {
             print -P "%F{160}エラー: Docker の GPG キー取得に失敗しました。%f" >&2
             return 1
@@ -95,7 +106,7 @@ _docker_install_apt() {
             return 1
         }
     else
-        print -P "%F{242}  [DRY-RUN] curl -fsSL https://download.docker.com/linux/ubuntu/gpg -o ${DOCKER_MOD_GPG_KEY}%f"
+        print -P "%F{242}  [DRY-RUN] curl -fsSL https://download.docker.com/linux/${distro}/gpg -o ${DOCKER_MOD_GPG_KEY}%f"
     fi
 
     # Step 4: Add Docker APT repository (DEB822 format)
@@ -107,17 +118,16 @@ _docker_install_apt() {
             return 1
         fi
 
-        sudo tee "$DOCKER_MOD_APT_SOURCE" >/dev/null <<REPO
-Types: deb
-URIs: https://download.docker.com/linux/ubuntu
+        local sources_content="Types: deb
+URIs: https://download.docker.com/linux/${distro}
 Suites: ${codename}
 Components: stable
-Signed-By: ${DOCKER_MOD_GPG_KEY}
-REPO
-        if [[ $? -ne 0 ]]; then
+Signed-By: ${DOCKER_MOD_GPG_KEY}"
+
+        print "$sources_content" | sudo tee "$DOCKER_MOD_APT_SOURCE" >/dev/null || {
             print -P "%F{160}エラー: Docker の apt ソース追加に失敗しました。%f" >&2
             return 1
-        fi
+        }
     else
         print -P "%F{242}  [DRY-RUN] sudo tee ${DOCKER_MOD_APT_SOURCE} (DEB822 format)%f"
     fi
@@ -265,6 +275,10 @@ module_uninstall() {
 
     case "$env" in
         linux)
+            if ! command -v apt-get >/dev/null 2>&1; then
+                print -P "%F{160}エラー: apt-get が見つかりません。Debian/Ubuntu 系のみ対応しています。%f" >&2
+                return 1
+            fi
             print -P "Docker Engine を削除します..."
 
             # Remove Docker packages
