@@ -12,6 +12,8 @@ MODULE_ORDER=13
 
 # NOTE: モジュール固有の変数には衝突回避のため OP_MOD_ プレフィックスを使用
 OP_MOD_DEBSIG_KEY_ID="AC2D62742012EA22"
+OP_MOD_TOKEN_DIR="${HOME}/.config/op"
+OP_MOD_TOKEN_FILE="${OP_MOD_TOKEN_DIR}/service-account-token"
 
 # 管理対象ファイル（配布元パス, 配置先パス, 表示名, 未検出時メッセージ）
 OP_MOD_MANAGED_FILES=(
@@ -265,6 +267,113 @@ _1password_setup_git_signing() {
     fi
 }
 
+# --- Helper: Service account token storage ---
+_1password_setup_service_account_token() {
+    print -P ""
+    print -P "サービスアカウントトークン設定:"
+
+    # Check if token file already exists
+    if [[ -f "$OP_MOD_TOKEN_FILE" ]]; then
+        print -P "  情報: トークンファイルが既に存在します (${OP_MOD_TOKEN_FILE})。"
+        print -P -n "  上書きしますか？ [y/N]: "
+        local overwrite
+        read -r overwrite
+        if [[ "$overwrite" != [yY] ]]; then
+            print -P "  スキップしました。"
+            return 0
+        fi
+    else
+        print -P -n "  サービスアカウントトークンを設定しますか？ [y/N]: "
+        local configure
+        read -r configure
+        if [[ "$configure" != [yY] ]]; then
+            print -P "  スキップしました。"
+            return 0
+        fi
+    fi
+
+    # Prompt for token value (silent input)
+    print -P -n "  トークンを入力してください: "
+    local token
+    read -r -s token
+    print ""  # Newline after silent input
+
+    if [[ -z "$token" ]]; then
+        print -P "  %F{220}警告: トークンが空です。スキップします。%f"
+        return 0
+    fi
+
+    # Validate token characters (allow only safe characters to prevent injection)
+    if [[ ! "$token" =~ ^[A-Za-z0-9_+/=.-]+$ ]]; then
+        print -P "%F{196}エラー: トークンに不正な文字が含まれています。%f"
+        return 1
+    fi
+
+    # Warn if token seems too short
+    if (( ${#token} < 10 )); then
+        print -P "%F{220}警告: トークンが短すぎます。正しい値か確認してください。%f"
+    fi
+
+    # Create directory with restricted permissions
+    if [[ ! -d "$OP_MOD_TOKEN_DIR" ]]; then
+        if (( DRY_RUN )); then
+            print -P "%F{242}  [DRY-RUN] mkdir -p ${OP_MOD_TOKEN_DIR} && chmod 700 ${OP_MOD_TOKEN_DIR}%f"
+        else
+            mkdir -p "$OP_MOD_TOKEN_DIR" || {
+                print -P "%F{160}エラー: ${OP_MOD_TOKEN_DIR} の作成に失敗しました。%f" >&2
+                return 1
+            }
+            chmod 700 "$OP_MOD_TOKEN_DIR" || {
+                print -P "%F{160}エラー: ${OP_MOD_TOKEN_DIR} のパーミッション設定に失敗しました。%f" >&2
+                return 1
+            }
+        fi
+    fi
+
+    # Write token file with restricted permissions
+    if (( DRY_RUN )); then
+        print -P "%F{242}  [DRY-RUN] トークンを ${OP_MOD_TOKEN_FILE} に保存 (chmod 600)%f"
+    else
+        # Write the token file atomically via a temp file
+        # Set restrictive umask so mktemp creates files with safe permissions
+        local old_umask
+        old_umask=$(umask)
+        umask 077
+
+        local tmp_file
+        tmp_file=$(mktemp "${OP_MOD_TOKEN_DIR}/.token.XXXXXX") || {
+            print -P "%F{160}エラー: 一時ファイルの作成に失敗しました。%f" >&2
+            umask "$old_umask"
+            return 1
+        }
+
+        chmod 600 "$tmp_file" || {
+            print -P "%F{160}エラー: 一時ファイルのパーミッション設定に失敗しました。%f" >&2
+            rm -f "$tmp_file"
+            umask "$old_umask"
+            return 1
+        }
+
+        printf "export OP_SERVICE_ACCOUNT_TOKEN='%s'\n" "$token" > "$tmp_file" || {
+            print -P "%F{160}エラー: トークンの書き込みに失敗しました。%f" >&2
+            rm -f "$tmp_file"
+            umask "$old_umask"
+            return 1
+        }
+
+        mv "$tmp_file" "$OP_MOD_TOKEN_FILE" || {
+            print -P "%F{160}エラー: トークンファイルの配置に失敗しました。%f" >&2
+            rm -f "$tmp_file"
+            umask "$old_umask"
+            return 1
+        }
+
+        umask "$old_umask"
+
+        print -P "  %F{34}トークンを保存しました: ${OP_MOD_TOKEN_FILE}%f"
+    fi
+}
+
 # --- セットアップ ---
 module_setup() {
     print -P ""
@@ -334,6 +443,9 @@ module_setup() {
     # --- 4. Git コミット署名設定 ---
     _1password_setup_git_signing "$env"
 
+    # --- 5. サービスアカウントトークン設定 ---
+    _1password_setup_service_account_token
+
     # --- 完了メッセージ ---
     print -P ""
     if (( DRY_RUN )); then
@@ -373,6 +485,35 @@ module_uninstall() {
                 fi
             fi
             restored=1
+        fi
+    fi
+
+    # サービスアカウントトークンの削除
+    if [[ -f "$OP_MOD_TOKEN_FILE" ]]; then
+        print -P -n "サービスアカウントトークンを削除しますか？ (${OP_MOD_TOKEN_FILE}) [y/N]: "
+        local remove_token
+        read -r remove_token
+        if [[ "$remove_token" == [yY] ]]; then
+            if (( DRY_RUN )); then
+                print -P "%F{242}  [DRY-RUN] rm -f ${OP_MOD_TOKEN_FILE}%f"
+            else
+                # Use shred for secure deletion if available
+                if command -v shred >/dev/null 2>&1; then
+                    shred -u "$OP_MOD_TOKEN_FILE" || {
+                        print -P "%F{160}エラー: トークンファイルの安全な削除に失敗しました。%f" >&2
+                        return 1
+                    }
+                else
+                    rm -f "$OP_MOD_TOKEN_FILE" || {
+                        print -P "%F{160}エラー: トークンファイルの削除に失敗しました。%f" >&2
+                        return 1
+                    }
+                fi
+                print -P "情報: サービスアカウントトークンを削除しました。"
+            fi
+            restored=1
+        else
+            print -P "情報: トークンファイルは残しました。手動で削除する場合: rm ${OP_MOD_TOKEN_FILE}"
         fi
     fi
 
