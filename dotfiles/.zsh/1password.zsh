@@ -32,7 +32,7 @@ elif [[ "$OSTYPE" == darwin* ]]; then
     # -------------------------------------------------
     # macOS: 1Password SSH エージェントソケットを設定
     # -------------------------------------------------
-    local _op_sock="$HOME/Library/Group Containers/2BUA8C4S2C.com.1password/t/agent.sock"
+    _op_sock="$HOME/Library/Group Containers/2BUA8C4S2C.com.1password/t/agent.sock"
     if [[ -S "$_op_sock" ]]; then
         export SSH_AUTH_SOCK="$_op_sock"
     fi
@@ -42,7 +42,7 @@ elif [[ "$OSTYPE" == linux* ]]; then
     # -------------------------------------------------
     # ネイティブ Linux: 1Password SSH エージェントソケットを設定
     # -------------------------------------------------
-    local _op_sock="$HOME/.1password/agent.sock"
+    _op_sock="$HOME/.1password/agent.sock"
     if [[ -S "$_op_sock" ]]; then
         export SSH_AUTH_SOCK="$_op_sock"
     fi

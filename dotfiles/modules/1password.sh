@@ -11,6 +11,7 @@ MODULE_DEFAULT=0
 MODULE_ORDER=13
 
 # NOTE: モジュール固有の変数には衝突回避のため OP_MOD_ プレフィックスを使用
+OP_MOD_DEBSIG_KEY_ID="AC2D62742012EA22"
 
 # 管理対象ファイル（配布元パス, 配置先パス, 表示名, 未検出時メッセージ）
 OP_MOD_MANAGED_FILES=(
@@ -87,21 +88,21 @@ _1password_install_op_apt() {
         }
 
         # debsig ポリシーの設定
-        sudo mkdir -p /etc/debsig/policies/AC2D62742012EA22/ 2>/dev/null
+        run_cmd sudo mkdir -p "/etc/debsig/policies/${OP_MOD_DEBSIG_KEY_ID}/"
         if ! curl -sS -o "$tmp_key" https://downloads.1password.com/linux/debian/debsig/1password.pol; then
             print -P "%F{220}警告: debsig ポリシーのダウンロードに失敗しました（インストールは継続します）。%f"
         else
-            sudo tee /etc/debsig/policies/AC2D62742012EA22/1password.pol < "$tmp_key" >/dev/null || {
+            sudo tee /etc/debsig/policies/${OP_MOD_DEBSIG_KEY_ID}/1password.pol < "$tmp_key" >/dev/null || {
                 print -P "%F{220}警告: debsig ポリシーの設定に失敗しました（インストールは継続します）。%f"
             }
         fi
 
-        sudo mkdir -p /usr/share/debsig/keyrings/AC2D62742012EA22 2>/dev/null
-        [[ -f /usr/share/debsig/keyrings/AC2D62742012EA22/debsig.gpg ]] && sudo rm -f /usr/share/debsig/keyrings/AC2D62742012EA22/debsig.gpg
+        run_cmd sudo mkdir -p "/usr/share/debsig/keyrings/${OP_MOD_DEBSIG_KEY_ID}"
+        [[ -f /usr/share/debsig/keyrings/${OP_MOD_DEBSIG_KEY_ID}/debsig.gpg ]] && sudo rm -f /usr/share/debsig/keyrings/${OP_MOD_DEBSIG_KEY_ID}/debsig.gpg
         if ! curl -sS -o "$tmp_key" https://downloads.1password.com/linux/keys/1password.asc; then
             print -P "%F{220}警告: debsig キーリング用キーの取得に失敗しました（インストールは継続します）。%f"
         else
-            sudo gpg --dearmor --output /usr/share/debsig/keyrings/AC2D62742012EA22/debsig.gpg "$tmp_key" 2>/dev/null || {
+            sudo gpg --dearmor --output /usr/share/debsig/keyrings/${OP_MOD_DEBSIG_KEY_ID}/debsig.gpg "$tmp_key" 2>/dev/null || {
                 print -P "%F{220}警告: debsig キーリングの設定に失敗しました（インストールは継続します）。%f"
             }
         fi
