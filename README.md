@@ -63,7 +63,7 @@ zsh dotfiles/setup.sh
 | **1Password** | 1Password CLI + SSH エージェント + Git 署名設定 | — |
 | **モダン CLI ツール** | eza / bat / fd / ripgrep | Homebrew (macOS) / apt + wget + gpg (Linux) |
 | **Node.js 開発環境** | fnm + Node.js LTS 自動インストール | Homebrew (macOS) / curl + unzip (Linux) |
-| **Docker** | Docker Engine + Compose | curl + gpg (Linux) / Docker Desktop (macOS) |
+| **Docker** | Docker Engine + Compose | Homebrew (macOS) / apt + curl (Linux) |
 | **Claude Code** | Anthropic の AI コーディングアシスタント CLI + 設定テンプレート | Node.js v18+ / jq（MCP マージ用、任意） |
 | **Python 開発環境** | pyenv + pyenv-virtualenv | Git + ビルド依存パッケージ |
 | **Gemini CLI** | Google の AI CLI | Node.js v20+ |
