@@ -33,26 +33,28 @@ _docker_detect_env() {
 }
 
 # --- Helper: Check if Docker is already installed ---
-# Returns 0 if installed (prints version), 1 if not
+# Returns 0 if both Docker and Compose plugin are installed, 1 otherwise
 _docker_is_installed() {
-    if command -v docker >/dev/null 2>&1; then
-        local ver
-        ver=$(docker --version 2>/dev/null || print "unknown")
-        print -P "情報: Docker は既にインストールされています (${ver})。スキップします。"
-        return 0
+    if ! command -v docker >/dev/null 2>&1; then
+        return 1
     fi
-    return 1
+
+    # Docker binary exists; check Compose plugin
+    if ! docker compose version >/dev/null 2>&1; then
+        print -P "%F{220}警告: Docker はインストールされていますが、Compose プラグインが見つかりません。再インストールします。%f"
+        return 1
+    fi
+
+    local docker_ver compose_ver
+    docker_ver=$(docker --version 2>/dev/null || print "unknown")
+    compose_ver=$(docker compose version 2>/dev/null || print "unknown")
+    print -P "情報: Docker は既にインストールされています (${docker_ver}, ${compose_ver})。スキップします。"
+    return 0
 }
 
 # --- Helper: Install Docker Engine via apt (Ubuntu/Debian) ---
 _docker_install_apt() {
     print -P "  Docker Engine を apt でインストールします..."
-
-    # Check for required commands
-    if ! command -v curl >/dev/null 2>&1; then
-        print -P "%F{160}エラー: curl がインストールされていません。%f" >&2
-        return 1
-    fi
 
     # Detect distro (ubuntu or debian)
     local distro
@@ -159,6 +161,9 @@ _docker_install_macos() {
 
 # --- Helper: Docker group setup + systemd auto-start (Linux only) ---
 _docker_setup_group() {
+    # NOTE: $USER becomes "root" under sudo; resolve the real invoking user
+    local target_user="${SUDO_USER:-$(id -un)}"
+
     print -P ""
     print -P "Docker グループ設定:"
 
@@ -169,10 +174,10 @@ _docker_setup_group() {
     }
 
     # Add current user to docker group
-    if id -nG "$USER" 2>/dev/null | grep -qw docker; then
-        print -P "  情報: ユーザー ${USER} は既に docker グループに所属しています。"
+    if id -nG "$target_user" 2>/dev/null | grep -qw docker; then
+        print -P "  情報: ユーザー ${target_user} は既に docker グループに所属しています。"
     else
-        run_cmd sudo usermod -aG docker "$USER" || {
+        run_cmd sudo usermod -aG docker "$target_user" || {
             print -P "%F{160}エラー: ユーザーの docker グループ追加に失敗しました。%f" >&2
             return 1
         }
