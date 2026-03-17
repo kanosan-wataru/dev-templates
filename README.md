@@ -47,6 +47,7 @@ zsh dotfiles/setup.sh
   [ ] 1Password            CLI + SSH エージェント + Git 署名
   [ ] モダン CLI ツール     eza / bat / fd / ripgrep
   [ ] Node.js 開発環境      fnm + Node.js LTS (バージョン管理)
+  [ ] Docker                Docker Engine + Compose
   [ ] Claude Code           Anthropic CLI (Node.js v18+ 必要)
   [ ] Python 開発環境       pyenv + virtualenv (Python バージョン管理)
   [ ] Gemini CLI            Google AI CLI (Node.js v20+ 必要)
@@ -62,6 +63,7 @@ zsh dotfiles/setup.sh
 | **1Password** | 1Password CLI + SSH エージェント + Git 署名設定 | — |
 | **モダン CLI ツール** | eza / bat / fd / ripgrep | Homebrew (macOS) / apt + wget + gpg (Linux) |
 | **Node.js 開発環境** | fnm + Node.js LTS 自動インストール | Homebrew (macOS) / curl + unzip (Linux) |
+| **Docker** | Docker Engine + Compose | Homebrew (macOS) / apt + curl (Linux) |
 | **Claude Code** | Anthropic の AI コーディングアシスタント CLI + 設定テンプレート | Node.js v18+ / jq（MCP マージ用、任意） |
 | **Python 開発環境** | pyenv + pyenv-virtualenv | Git + ビルド依存パッケージ |
 | **Gemini CLI** | Google の AI CLI | Node.js v20+ |
@@ -131,6 +133,12 @@ zsh dotfiles/setup.sh --uninstall
 1. [fnm](https://github.com/Schniz/fnm) (Fast Node Manager) のインストール（macOS: Homebrew / Linux: GitHub Releases）
 2. Node.js LTS の自動インストール + デフォルト設定
 3. `node.zsh` の配置（fnm 初期化・`--use-on-cd` 対応）
+
+#### Docker
+1. 環境の自動判定（Linux / macOS）
+2. Docker Engine + Compose プラグインのインストール（Linux: apt + GPG キー設定 / macOS: Homebrew Cask で Docker Desktop）
+3. docker グループへのユーザー追加（Linux のみ）
+4. systemd サービスの自動起動設定（Linux のみ、systemctl 利用可能時）
 
 #### Python 開発環境
 1. ビルド依存パッケージのインストール（macOS: Homebrew / Linux: apt）
@@ -210,6 +218,7 @@ VS Code / Cursor から Dev Containers として接続する場合は、コマ�
 - 1Password CLI + SSH エージェント + Git 署名
 - モダン CLI ツール (eza, bat, fd, ripgrep)
 - Node.js (fnm + LTS)
+- Docker Engine + Compose
 - Claude Code
 - Python (pyenv)
 - Gemini CLI
@@ -285,6 +294,7 @@ dev-templates/
 │   │   ├── 1password.sh      # モジュール: 1Password CLI + SSH + Git 署名
 │   │   ├── modern-cli.sh     # モジュール: モダン CLI ツール
 │   │   ├── node.sh           # モジュール: Node.js 開発環境
+│   │   ├── docker.sh         # モジュール: Docker
 │   │   ├── claude-code.sh    # モジュール: Claude Code
 │   │   ├── codex-cli.sh      # モジュール: Codex CLI
 │   │   ├── python.sh         # モジュール: Python 開発環境

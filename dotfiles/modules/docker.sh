@@ -1,16 +1,16 @@
 # ---------------------------------------------
-# Module: Docker
+# モジュール: Docker
 # Docker Engine + Compose
 # ---------------------------------------------
 
-# --- Metadata ---
+# --- メタデータ ---
 MODULE_ID="docker"
 MODULE_NAME="Docker"
 MODULE_DESC="Docker Engine + Compose"
 MODULE_DEFAULT=0
 MODULE_ORDER=19
 
-# NOTE: Module-specific variables use DOCKER_MOD_ prefix to avoid collisions
+# NOTE: モジュール固有の変数には衝突回避のため DOCKER_MOD_ プレフィックスを使用
 
 DOCKER_MOD_APT_SOURCE="/etc/apt/sources.list.d/docker.sources"
 DOCKER_MOD_GPG_KEY="/etc/apt/keyrings/docker.asc"
@@ -22,8 +22,8 @@ DOCKER_MOD_APT_PACKAGES=(
     docker-compose-plugin
 )
 
-# --- Helper: Environment detection ---
-# Returns: "macos" / "linux" / "unknown"
+# --- ヘルパー: 環境判定 ---
+# 戻り値: "macos" / "linux" / "unknown"
 _docker_detect_env() {
     case "$OSTYPE" in
         darwin*) print "macos" ;;
@@ -32,14 +32,14 @@ _docker_detect_env() {
     esac
 }
 
-# --- Helper: Check if Docker is already installed ---
-# Returns 0 if both Docker and Compose plugin are installed, 1 otherwise
+# --- ヘルパー: Docker がインストール済みか確認 ---
+# 戻り値: Docker と Compose プラグインの両方がインストール済みなら 0、それ以外は 1
 _docker_is_installed() {
     if ! command -v docker >/dev/null 2>&1; then
         return 1
     fi
 
-    # Docker binary exists; check Compose plugin
+    # Docker バイナリは存在する; Compose プラグインを確認
     if ! docker compose version >/dev/null 2>&1; then
         print -P "%F{220}警告: Docker はインストールされていますが、Compose プラグインが見つかりません。再インストールします。%f"
         return 1
@@ -52,11 +52,11 @@ _docker_is_installed() {
     return 0
 }
 
-# --- Helper: Install Docker Engine via apt (Ubuntu/Debian) ---
+# --- ヘルパー: Docker Engine の apt インストール (Ubuntu/Debian) ---
 _docker_install_apt() {
     print -P "  Docker Engine を apt でインストールします..."
 
-    # Detect distro (ubuntu or debian)
+    # ディストリビューションを検出 (ubuntu または debian)
     local distro
     distro=$(. /etc/os-release && echo "$ID")
     case "$distro" in
@@ -67,7 +67,7 @@ _docker_install_apt() {
             ;;
     esac
 
-    # Step 1: Remove conflicting old packages
+    # ステップ 1: 競合する旧パッケージの削除
     if (( ! DRY_RUN )); then
         local -a old_pkgs
         old_pkgs=($(dpkg --get-selections \
@@ -82,7 +82,7 @@ _docker_install_apt() {
         print -P "%F{242}  [DRY-RUN] sudo apt-get remove (conflicting packages)%f"
     fi
 
-    # Step 2: Install prerequisites
+    # ステップ 2: 前提パッケージのインストール
     run_cmd sudo apt-get update -qq || {
         print -P "%F{220}警告: apt update に失敗しました。%f"
     }
@@ -91,7 +91,7 @@ _docker_install_apt() {
         return 1
     }
 
-    # Step 3: Add Docker GPG key
+    # ステップ 3: Docker GPG キーの追加
     run_cmd sudo install -m 0755 -d /etc/apt/keyrings || {
         print -P "%F{160}エラー: /etc/apt/keyrings の作成に失敗しました。%f" >&2
         return 1
@@ -111,7 +111,7 @@ _docker_install_apt() {
         print -P "%F{242}  [DRY-RUN] curl -fsSL https://download.docker.com/linux/${distro}/gpg -o ${DOCKER_MOD_GPG_KEY}%f"
     fi
 
-    # Step 4: Add Docker APT repository (DEB822 format)
+    # ステップ 4: Docker APT リポジトリの追加 (DEB822 形式)
     if (( ! DRY_RUN )); then
         local codename
         codename=$(. /etc/os-release && echo "${UBUNTU_CODENAME:-$VERSION_CODENAME}")
@@ -134,7 +134,7 @@ Signed-By: ${DOCKER_MOD_GPG_KEY}"
         print -P "%F{242}  [DRY-RUN] sudo tee ${DOCKER_MOD_APT_SOURCE} (DEB822 format)%f"
     fi
 
-    # Step 5: Install Docker Engine + Compose plugin
+    # ステップ 5: Docker Engine + Compose プラグインのインストール
     run_cmd sudo apt-get update -qq || {
         print -P "%F{220}警告: apt update に失敗しました。%f"
     }
@@ -144,7 +144,7 @@ Signed-By: ${DOCKER_MOD_GPG_KEY}"
     }
 }
 
-# --- Helper: Install Docker Desktop via Homebrew (macOS) ---
+# --- ヘルパー: Docker Desktop の Homebrew インストール (macOS) ---
 _docker_install_macos() {
     if ! command -v brew >/dev/null 2>&1; then
         print -P "%F{160}エラー: Homebrew がインストールされていません。%f" >&2
@@ -159,21 +159,21 @@ _docker_install_macos() {
     }
 }
 
-# --- Helper: Docker group setup + systemd auto-start (Linux only) ---
+# --- ヘルパー: Docker グループ設定 + systemd 自動起動 (Linux のみ) ---
 _docker_setup_group() {
-    # NOTE: $USER becomes "root" under sudo; resolve the real invoking user
+    # NOTE: sudo 実行時に $USER が "root" になるため、実際の呼び出しユーザーを解決
     local target_user="${SUDO_USER:-$(id -un)}"
 
     print -P ""
     print -P "Docker グループ設定:"
 
-    # Add docker group (idempotent: -f does not fail if group exists)
+    # docker グループの作成（べき等: -f により既存でもエラーにならない）
     run_cmd sudo groupadd -f docker || {
         print -P "%F{160}エラー: docker グループの作成に失敗しました。%f" >&2
         return 1
     }
 
-    # Add current user to docker group
+    # 現在のユーザーを docker グループに追加
     if id -nG "$target_user" 2>/dev/null | grep -qw docker; then
         print -P "  情報: ユーザー ${target_user} は既に docker グループに所属しています。"
     else
@@ -184,7 +184,7 @@ _docker_setup_group() {
         print -P "  %F{220}NOTE: docker グループの変更を反映するには再ログインが必要です。%f"
     fi
 
-    # Enable auto-start via systemd (if available)
+    # systemd による自動起動の有効化（利用可能な場合）
     if command -v systemctl >/dev/null 2>&1; then
         print -P ""
         print -P "systemd サービスの有効化:"
@@ -199,7 +199,7 @@ _docker_setup_group() {
     fi
 }
 
-# --- Setup ---
+# --- セットアップ ---
 module_setup() {
     print -P ""
     print -P "%F{36}%B[Docker]%b%f"
@@ -217,9 +217,9 @@ module_setup() {
             ;;
     esac
 
-    # --- 1. Docker installation (idempotent) ---
+    # --- 1. Docker のインストール（べき等） ---
     if _docker_is_installed; then
-        # Already installed; skip installation
+        # インストール済み; インストールをスキップ
         :
     else
         print -P "Docker をインストールします..."
@@ -236,7 +236,7 @@ module_setup() {
                 ;;
         esac
 
-        # Verify installation
+        # インストールの確認
         if (( ! DRY_RUN )); then
             if command -v docker >/dev/null 2>&1; then
                 print -P "  %F{34}Docker のインストールが完了しました ($(docker --version 2>/dev/null))。%f"
@@ -247,12 +247,12 @@ module_setup() {
         fi
     fi
 
-    # --- 2. Docker group + systemd (Linux only) ---
+    # --- 2. Docker グループ + systemd (Linux のみ) ---
     if [[ "$env" == "linux" ]]; then
         _docker_setup_group || return 1
     fi
 
-    # --- Completion message ---
+    # --- 完了メッセージ ---
     print -P ""
     if (( DRY_RUN )); then
         print -P "情報: Docker セットアップ予定です（dry-run）。"
@@ -260,7 +260,7 @@ module_setup() {
         print -P "%F{34}Docker のセットアップが完了しました。%f"
         if command -v docker >/dev/null 2>&1; then
             print -P "  Docker: $(docker --version 2>/dev/null || print 'N/A')"
-            # Show Compose version if available
+            # Compose バージョンの表示（利用可能な場合）
             local compose_ver
             compose_ver=$(docker compose version 2>/dev/null || true)
             [[ -n "$compose_ver" ]] && print -P "  Compose: ${compose_ver}"
@@ -273,7 +273,7 @@ module_setup() {
     fi
 }
 
-# --- Uninstall ---
+# --- アンインストール ---
 module_uninstall() {
     local env
     env=$(_docker_detect_env)
@@ -286,14 +286,14 @@ module_uninstall() {
             fi
             print -P "Docker Engine を削除します..."
 
-            # Remove Docker packages
+            # Docker パッケージの削除
             run_cmd sudo apt-get purge -y "${DOCKER_MOD_APT_PACKAGES[@]}" docker-ce-rootless-extras 2>/dev/null || {
                 print -P "%F{220}警告: Docker パッケージの削除に失敗しました（既に削除済みの可能性があります）。%f"
             }
 
             run_cmd sudo apt-get autoremove -y 2>/dev/null || true
 
-            # Remove APT source and GPG key
+            # APT ソースと GPG キーの削除
             if [[ -f "$DOCKER_MOD_APT_SOURCE" ]]; then
                 run_cmd sudo rm -f "$DOCKER_MOD_APT_SOURCE" || {
                     print -P "%F{220}警告: ${DOCKER_MOD_APT_SOURCE} の削除に失敗しました。%f"
