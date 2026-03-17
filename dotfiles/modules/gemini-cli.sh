@@ -9,7 +9,6 @@ MODULE_NAME="Gemini CLI"
 MODULE_DESC="Google AI CLI (Node.js v20+ 必要)"
 MODULE_DEFAULT=0
 MODULE_ORDER=30
-# TODO: MODULE_DEPS is not yet consumed by setup.sh -- kept for future dependency resolution
 MODULE_DEPS="node"
 
 # --- Gemini CLI 固有変数 ---
