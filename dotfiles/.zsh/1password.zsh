@@ -10,16 +10,16 @@
 
 # --- 1Password Service Account Token ---
 # NOTE: Independent of ENABLE_SSH_1PASSWORD — always load if the file exists
-if [[ -r "${HOME}/.config/op/service-account-token" ]]; then
+if [[ -r "${HOME}/.config/op/.env" ]]; then
     # Validate file permissions (warn if not 600)
-    _op_token_perms=$(command stat -c '%a' "${HOME}/.config/op/service-account-token" 2>/dev/null \
-        || command stat -f '%Lp' "${HOME}/.config/op/service-account-token" 2>/dev/null)
+    _op_token_perms=$(command stat -c '%a' "${HOME}/.config/op/.env" 2>/dev/null \
+        || command stat -f '%Lp' "${HOME}/.config/op/.env" 2>/dev/null)
     if [[ "$_op_token_perms" != "600" ]]; then
-        print -P "%F{220}警告: ${HOME}/.config/op/service-account-token のパーミッションが ${_op_token_perms} です (推奨: 600)。%f" >&2
+        print -P "%F{220}警告: ${HOME}/.config/op/.env のパーミッションが ${_op_token_perms} です (推奨: 600)。%f" >&2
     fi
     unset _op_token_perms
     # Validate file contains only the expected export line before sourcing
-    _op_token_file="${HOME}/.config/op/service-account-token"
+    _op_token_file="${HOME}/.config/op/.env"
     if grep -qxE "export OP_SERVICE_ACCOUNT_TOKEN='[A-Za-z0-9_+/=.-]+'" "$_op_token_file"; then
         source "$_op_token_file"
     else

@@ -13,7 +13,7 @@ MODULE_ORDER=13
 # NOTE: モジュール固有の変数には衝突回避のため OP_MOD_ プレフィックスを使用
 OP_MOD_DEBSIG_KEY_ID="AC2D62742012EA22"
 OP_MOD_TOKEN_DIR="${HOME}/.config/op"
-OP_MOD_TOKEN_FILE="${OP_MOD_TOKEN_DIR}/service-account-token"
+OP_MOD_TOKEN_FILE="${OP_MOD_TOKEN_DIR}/.env"
 
 # 管理対象ファイル（配布元パス, 配置先パス, 表示名, 未検出時メッセージ）
 OP_MOD_MANAGED_FILES=(
