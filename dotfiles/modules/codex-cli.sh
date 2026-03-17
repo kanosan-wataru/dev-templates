@@ -9,7 +9,6 @@ MODULE_NAME="Codex CLI"
 MODULE_DESC="OpenAI Codex CLI (Node.js v18+ 必要)"
 MODULE_DEFAULT=0
 MODULE_ORDER=31
-# TODO: MODULE_DEPS is not yet consumed by setup.sh -- kept for future dependency resolution
 MODULE_DEPS="node"
 
 # --- Codex CLI 固有変数 ---

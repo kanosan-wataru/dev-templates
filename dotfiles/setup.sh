@@ -31,6 +31,7 @@ UNINSTALL=0
 ALL_FLAG=0
 HELP_FLAG=0
 typeset -a SELECT_MODULES
+typeset -A MODULE_DEPS_MAP
 
 while (( $# > 0 )); do
     case "$1" in
@@ -372,7 +373,7 @@ load_modules() {
         unset 'functions[module_setup]' 'functions[module_uninstall]' 2>/dev/null
 
         # メタデータ変数をリセット
-        local MODULE_ID="" MODULE_NAME="" MODULE_DESC="" MODULE_DEFAULT=0 MODULE_ORDER=50
+        local MODULE_ID="" MODULE_NAME="" MODULE_DESC="" MODULE_DEFAULT=0 MODULE_ORDER=50 MODULE_DEPS=""
 
         # モジュールファイルをソース
         if ! source "$module_file"; then
@@ -409,6 +410,9 @@ load_modules() {
             functions[uninstall_${safe_id}]=$functions[module_uninstall]
             unset 'functions[module_uninstall]'
         fi
+
+        # Save dependency mapping
+        MODULE_DEPS_MAP[$MODULE_ID]="$MODULE_DEPS"
 
         # ORDER 付きで一時配列に格納（後でソート）
         _unsorted+=("$(printf '%03d' "$MODULE_ORDER")|${MODULE_ID}|${MODULE_NAME}|${MODULE_DESC}|${MODULE_DEFAULT}")
@@ -510,6 +514,69 @@ run_module_uninstall() {
 }
 
 
+# モジュール依存関係を解決し、不足している依存モジュールを自動追加する
+# 変更対象: selected_module_ids（不足する依存先を追加）
+resolve_module_deps() {
+    local -a added_deps=()
+    local changed=1
+
+    # 推移的依存を解決するため、変更がなくなるまで繰り返す
+    while (( changed )); do
+        changed=0
+        for mod_id in "${selected_module_ids[@]}"; do
+            local deps="${MODULE_DEPS_MAP[$mod_id]}"
+            [[ -z "$deps" ]] && continue
+
+            # MODULE_DEPS is a space-separated list
+            for dep in ${(s: :)deps}; do
+                # Check if dep is already selected
+                if ! (( ${selected_module_ids[(Ie)$dep]} )); then
+                    # Verify the dep module actually exists in MODULES
+                    local dep_exists=0
+                    for entry in "${MODULES[@]}"; do
+                        local entry_id="${entry%%|*}"
+                        if [[ "$entry_id" == "$dep" ]]; then
+                            dep_exists=1
+                            break
+                        fi
+                    done
+
+                    if (( dep_exists )); then
+                        selected_module_ids+=("$dep")
+                        added_deps+=("$dep")
+                        changed=1
+                    else
+                        print -P "%F{220}警告: モジュール '${mod_id}' の依存先 '${dep}' が見つかりません。%f"
+                    fi
+                fi
+            done
+        done
+    done
+
+    # 自動追加された依存をユーザーに通知
+    if (( ${#added_deps[@]} > 0 )); then
+        print -P ""
+        print -P "%F{36}依存関係の自動解決:%f"
+        for dep in "${added_deps[@]}"; do
+            print -P "  + ${dep} (依存先として自動追加)"
+        done
+        print -P ""
+    fi
+
+    # MODULE_ORDER 順に再ソート（依存先が先にインストールされるようにする）
+    if (( ${#added_deps[@]} > 0 )); then
+        local -a sorted_ids=()
+        for entry in "${MODULES[@]}"; do
+            local entry_id="${entry%%|*}"
+            if (( ${selected_module_ids[(Ie)$entry_id]} )); then
+                sorted_ids+=("$entry_id")
+            fi
+        done
+        selected_module_ids=("${sorted_ids[@]}")
+    fi
+}
+
+
 # ==============================================
 # アンインストールモード
 # NOTE: --uninstall は常に全モジュールを対象にする
@@ -577,6 +644,7 @@ if (( ${#SELECT_MODULES[@]} > 0 )); then
             selected_module_ids+=("$mod_id")
         fi
     done
+    resolve_module_deps
 
 elif (( ALL_FLAG )); then
     # --all の場合: 全モジュールを選択
@@ -628,6 +696,7 @@ elif [[ -t 0 ]]; then
             selected_module_ids+=("${MODULES[$idx][(ws:|:)1]}")
         done
     fi
+    resolve_module_deps
 
     print -P ""
 else
