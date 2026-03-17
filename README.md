@@ -12,7 +12,7 @@ Zsh ベースのモジュラー構成で、macOS / Linux に対応していま�
 | `dotfiles/.zsh/aliases.zsh` | エイリアス定義（git/docker エイリアス、fzf 連携関数） |
 | `dotfiles/.zsh/node.zsh` | fnm (Fast Node Manager) 初期化 |
 | `dotfiles/.zsh/python.zsh` | pyenv / pyenv-virtualenv 初期化 |
-| `dotfiles/.zsh/ssh.zsh` | 1Password SSH エージェント設定（WSL 用） |
+| `dotfiles/.zsh/1password.zsh` | 1Password SSH エージェント設定（WSL/Linux/macOS 自動判定） |
 | `dotfiles/.zsh/env.zsh` | 環境変数読み込み（`~/.claude/.env` から MCP サーバー用等） |
 | `dotfiles/.claude/` | Claude Code 設定テンプレート一式（CLAUDE.md, スキル, エージェント等） |
 | `dotfiles/.codex/` | Codex CLI 設定テンプレート（モデル設定、サンドボックスルール） |
@@ -260,11 +260,12 @@ dev-templates/
 │   │   ├── aliases.zsh      # エイリアス定義
 │   │   ├── node.zsh         # fnm 初期化
 │   │   ├── python.zsh       # pyenv 初期化
-│   │   ├── ssh.zsh          # 1Password SSH エージェント（WSL 用）
+│   │   ├── 1password.zsh    # 1Password SSH エージェント（WSL/Linux/macOS）
 │   │   └── env.zsh          # 環境変数読み込み（~/.claude/.env）
 │   ├── modules/
 │   │   ├── zsh.sh            # モジュール: Zsh 設定一式
 │   │   ├── git.sh            # モジュール: Git グローバル設定
+│   │   ├── 1password.sh      # モジュール: 1Password CLI + SSH + Git 署名
 │   │   ├── modern-cli.sh     # モジュール: モダン CLI ツール
 │   │   ├── node.sh           # モジュール: Node.js 開発環境
 │   │   ├── claude-code.sh    # モジュール: Claude Code

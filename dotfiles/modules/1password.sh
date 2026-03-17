@@ -1,0 +1,390 @@
+# ---------------------------------------------
+# モジュール: 1Password
+# CLI + SSH エージェント + Git 署名設定
+# ---------------------------------------------
+
+# --- メタデータ ---
+MODULE_ID="1password"
+MODULE_NAME="1Password"
+MODULE_DESC="CLI + SSH エージェント + Git 署名"
+MODULE_DEFAULT=0
+MODULE_ORDER=13
+
+# NOTE: モジュール固有の変数には衝突回避のため OP_MOD_ プレフィックスを使用
+
+# 管理対象ファイル（配布元パス, 配置先パス, 表示名, 未検出時メッセージ）
+OP_MOD_MANAGED_FILES=(
+    "$SCRIPT_DIR/.zsh/1password.zsh|$HOME/.zsh/1password.zsh|1password.zsh|"
+)
+
+# --- ヘルパー: 環境判定 ---
+# 戻り値: "wsl" / "linux" / "macos" / "unknown"
+_1password_detect_env() {
+    case "$OSTYPE" in
+        darwin*)
+            print "macos"
+            ;;
+        linux*)
+            if [[ -f /proc/version ]] && grep -qi 'microsoft' /proc/version 2>/dev/null; then
+                print "wsl"
+            else
+                print "linux"
+            fi
+            ;;
+        *)
+            print "unknown"
+            ;;
+    esac
+}
+
+# --- ヘルパー: op CLI のインストール (Ubuntu/Debian) ---
+_1password_install_op_apt() {
+    print -P "  1Password CLI の apt リポジトリを設定します..."
+
+    # 前提コマンドの確認
+    local -a required_cmds=(curl gpg)
+    for cmd in "${required_cmds[@]}"; do
+        if ! command -v "$cmd" >/dev/null 2>&1; then
+            print -P "%F{160}エラー: ${cmd} がインストールされていません。%f" >&2
+            return 1
+        fi
+    done
+
+    run_cmd sudo mkdir -p /etc/apt/keyrings || {
+        print -P "%F{160}エラー: /etc/apt/keyrings の作成に失敗しました。%f" >&2
+        return 1
+    }
+
+    if (( ! DRY_RUN )); then
+        # GPG キーのダウンロード
+        curl -sS https://downloads.1password.com/linux/keys/1password.asc \
+            | sudo gpg --dearmor --output /etc/apt/keyrings/1password-archive-keyring.gpg 2>/dev/null || {
+            print -P "%F{160}エラー: 1Password の GPG キー取得に失敗しました。%f" >&2
+            return 1
+        }
+
+        # apt ソースの追加
+        echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/1password-archive-keyring.gpg] https://downloads.1password.com/linux/debian/$(dpkg --print-architecture) stable main" \
+            | sudo tee /etc/apt/sources.list.d/1password.list >/dev/null || {
+            print -P "%F{160}エラー: 1Password の apt ソース追加に失敗しました。%f" >&2
+            return 1
+        }
+
+        # debsig ポリシーの設定
+        sudo mkdir -p /etc/debsig/policies/AC2D62742012EA22/ 2>/dev/null
+        curl -sS https://downloads.1password.com/linux/debian/debsig/1password.pol \
+            | sudo tee /etc/debsig/policies/AC2D62742012EA22/1password.pol >/dev/null || {
+            print -P "%F{220}警告: debsig ポリシーの設定に失敗しました（インストールは継続します）。%f"
+        }
+
+        sudo mkdir -p /usr/share/debsig/keyrings/AC2D62742012EA22 2>/dev/null
+        curl -sS https://downloads.1password.com/linux/keys/1password.asc \
+            | sudo gpg --dearmor --output /usr/share/debsig/keyrings/AC2D62742012EA22/debsig.gpg 2>/dev/null || {
+            print -P "%F{220}警告: debsig キーリングの設定に失敗しました（インストールは継続します）。%f"
+        }
+    else
+        print -P "%F{242}  [DRY-RUN] curl ... | sudo gpg --dearmor -o /etc/apt/keyrings/1password-archive-keyring.gpg%f"
+        print -P "%F{242}  [DRY-RUN] echo 'deb ...' | sudo tee /etc/apt/sources.list.d/1password.list%f"
+        print -P "%F{242}  [DRY-RUN] debsig ポリシー設定%f"
+    fi
+
+    run_cmd sudo apt-get update -qq || {
+        print -P "%F{220}警告: apt update に失敗しました。%f"
+    }
+    run_cmd sudo apt-get install -y 1password-cli || {
+        print -P "%F{160}エラー: 1Password CLI のインストールに失敗しました。%f" >&2
+        return 1
+    }
+}
+
+# --- ヘルパー: op CLI のインストール (macOS) ---
+_1password_install_op_brew() {
+    run_cmd brew install --cask 1password-cli || {
+        print -P "%F{160}エラー: 1Password CLI のインストールに失敗しました。%f" >&2
+        return 1
+    }
+}
+
+# --- ヘルパー: SSH エージェント設定の案内 ---
+_1password_setup_ssh_agent() {
+    local env="$1"
+
+    print -P ""
+    print -P "SSH エージェント設定:"
+
+    case "$env" in
+        wsl)
+            print -P "  WSL 環境を検出しました。"
+            print -P "  Windows 側の 1Password デスクトップアプリで SSH エージェントを有効にしてください。"
+            print -P "  1password.zsh により ssh/ssh-add が Windows 側にリダイレクトされます。"
+            print -P ""
+            print -P "  有効化:"
+            print -P "    export ENABLE_SSH_1PASSWORD=1  # ~/.zshenv 等に追加"
+            ;;
+        linux)
+            local sock_path="$HOME/.1password/agent.sock"
+            print -P "  ネイティブ Linux 環境を検出しました。"
+            if [[ -S "$sock_path" ]]; then
+                print -P "  %F{34}SSH エージェントソケットが見つかりました。%f"
+            else
+                print -P "  %F{220}SSH エージェントソケットが見つかりません。%f"
+                print -P "  1Password デスクトップアプリで SSH エージェントを有効にしてください。"
+                print -P "    設定 → 開発者 → SSH エージェント → 有効にする"
+            fi
+            print -P ""
+            print -P "  有効化:"
+            print -P "    export ENABLE_SSH_1PASSWORD=1  # ~/.zshenv 等に追加"
+            ;;
+        macos)
+            local sock_path="$HOME/Library/Group Containers/2BUA8C4S2C.com.1password/t/agent.sock"
+            print -P "  macOS 環境を検出しました。"
+            if [[ -S "$sock_path" ]]; then
+                print -P "  %F{34}SSH エージェントソケットが見つかりました。%f"
+            else
+                print -P "  %F{220}SSH エージェントソケットが見つかりません。%f"
+                print -P "  1Password デスクトップアプリで SSH エージェントを有効にしてください。"
+                print -P "    設定 → 開発者 → SSH エージェント → 有効にする"
+            fi
+            print -P ""
+            print -P "  有効化:"
+            print -P "    export ENABLE_SSH_1PASSWORD=1  # ~/.zshenv 等に追加"
+            ;;
+    esac
+}
+
+# --- ヘルパー: Git コミット署名設定 ---
+_1password_setup_git_signing() {
+    local env="$1"
+
+    print -P ""
+    print -P "Git コミット署名設定:"
+
+    if ! command -v git >/dev/null 2>&1; then
+        print -P "  %F{220}警告: git が見つかりません。Git 署名設定をスキップします。%f"
+        return 0
+    fi
+
+    # 既に gpg.format = ssh が設定されているか確認
+    local current_format
+    current_format=$(git config --global gpg.format 2>/dev/null || true)
+    if [[ "$current_format" == "ssh" ]]; then
+        print -P "  情報: gpg.format は既に ssh に設定されています。"
+        local current_program
+        current_program=$(git config --global gpg.ssh.program 2>/dev/null || true)
+        local current_key
+        current_key=$(git config --global user.signingkey 2>/dev/null || true)
+        local current_sign
+        current_sign=$(git config --global commit.gpgsign 2>/dev/null || true)
+        [[ -n "$current_program" ]] && print -P "  gpg.ssh.program: ${current_program}"
+        [[ -n "$current_key" ]] && print -P "  user.signingkey:  ${current_key}"
+        [[ -n "$current_sign" ]] && print -P "  commit.gpgsign:   ${current_sign}"
+        return 0
+    fi
+
+    # op-ssh-sign のパスを環境に応じて決定
+    local sign_program=""
+    case "$env" in
+        wsl)
+            # WSL: Windows 側の op-ssh-sign.exe を使用
+            sign_program="/mnt/c/Users/\${WINDOWS_USER}/AppData/Local/1Password/app/8/op-ssh-sign.exe"
+            ;;
+        linux)
+            sign_program="/opt/1Password/op-ssh-sign"
+            ;;
+        macos)
+            sign_program="/Applications/1Password.app/Contents/MacOS/op-ssh-sign"
+            ;;
+    esac
+
+    # gpg.format と commit.gpgsign を設定
+    if (( DRY_RUN )); then
+        print -P "%F{242}  [DRY-RUN] git config --global gpg.format ssh%f"
+        print -P "%F{242}  [DRY-RUN] git config --global gpg.ssh.program ${sign_program}%f"
+        print -P "%F{242}  [DRY-RUN] git config --global commit.gpgsign true%f"
+    else
+        git config --global gpg.format ssh || {
+            print -P "%F{160}エラー: gpg.format の設定に失敗しました。%f" >&2
+            return 1
+        }
+        git config --global gpg.ssh.program "$sign_program" || {
+            print -P "%F{160}エラー: gpg.ssh.program の設定に失敗しました。%f" >&2
+            return 1
+        }
+        git config --global commit.gpgsign true || {
+            print -P "%F{160}エラー: commit.gpgsign の設定に失敗しました。%f" >&2
+            return 1
+        }
+        print -P "  %F{34}Git 署名設定を適用しました。%f"
+        print -P "  gpg.format:       ssh"
+        print -P "  gpg.ssh.program:  ${sign_program}"
+        print -P "  commit.gpgsign:   true"
+    fi
+
+    # user.signingkey の案内
+    local current_key
+    current_key=$(git config --global user.signingkey 2>/dev/null || true)
+    if [[ -z "$current_key" ]]; then
+        print -P ""
+        print -P "  %F{220}NOTE: user.signingkey が未設定です。以下を実行してください:%f"
+        print -P "    git config --global user.signingkey \"ssh-ed25519 AAAA...\""
+        print -P "  1Password → SSH キーの詳細 → 公開鍵をコピーして指定してください。"
+    fi
+}
+
+# --- セットアップ ---
+module_setup() {
+    print -P ""
+    print -P "%F{36}%B[1Password]%b%f"
+    print -P "---------------------------------------------"
+
+    local env
+    env=$(_1password_detect_env)
+
+    case "$env" in
+        wsl)    print -P "情報: 環境を検出しました — WSL" ;;
+        linux)  print -P "情報: 環境を検出しました — ネイティブ Linux" ;;
+        macos)  print -P "情報: 環境を検出しました — macOS" ;;
+        *)
+            print -P "%F{160}エラー: 未対応の OS です (OSTYPE=${OSTYPE})。%f" >&2
+            return 1
+            ;;
+    esac
+
+    # --- 1. op CLI のインストール ---
+    if command -v op >/dev/null 2>&1; then
+        print -P "情報: op CLI は既にインストールされています ($(op --version 2>/dev/null || echo '不明'))。スキップします。"
+    else
+        print -P "1Password CLI (op) をインストールします..."
+        case "$env" in
+            wsl|linux)
+                if ! command -v apt-get >/dev/null 2>&1; then
+                    print -P "%F{160}エラー: apt-get が見つかりません。Debian/Ubuntu 系のみ対応しています。%f" >&2
+                    return 1
+                fi
+                _1password_install_op_apt || return 1
+                ;;
+            macos)
+                if ! command -v brew >/dev/null 2>&1; then
+                    print -P "%F{160}エラー: Homebrew がインストールされていません。%f" >&2
+                    print -P "  インストール: https://brew.sh/" >&2
+                    return 1
+                fi
+                _1password_install_op_brew || return 1
+                ;;
+        esac
+
+        if (( ! DRY_RUN )); then
+            if command -v op >/dev/null 2>&1; then
+                print -P "  %F{34}op CLI のインストールが完了しました ($(op --version 2>/dev/null))。%f"
+            else
+                print -P "%F{160}エラー: op CLI のインストール後にコマンドが見つかりません。%f" >&2
+                return 1
+            fi
+        fi
+    fi
+
+    # --- 2. 設定ファイルの配置 ---
+    print -P ""
+    print -P "設定ファイルを配置します..."
+    for entry in "${OP_MOD_MANAGED_FILES[@]}"; do
+        local src="${entry[(ws:|:)1]}"
+        local dst="${entry[(ws:|:)2]}"
+        local label="${entry[(ws:|:)3]}"
+        local hint="${entry[(ws:|:)4]}"
+        install_config "$src" "$dst" "$label" "$hint"
+    done
+
+    # --- 3. SSH エージェント設定の案内 ---
+    _1password_setup_ssh_agent "$env"
+
+    # --- 4. Git コミット署名設定 ---
+    _1password_setup_git_signing "$env"
+
+    # --- 完了メッセージ ---
+    print -P ""
+    if (( DRY_RUN )); then
+        print -P "情報: 1Password セットアップ予定です（dry-run）。"
+    else
+        print -P "%F{34}1Password のセットアップが完了しました。%f"
+    fi
+
+    print -P ""
+    print -P "NOTE: 1Password デスクトップアプリが必要です。CLI 単体では認証できません。"
+    print -P "  初回は 'op signin' でサインインしてください。"
+}
+
+# --- アンインストール ---
+module_uninstall() {
+    local restored=0
+
+    # Git 署名設定の解除
+    if command -v git >/dev/null 2>&1; then
+        local current_format
+        current_format=$(git config --global gpg.format 2>/dev/null || true)
+        if [[ "$current_format" == "ssh" ]]; then
+            if (( DRY_RUN )); then
+                print -P "%F{242}  [DRY-RUN] git config --global --unset gpg.format%f"
+                print -P "%F{242}  [DRY-RUN] git config --global --unset gpg.ssh.program%f"
+                print -P "%F{242}  [DRY-RUN] git config --global --unset commit.gpgsign%f"
+            else
+                git config --global --unset gpg.format 2>/dev/null
+                git config --global --unset gpg.ssh.program 2>/dev/null
+                git config --global --unset commit.gpgsign 2>/dev/null
+                print -P "情報: Git 署名設定を解除しました。"
+            fi
+            restored=1
+        fi
+    fi
+
+    # 管理対象ファイルのバックアップ復元 / 削除
+    for entry in "${OP_MOD_MANAGED_FILES[@]}"; do
+        local dst="${entry[(ws:|:)2]}"
+        local label="${entry[(ws:|:)3]}"
+
+        local -a latest_backup
+        latest_backup=( "${dst}.backup."*(N^/om[1]) )
+
+        if (( ${#latest_backup[@]} > 0 )); then
+            print -P "復元: ${label} をバックアップ (${latest_backup[1]:t}) から戻します。"
+            run_cmd command mv "${latest_backup[1]}" "$dst" || {
+                print -P "%F{160}エラー: ${label} の復元に失敗しました。%f" >&2
+                return 1
+            }
+            restored=1
+        elif [[ -f "$dst" || -h "$dst" ]]; then
+            print -P "削除: ${label} を削除します。"
+            run_cmd command rm -f "$dst" || {
+                print -P "%F{160}エラー: ${label} の削除に失敗しました。%f" >&2
+                return 1
+            }
+            restored=1
+        else
+            print -P "情報: ${label} は配置されていません。スキップします。"
+        fi
+    done
+
+    if (( restored )); then
+        print -P "%F{34}1Password のアンインストールが完了しました。%f"
+    else
+        print -P "情報: 1Password の復元・削除対象はありませんでした。"
+    fi
+
+    print -P ""
+    print -P "NOTE: 1Password CLI 本体は削除されていません。不要な場合は手動で削除してください:"
+
+    local env
+    env=$(_1password_detect_env)
+    case "$env" in
+        wsl|linux)
+            print -P "  sudo apt-get remove 1password-cli"
+            print -P "  sudo rm -f /etc/apt/sources.list.d/1password.list"
+            print -P "  sudo rm -f /etc/apt/keyrings/1password-archive-keyring.gpg"
+            ;;
+        macos)
+            print -P "  brew uninstall --cask 1password-cli"
+            ;;
+        *)
+            print -P "  OS に応じたパッケージマネージャーで削除してください。"
+            ;;
+    esac
+}
