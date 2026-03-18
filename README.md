@@ -1,31 +1,33 @@
 # dev-templates
 
 開発環境の設定ファイル（dotfiles）と開発ツールを管理するリポジトリです。
-Zsh ベースのモジュラー構成で、macOS / Linux に対応しています。
+Bash スクリプト（セットアップ）+ Zsh（対話シェル）のモジュラー構成で、macOS / Linux に対応しています。
 
 ## 含まれる設定
 
 | ファイル | 説明 |
 |---------|------|
+| `dotfiles/setup.sh` | セットアップスクリプト（bash、インタラクティブ選択・自動インストール） |
+| `dotfiles/lib/*.sh` | 共通ライブラリ（colors.sh, array.sh, backup.sh, tui.sh） |
+| `dotfiles/modules/*.sh` | モジュール定義ファイル（各モジュールのセットアップ・アンインストール処理） |
 | `dotfiles/.zshrc` | Zsh エントリーポイント（履歴設定、モジュール読み込み） |
+| `dotfiles/.bashrc` | Bash エントリーポイント（`.shell/` の共有設定を読み込み） |
 | `dotfiles/.zsh/plugins.zsh` | Zinit プラグイン設定 |
-| `dotfiles/.zsh/aliases.zsh` | エイリアス定義（git/docker エイリアス、fzf 連携関数） |
-| `dotfiles/.zsh/node.zsh` | fnm (Fast Node Manager) 初期化 |
-| `dotfiles/.zsh/python.zsh` | pyenv / pyenv-virtualenv 初期化 |
-| `dotfiles/.zsh/1password.zsh` | 1Password SSH エージェント設定（WSL/Linux/macOS 自動判定） |
 | `dotfiles/.zsh/.p10k.zsh` | Powerlevel10k テーマ設定 |
-| `dotfiles/.zsh/env.zsh` | 環境変数読み込み（`~/.claude/.env` から MCP サーバー用等） |
+| `dotfiles/.shell/aliases.sh` | エイリアス定義（git/docker エイリアス、fzf 連携関数） |
+| `dotfiles/.shell/env.sh` | 環境変数読み込み（`~/.claude/.env` から MCP サーバー用等） |
+| `dotfiles/.shell/node.sh` | fnm (Fast Node Manager) 初期化 |
+| `dotfiles/.shell/python.sh` | pyenv / pyenv-virtualenv 初期化 |
+| `dotfiles/.shell/1password.sh` | 1Password SSH エージェント設定（WSL/Linux/macOS 自動判定） |
 | `dotfiles/.claude/` | Claude Code 設定テンプレート一式（CLAUDE.md, スキル, エージェント等） |
 | `dotfiles/.codex/` | Codex CLI 設定テンプレート（モデル設定、サンドボックスルール） |
 | `dotfiles/.gemini/` | Gemini CLI 設定テンプレート（セッション設定、カスタム指示） |
 | `dotfiles/.gitconfig.shared` | Git 共有設定（include.path 経由で読み込み） |
 | `dotfiles/.gitignore_global` | グローバル gitignore |
-| `dotfiles/setup.sh` | セットアップスクリプト（インタラクティブ選択・自動インストール） |
-| `dotfiles/modules/*.sh` | モジュール定義ファイル（各モジュールのセットアップ・アンインストール処理） |
 
 ## 動作要件
 
-- **Zsh** (v5.0 以上)
+- **Bash** (v4.0 以上)
 - **Git**
 
 ## セットアップ
@@ -33,7 +35,7 @@ Zsh ベースのモジュラー構成で、macOS / Linux に対応していま�
 ```bash
 git clone https://github.com/kanosan-wataru/dev-templates.git
 cd dev-templates
-zsh dotfiles/setup.sh
+bash dotfiles/setup.sh
 ```
 
 実行すると、チェックボックス UI でインストールするモジュールを選択できます:
@@ -47,7 +49,7 @@ zsh dotfiles/setup.sh
   [ ] 1Password            CLI + SSH エージェント + Git 署名
   [ ] モダン CLI ツール     eza / bat / fd / ripgrep
   [ ] Node.js 開発環境      fnm + Node.js LTS (バージョン管理)
-  [ ] Docker                Docker Engine + Compose
+  [ ] Docker                Docker Engine + Compose + NVIDIA GPU
   [ ] Claude Code           Anthropic CLI (Node.js v18+ 必要)
   [ ] Python 開発環境       pyenv + virtualenv (Python バージョン管理)
   [ ] Gemini CLI            Google AI CLI (Node.js v20+ 必要)
@@ -63,7 +65,7 @@ zsh dotfiles/setup.sh
 | **1Password** | 1Password CLI + SSH エージェント + Git 署名設定 | — |
 | **モダン CLI ツール** | eza / bat / fd / ripgrep | Homebrew (macOS) / apt + wget + gpg (Linux) |
 | **Node.js 開発環境** | fnm + Node.js LTS 自動インストール | Homebrew (macOS) / curl + unzip (Linux) |
-| **Docker** | Docker Engine + Compose | Homebrew (macOS) / apt + curl (Linux) |
+| **Docker** | Docker Engine + Compose + NVIDIA GPU サポート | Homebrew (macOS) / apt + curl (Linux) |
 | **Claude Code** | Anthropic の AI コーディングアシスタント CLI + 設定テンプレート | Node.js v18+ / jq（MCP マージ用、任意） |
 | **Python 開発環境** | pyenv + pyenv-virtualenv | Git + ビルド依存パッケージ |
 | **Gemini CLI** | Google の AI CLI | Node.js v20+ |
@@ -81,19 +83,19 @@ zsh dotfiles/setup.sh
 
 ```bash
 # インタラクティブ選択（デフォルト）
-zsh dotfiles/setup.sh
+bash dotfiles/setup.sh
 
 # 全モジュール一括インストール
-zsh dotfiles/setup.sh --all
+bash dotfiles/setup.sh --all
 
 # 特定モジュールのみインストール
-zsh dotfiles/setup.sh --select zsh --select node
+bash dotfiles/setup.sh --select zsh --select node
 
 # 変更内容を事前に確認
-zsh dotfiles/setup.sh --all --dry-run
+bash dotfiles/setup.sh --all --dry-run
 
 # 設定ファイルをバックアップから復元・ツールをアンインストール
-zsh dotfiles/setup.sh --uninstall
+bash dotfiles/setup.sh --uninstall
 ```
 
 非 TTY 環境（CI / パイプ）では自動的に `--all` と同等の動作になります。
@@ -102,11 +104,10 @@ zsh dotfiles/setup.sh --uninstall
 ### セットアップの流れ
 
 #### Zsh 設定一式
-1. Zsh で実行されていることの確認（`$ZSH_VERSION` チェック）
-2. Git の存在確認
-3. [Zinit](https://github.com/zdharma-continuum/zinit) プラグインマネージャーのインストール
-4. `~/.zsh` ディレクトリの作成（パーミッション 700）
-5. 設定ファイルの配置（`.zshrc`, `plugins.zsh`, `aliases.zsh`, `.p10k.zsh`）
+1. Git の存在確認
+2. [Zinit](https://github.com/zdharma-continuum/zinit) プラグインマネージャーのインストール
+3. `~/.zsh` / `~/.shell` ディレクトリの作成（パーミッション 700）
+4. 設定ファイルの配置（`.zshrc`, `.bashrc`, `.zsh/plugins.zsh`, `.zsh/.p10k.zsh`, `.shell/*.sh`）
    - 既存ファイルと内容が同一の場合はスキップ（べき等）
    - 内容が異なる場合はタイムスタンプ付きでバックアップ後に配置
 
@@ -120,37 +121,38 @@ zsh dotfiles/setup.sh --uninstall
 #### 1Password
 1. 環境の自動判定（WSL / ネイティブ Linux / macOS）
 2. 1Password CLI (`op`) のインストール（macOS: Homebrew / Linux: apt + GPG キー設定）
-3. `1password.zsh` の配置（SSH エージェント設定・WSL リダイレクト対応）
+3. `1password.sh` の配置（`.shell/` に SSH エージェント設定・WSL リダイレクト対応）
 4. SSH エージェントの設定案内（環境に応じたガイド表示）
 5. Git コミット署名設定（`gpg.format=ssh` + `op-ssh-sign` の自動設定）
 
 #### モダン CLI ツール
 1. OS 判定（macOS: Homebrew / Linux: apt）
 2. 各ツール（eza, bat, fd, ripgrep）を順次インストール（既にインストール済みならスキップ）
-3. エイリアス（`ls` → eza, `cat` → bat 等）は `aliases.zsh` で条件付き設定済み
+3. エイリアス（`ls` → eza, `cat` → bat 等）は `.shell/aliases.sh` で条件付き設定済み
 
 #### Node.js 開発環境
 1. [fnm](https://github.com/Schniz/fnm) (Fast Node Manager) のインストール（macOS: Homebrew / Linux: GitHub Releases）
 2. Node.js LTS の自動インストール + デフォルト設定
-3. `node.zsh` の配置（fnm 初期化・`--use-on-cd` 対応）
+3. `node.sh` の配置（`.shell/` に fnm 初期化・`--use-on-cd` 対応）
 
 #### Docker
 1. 環境の自動判定（Linux / macOS）
 2. Docker Engine + Compose プラグインのインストール（Linux: apt + GPG キー設定 / macOS: Homebrew Cask で Docker Desktop）
 3. docker グループへのユーザー追加（Linux のみ）
 4. systemd サービスの自動起動設定（Linux のみ、systemctl 利用可能時）
+5. NVIDIA Container Toolkit の自動インストール（NVIDIA GPU ドライバー検出時のみ）
 
 #### Python 開発環境
 1. ビルド依存パッケージのインストール（macOS: Homebrew / Linux: apt）
 2. [pyenv](https://github.com/pyenv/pyenv) のインストール（macOS: Homebrew / Linux: git clone）
 3. [pyenv-virtualenv](https://github.com/pyenv/pyenv-virtualenv) プラグインのインストール
-4. `python.zsh` の配置（pyenv 初期化）
+4. `python.sh` の配置（`.shell/` に pyenv 初期化）
 
 #### Claude Code
 1. Node.js v18+ / npm の存在確認
 2. `npm install -g @anthropic-ai/claude-code`（既にインストール済みならスキップ）
 3. 設定ファイルの配置（CLAUDE.md, settings.json, hookify ルール, スキル, エージェント）
-4. `env.zsh` の配置（`~/.claude/.env` からの環境変数読み込み）
+4. `env.sh` の配置（`.shell/` に `~/.claude/.env` からの環境変数読み込み）
 5. MCP サーバー設定の `~/.claude.json` へのマージ（jq 使用、べき等。jq 未インストール時はスキップ）
 6. `~/.claude/.env` に環境変数を設定するよう案内表示
 
@@ -238,9 +240,10 @@ OPENAI_API_KEY=sk-...
 
 `dotfiles/**` または `.github/workflows/**` に変更を含む Pull Request で、GitHub Actions によるチェックが自動実行されます:
 
-- **Zsh 構文チェック** (`zsh -n`): `dotfiles/` 配下の `.zsh`, `.sh`, `.zshrc` ファイル（`.p10k.zsh` を除く）の構文エラーを検出
+- **Shell Format Check** (`shfmt`): bash スクリプト（`.sh`）および zsh スクリプト（`.zsh`）のフォーマットチェック
+- **ShellCheck**: bash スクリプトの静的解析（`shellcheck -s bash`）
+- **BATS テスト**: `dotfiles/tests/*.bats` によるユニットテスト
 - **Setup Dry Run**: `setup.sh --all --dry-run` を実行し、セットアップスクリプトの動作を検証
-- **Shell Format Check**: `shfmt` による `.zsh/*.zsh` ファイルのフォーマットチェック
 
 構文チェックと dry-run は **Ubuntu** と **macOS** の両環境で実行されます。
 
@@ -255,7 +258,7 @@ dev-templates/
 ├── .devcontainer/
 │   └── devcontainer.json     # VS Code Dev Containers 設定
 ├── .github/workflows/
-│   └── ci.yml                # CI: 構文チェック + dry-run テスト（Ubuntu/macOS）
+│   └── ci.yml                # CI: shfmt + shellcheck + BATS + dry-run（Ubuntu/macOS）
 ├── Dockerfile                 # 開発環境コンテナ定義
 ├── docker-compose.yml         # Docker Compose 設定
 ├── .dockerignore               # Docker ビルドコンテキスト除外設定
@@ -282,27 +285,34 @@ dev-templates/
 │   │       └── context-loader/  # コンテキストローダースキル
 │   ├── .zsh/
 │   │   ├── .p10k.zsh        # Powerlevel10k テーマ設定
-│   │   ├── plugins.zsh      # Zinit プラグイン設定
-│   │   ├── aliases.zsh      # エイリアス定義
-│   │   ├── node.zsh         # fnm 初期化
-│   │   ├── python.zsh       # pyenv 初期化
-│   │   ├── 1password.zsh    # 1Password SSH エージェント（WSL/Linux/macOS）
-│   │   └── env.zsh          # 環境変数読み込み（~/.claude/.env）
+│   │   └── plugins.zsh      # Zinit プラグイン設定
+│   ├── .shell/                  # 共有設定（bash / zsh 両対応）
+│   │   ├── aliases.sh       # エイリアス定義
+│   │   ├── env.sh           # 環境変数読み込み（~/.claude/.env）
+│   │   ├── node.sh          # fnm 初期化
+│   │   ├── python.sh        # pyenv 初期化
+│   │   └── 1password.sh     # 1Password SSH エージェント（WSL/Linux/macOS）
+│   ├── lib/                     # セットアップ共通ライブラリ
+│   │   ├── colors.sh        # カラー出力ヘルパー
+│   │   ├── array.sh         # 配列操作ユーティリティ
+│   │   ├── backup.sh        # ファイルバックアップ・リストア
+│   │   └── tui.sh           # TUI（チェックボックス UI 等）
 │   ├── modules/
 │   │   ├── zsh.sh            # モジュール: Zsh 設定一式
 │   │   ├── git.sh            # モジュール: Git グローバル設定
 │   │   ├── 1password.sh      # モジュール: 1Password CLI + SSH + Git 署名
 │   │   ├── modern-cli.sh     # モジュール: モダン CLI ツール
 │   │   ├── node.sh           # モジュール: Node.js 開発環境
-│   │   ├── docker.sh         # モジュール: Docker
+│   │   ├── docker.sh         # モジュール: Docker + NVIDIA GPU
 │   │   ├── claude-code.sh    # モジュール: Claude Code
 │   │   ├── codex-cli.sh      # モジュール: Codex CLI
 │   │   ├── python.sh         # モジュール: Python 開発環境
 │   │   └── gemini-cli.sh     # モジュール: Gemini CLI
 │   ├── .gitconfig.shared     # Git 共有設定（include.path 経由）
 │   ├── .gitignore_global     # グローバル gitignore
-│   ├── .zshrc                # エントリーポイント（履歴設定 + モジュール読み込み）
-│   └── setup.sh              # セットアップコア（UI + 共通関数 + モジュール動的読み込み）
+│   ├── .bashrc                # Bash エントリーポイント（.shell/ 読み込み）
+│   ├── .zshrc                # Zsh エントリーポイント（履歴設定 + モジュール読み込み）
+│   └── setup.sh              # セットアップスクリプト（bash、モジュール動的読み込み）
 ├── .editorconfig              # エディタ設定（インデント・改行コード統一）
 ├── .gitignore
 └── README.md
