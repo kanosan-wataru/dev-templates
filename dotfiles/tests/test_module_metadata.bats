@@ -44,11 +44,15 @@ MODULES_DIR="$(cd "$(dirname "$BATS_TEST_FILENAME")/../modules" && pwd)"
     done
 }
 
-@test "all modules define module_setup function" {
+@test "all modules define setup_<safe_id> function" {
     for f in "$MODULES_DIR"/*.sh; do
-        run grep -q '^module_setup()' "$f"
+        # Extract MODULE_ID and convert hyphens to underscores for safe_id
+        local module_id
+        module_id=$(grep '^MODULE_ID=' "$f" | head -1 | cut -d= -f2 | tr -d '"')
+        local safe_id="${module_id//-/_}"
+        run grep -q "^setup_${safe_id}()" "$f"
         if [ "$status" -ne 0 ]; then
-            echo "$(basename "$f") is missing module_setup()" >&2
+            echo "$(basename "$f") is missing setup_${safe_id}()" >&2
             return 1
         fi
     done

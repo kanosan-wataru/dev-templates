@@ -22,7 +22,7 @@ GIT_MOD_MANAGED_FILES=(
 )
 
 # --- セットアップ ---
-module_setup() {
+setup_git() {
     print -P ""
     print -P "%F{36}%B[Git グローバル設定]%b%f"
     print -P "---------------------------------------------"
@@ -135,7 +135,7 @@ _git_show_user_guide() {
 }
 
 # --- アンインストール ---
-module_uninstall() {
+uninstall_git() {
     local restored=0
 
     # git config の解除（git が利用可能な場合のみ）

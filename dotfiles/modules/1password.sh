@@ -375,7 +375,7 @@ _1password_setup_service_account_token() {
 }
 
 # --- セットアップ ---
-module_setup() {
+setup_1password() {
     print -P ""
     print -P "%F{36}%B[1Password]%b%f"
     print -P "---------------------------------------------"
@@ -460,7 +460,7 @@ module_setup() {
 }
 
 # --- アンインストール ---
-module_uninstall() {
+uninstall_1password() {
     local restored=0
 
     # Git 署名設定の解除

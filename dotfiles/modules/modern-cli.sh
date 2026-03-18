@@ -116,7 +116,7 @@ _mcli_install_eza_apt() {
 }
 
 # --- セットアップ ---
-module_setup() {
+setup_modern_cli() {
     print -P ""
     print -P "%F{36}%B[モダン CLI ツール]%b%f"
     print -P "---------------------------------------------"
@@ -219,7 +219,7 @@ module_setup() {
 
 # --- アンインストール ---
 # NOTE: システムパッケージの自動削除は意図しない依存破壊のリスクがあるため、手順の表示のみとする
-module_uninstall() {
+uninstall_modern_cli() {
     print -P "モダン CLI ツールのアンインストール手順:"
     print -P ""
 

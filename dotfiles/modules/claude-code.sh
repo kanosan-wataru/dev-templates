@@ -328,7 +328,7 @@ _claude_mod_remove_mcp_servers() {
 }
 
 # --- セットアップ ---
-module_setup() {
+setup_claude_code() {
     print -P ""
     print -P "%F{36}%B[Claude Code]%b%f"
     print -P "---------------------------------------------"
@@ -406,7 +406,7 @@ module_setup() {
 }
 
 # --- アンインストール ---
-module_uninstall() {
+uninstall_claude_code() {
     local restored=0
 
     # =========================================

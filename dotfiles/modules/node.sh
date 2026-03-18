@@ -42,7 +42,7 @@ _node_detect_arch() {
 }
 
 # --- セットアップ ---
-module_setup() {
+setup_node() {
     print -P ""
     print -P "%F{36}%B[Node.js 開発環境]%b%f"
     print -P "---------------------------------------------"
@@ -280,7 +280,7 @@ _node_install_config() {
 }
 
 # --- アンインストール ---
-module_uninstall() {
+uninstall_node() {
     local restored=0
 
     for entry in "${NODE_MOD_MANAGED_FILES[@]}"; do

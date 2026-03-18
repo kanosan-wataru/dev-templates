@@ -200,7 +200,7 @@ _docker_setup_group() {
 }
 
 # --- セットアップ ---
-module_setup() {
+setup_docker() {
     print -P ""
     print -P "%F{36}%B[Docker]%b%f"
     print -P "---------------------------------------------"
@@ -274,7 +274,7 @@ module_setup() {
 }
 
 # --- アンインストール ---
-module_uninstall() {
+uninstall_docker() {
     local env
     env=$(_docker_detect_env)
 

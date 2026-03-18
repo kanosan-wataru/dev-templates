@@ -27,7 +27,7 @@ ZSH_MOD_MANAGED_FILES=(
 )
 
 # --- セットアップ ---
-module_setup() {
+setup_zsh() {
     print -P ""
     print -P "%F{36}%B[Zsh 設定一式]%b%f"
     print -P "---------------------------------------------"
@@ -89,7 +89,7 @@ module_setup() {
 }
 
 # --- アンインストール ---
-module_uninstall() {
+uninstall_zsh() {
     local restored=0
 
     for entry in "${ZSH_MOD_MANAGED_FILES[@]}"; do

@@ -36,7 +36,7 @@ GEMINI_MOD_REQUIRED_DIRS=(
 )
 
 # --- セットアップ ---
-module_setup() {
+setup_gemini_cli() {
     print -P ""
     print -P "%F{36}%B[Gemini CLI]%b%f"
     print -P "---------------------------------------------"
@@ -116,7 +116,7 @@ module_setup() {
 }
 
 # --- アンインストール ---
-module_uninstall() {
+uninstall_gemini_cli() {
     local restored=0
 
     # =========================================

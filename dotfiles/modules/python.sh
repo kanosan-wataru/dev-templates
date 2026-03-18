@@ -50,7 +50,7 @@ _py_detect_os() {
 }
 
 # --- セットアップ ---
-module_setup() {
+setup_python() {
     print -P ""
     print -P "%F{36}%B[Python 開発環境]%b%f"
     print -P "---------------------------------------------"
@@ -185,7 +185,7 @@ _py_install_config() {
 }
 
 # --- アンインストール ---
-module_uninstall() {
+uninstall_python() {
     local restored=0
 
     for entry in "${PY_MOD_MANAGED_FILES[@]}"; do

@@ -40,7 +40,7 @@ CODEX_MOD_REQUIRED_DIRS=(
 )
 
 # --- セットアップ ---
-module_setup() {
+setup_codex_cli() {
     print -P ""
     print -P "%F{36}%B[Codex CLI]%b%f"
     print -P "---------------------------------------------"
@@ -121,7 +121,7 @@ module_setup() {
 }
 
 # --- アンインストール ---
-module_uninstall() {
+uninstall_codex_cli() {
     local restored=0
 
     # =========================================

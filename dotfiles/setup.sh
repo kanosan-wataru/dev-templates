@@ -370,9 +370,6 @@ load_modules() {
     typeset -a _unsorted
 
     for module_file in "$modules_dir"/*.sh(N); do
-        # 前回ループの残留関数をクリーンアップ
-        unset 'functions[module_setup]' 'functions[module_uninstall]' 2>/dev/null
-
         # メタデータ変数をリセット
         local MODULE_ID="" MODULE_NAME="" MODULE_DESC="" MODULE_DEFAULT=0 MODULE_ORDER=50 MODULE_DEPS=""
 
@@ -388,28 +385,12 @@ load_modules() {
             continue
         fi
 
-        # module_setup / module_uninstall が定義されているか確認
-        if [[ -z "${functions[module_setup]}" ]]; then
-            print -P "%F{220}警告: ${module_file:t} に module_setup が定義されていません。スキップします。%f"
-            continue
-        fi
-
-        # functions[] で関数をリネーム（名前衝突を回避）
+        # setup_<safe_id> が定義されているか確認
         local safe_id="${MODULE_ID//-/_}"
 
-        # モジュール ID 衝突の検出（ハイフン/アンダースコア変換による衝突を含む）
-        if [[ -n "${functions[setup_${safe_id}]}" ]]; then
-            print -P "%F{160}エラー: モジュール '${MODULE_ID}' の関数名が既存モジュールと衝突しています。スキップします。%f" >&2
-            unset 'functions[module_setup]' 'functions[module_uninstall]'
+        if ! declare -f "setup_${safe_id}" >/dev/null 2>&1; then
+            print -P "%F{220}警告: ${module_file:t} に setup_${safe_id} が定義されていません。スキップします。%f"
             continue
-        fi
-
-        functions[setup_${safe_id}]=$functions[module_setup]
-        unset 'functions[module_setup]'
-
-        if [[ -n "${functions[module_uninstall]}" ]]; then
-            functions[uninstall_${safe_id}]=$functions[module_uninstall]
-            unset 'functions[module_uninstall]'
         fi
 
         # Save dependency mapping
@@ -494,7 +475,7 @@ done
 run_module_setup() {
     local module_id="$1"
     local func_name="setup_${module_id//-/_}"
-    if [[ -n "${functions[$func_name]}" ]]; then
+    if declare -f "$func_name" >/dev/null 2>&1; then
         "$func_name"
     else
         print -P "%F{160}エラー: 不明なモジュール: ${module_id}%f" >&2
@@ -503,11 +484,11 @@ run_module_setup() {
 }
 
 # モジュール ID からアンインストール関数を動的に実行
-# NOTE: module_uninstall が未定義のモジュールは正常にスキップする
+# NOTE: uninstall_<safe_id> が未定義のモジュールは正常にスキップする
 run_module_uninstall() {
     local module_id="$1"
     local func_name="uninstall_${module_id//-/_}"
-    if [[ -n "${functions[$func_name]}" ]]; then
+    if declare -f "$func_name" >/dev/null 2>&1; then
         "$func_name"
     else
         print -P "情報: ${module_id} にはアンインストール処理が定義されていません。スキップします。"
