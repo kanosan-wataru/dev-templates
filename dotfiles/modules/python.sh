@@ -37,7 +37,7 @@ PY_MOD_DEPS=(
 
 # 管理対象ファイル（配布元パス, 配置先パス, 表示名, 未検出時メッセージ）
 PY_MOD_MANAGED_FILES=(
-    "$SCRIPT_DIR/.zsh/python.zsh|${ZDOTDIR:-$HOME}/.zsh/python.zsh|python.zsh|"
+    "$SCRIPT_DIR/.shell/python.sh|${HOME}/.shell/python.sh|python.sh|"
 )
 
 # --- ヘルパー: OS 判定 ---

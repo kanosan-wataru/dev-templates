@@ -1,15 +1,15 @@
 # ----------------------------
-# 基本エイリアス
+# Basic aliases
 # ----------------------------
 alias ls='ls --color=auto'
 alias la='ls -a'
 
 # ----------------------------
-# モダン CLI エイリアス（条件付き）
-# NOTE: ツール未インストール時は自動スキップ
+# Modern CLI aliases (conditional)
+# NOTE: Auto-skip when tool is not installed
 # ----------------------------
 
-# eza → ls 系の上書き
+# eza -> ls overrides
 if command -v eza >/dev/null 2>&1; then
     alias ls='eza --icons'
     alias ll='eza -l --icons --git'
@@ -17,8 +17,8 @@ if command -v eza >/dev/null 2>&1; then
     alias tree='eza --tree --icons'
 fi
 
-# bat → cat の上書き
-# NOTE: Ubuntu では bat が batcat として提供される
+# bat -> cat override
+# NOTE: On Ubuntu, bat is provided as batcat
 if command -v bat >/dev/null 2>&1; then
     alias cat='bat --paging=never'
 elif command -v batcat >/dev/null 2>&1; then
@@ -26,13 +26,13 @@ elif command -v batcat >/dev/null 2>&1; then
     alias cat='batcat --paging=never'
 fi
 
-# fd (Ubuntu では fdfind として提供)
+# fd (provided as fdfind on Ubuntu)
 if command -v fdfind >/dev/null 2>&1 && ! command -v fd >/dev/null 2>&1; then
     alias fd='fdfind'
 fi
 
 # ----------------------------
-# git エイリアス
+# git aliases
 # ----------------------------
 alias gs='git status'
 alias ga='git add'
@@ -44,7 +44,7 @@ alias gco='git checkout'
 alias gb='git branch'
 
 # ----------------------------
-# docker エイリアス
+# docker aliases
 # ----------------------------
 alias dc='docker compose'
 alias dcu='docker compose up -d'
@@ -52,29 +52,29 @@ alias dcd='docker compose down'
 alias dps='docker ps'
 
 # ----------------------------
-# fzf 連携関数
+# fzf integration functions
 # ----------------------------
 
-# git ブランチを fzf で検索してチェックアウト
+# Search git branches with fzf and checkout
 gco_fzf() {
     command -v fzf >/dev/null 2>&1 || {
-        echo "fzf が必要です" >&2
+        echo "fzf is required" >&2
         return 1
     }
     git rev-parse --is-inside-work-tree >/dev/null 2>&1 || {
-        echo "Git リポジトリ内で実行してください" >&2
+        echo "Must be inside a git repository" >&2
         return 1
     }
     local branch
     branch=$(git branch --all --format='%(refname:short)' |
         grep -v '^origin/HEAD$' |
         fzf --height 40% --reverse --prompt="checkout> ") || return
-    # リモートブランチの場合は origin/ プレフィックスを除去
+    # Strip origin/ prefix for remote branches
     branch=${branch#origin/}
     git checkout "$branch"
 }
 
-# ghq リポジトリを fzf で検索して移動
+# Search ghq repositories with fzf and cd
 if command -v ghq >/dev/null 2>&1 && command -v fzf >/dev/null 2>&1; then
     ghq_fzf() {
         local dir

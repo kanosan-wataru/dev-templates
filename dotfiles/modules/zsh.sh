@@ -21,9 +21,10 @@ ZSH_MOD_ZINIT_VERSION="v3.14.0"
 # NOTE: 配列の各要素は "src|dst|label|hint" の形式
 ZSH_MOD_MANAGED_FILES=(
     "$SCRIPT_DIR/.zshrc|$ZSH_MOD_BASE_DIR/.zshrc|.zshrc|"
+    "$SCRIPT_DIR/.bashrc|$ZSH_MOD_BASE_DIR/.bashrc|.bashrc|"
     "$SCRIPT_DIR/.zsh/.p10k.zsh|$ZSH_MOD_CONFIG_DIR/.p10k.zsh|.p10k.zsh|Powerlevel10k のデフォルト設定が使用されます。"
     "$SCRIPT_DIR/.zsh/plugins.zsh|$ZSH_MOD_CONFIG_DIR/plugins.zsh|plugins.zsh|プラグインは手動で設定してください。"
-    "$SCRIPT_DIR/.zsh/aliases.zsh|$ZSH_MOD_CONFIG_DIR/aliases.zsh|aliases.zsh|エイリアスは手動で設定してください。"
+    "$SCRIPT_DIR/.shell/aliases.sh|$HOME/.shell/aliases.sh|aliases.sh|エイリアスは手動で設定してください。"
 )
 
 # --- セットアップ ---
@@ -60,19 +61,22 @@ setup_zsh() {
     fi
 
     # 設定ディレクトリの作成
-    if [[ ! -d "$ZSH_MOD_CONFIG_DIR" ]]; then
-        run_cmd command mkdir -p -m 700 "$ZSH_MOD_CONFIG_DIR" || {
-            msg_error "$ZSH_MOD_CONFIG_DIR の作成に失敗しました。"
-            return 1
-        }
-        if (( DRY_RUN )); then
-            msg_info "$ZSH_MOD_CONFIG_DIR を作成予定です（dry-run）。"
+    local _zsh_mod_dir
+    for _zsh_mod_dir in "$ZSH_MOD_CONFIG_DIR" "$HOME/.shell"; do
+        if [[ ! -d "$_zsh_mod_dir" ]]; then
+            run_cmd command mkdir -p -m 700 "$_zsh_mod_dir" || {
+                msg_error "$_zsh_mod_dir の作成に失敗しました。"
+                return 1
+            }
+            if (( DRY_RUN )); then
+                msg_info "$_zsh_mod_dir を作成予定です（dry-run）。"
+            else
+                msg_info "$_zsh_mod_dir を作成しました。"
+            fi
         else
-            msg_info "$ZSH_MOD_CONFIG_DIR を作成しました。"
+            msg_info "$_zsh_mod_dir は既に存在します。"
         fi
-    else
-        msg_info "$ZSH_MOD_CONFIG_DIR は既に存在します。"
-    fi
+    done
 
     # 設定ファイルの配置
     msg_info "設定ファイルを配置します..."
