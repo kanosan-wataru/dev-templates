@@ -28,9 +28,9 @@ MODULES_DIR="$(cd "$(dirname "$BATS_TEST_FILENAME")/../modules" && pwd)"
     done
 }
 
-@test "all modules pass zsh syntax check" {
+@test "all modules pass bash syntax check" {
     for f in "$MODULES_DIR"/*.sh; do
-        run zsh -n "$f"
+        run bash -n "$f"
         if [ "$status" -ne 0 ]; then
             echo "$(basename "$f") has syntax errors: $output" >&2
             return 1
@@ -38,10 +38,10 @@ MODULES_DIR="$(cd "$(dirname "$BATS_TEST_FILENAME")/../modules" && pwd)"
     done
 }
 
-@test "setup.sh passes zsh syntax check" {
+@test "setup.sh passes bash syntax check" {
     local setup_sh
     setup_sh="$(cd "$(dirname "$BATS_TEST_FILENAME")/.." && pwd)/setup.sh"
-    run zsh -n "$setup_sh"
+    run bash -n "$setup_sh"
     if [ "$status" -ne 0 ]; then
         echo "setup.sh has syntax errors: $output" >&2
         return 1
