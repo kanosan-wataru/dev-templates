@@ -43,8 +43,8 @@ CLAUDE_MOD_MANAGED_FILES=(
     "$SCRIPT_DIR/.claude/skills/start-work/SKILL.md|$CLAUDE_MOD_SKILLS_DIR/start-work/SKILL.md|skills/start-work/SKILL.md|"
     # スキル: test
     "$SCRIPT_DIR/.claude/skills/test/SKILL.md|$CLAUDE_MOD_SKILLS_DIR/test/SKILL.md|skills/test/SKILL.md|"
-    # zsh モジュール: .env 読み込み（MCP サーバー用環境変数）
-    "$SCRIPT_DIR/.zsh/env.zsh|${ZSH_CONFIG_DIR:-$HOME/.zsh}/env.zsh|.zsh/env.zsh|"
+    # Shared shell module: .env loading (environment variables for MCP servers)
+    "$SCRIPT_DIR/.shell/env.sh|${HOME}/.shell/env.sh|.shell/env.sh|"
     # エージェント定義
     "$SCRIPT_DIR/.claude/agents/general-purpose.md|$CLAUDE_MOD_CONFIG_DIR/agents/general-purpose.md|agents/general-purpose.md|"
     "$SCRIPT_DIR/.claude/agents/gemini-explore.md|$CLAUDE_MOD_CONFIG_DIR/agents/gemini-explore.md|agents/gemini-explore.md|"
@@ -63,7 +63,7 @@ CLAUDE_MOD_REQUIRED_DIRS=(
     "$CLAUDE_MOD_SKILLS_DIR/start-work"
     "$CLAUDE_MOD_SKILLS_DIR/test"
     "$CLAUDE_MOD_CONFIG_DIR/agents"
-    "${ZSH_CONFIG_DIR:-$HOME/.zsh}"
+    "${HOME}/.shell"
 )
 
 # --- MCP サーバー設定のマージ ---
