@@ -199,6 +199,92 @@ _docker_setup_group() {
     fi
 }
 
+# --- ヘルパー: NVIDIA ドライバーがインストール済みか確認 ---
+_docker_has_nvidia_driver() {
+    command -v nvidia-smi >/dev/null 2>&1
+}
+
+# --- ヘルパー: NVIDIA Container Toolkit がインストール済みか確認 ---
+_docker_is_nvidia_toolkit_installed() {
+    command -v nvidia-ctk >/dev/null 2>&1
+}
+
+# --- ヘルパー: NVIDIA Container Toolkit のインストール (apt) ---
+_docker_install_nvidia_toolkit() {
+    msg_step "NVIDIA Container Toolkit をインストールします..."
+
+    # ステップ 1: 前提パッケージのインストール
+    run_cmd sudo apt-get update -qq || {
+        msg_warn "apt update に失敗しました。"
+    }
+    run_cmd sudo apt-get install -y ca-certificates curl gnupg2 || {
+        msg_error "前提パッケージのインストールに失敗しました。"
+        return 1
+    }
+
+    # ステップ 2: NVIDIA GPG キーの追加
+    run_cmd sudo install -m 0755 -d /etc/apt/keyrings || {
+        msg_error "/etc/apt/keyrings の作成に失敗しました。"
+        return 1
+    }
+    if (( ! DRY_RUN )); then
+        curl -fsSL https://nvidia.github.io/libnvidia-container/gpgkey \
+            | sudo gpg --dearmor -o /etc/apt/keyrings/nvidia-container-toolkit-keyring.gpg || {
+            msg_error "NVIDIA GPG キーの取得に失敗しました。"
+            return 1
+        }
+        sudo chmod a+r /etc/apt/keyrings/nvidia-container-toolkit-keyring.gpg || {
+            msg_error "GPG キーのパーミッション設定に失敗しました。"
+            return 1
+        }
+    else
+        msg_dry_run "curl -fsSL https://nvidia.github.io/libnvidia-container/gpgkey | sudo gpg --dearmor -o /etc/apt/keyrings/nvidia-container-toolkit-keyring.gpg"
+    fi
+
+    # ステップ 3: apt リポジトリの追加
+    if (( ! DRY_RUN )); then
+        curl -fsSL https://nvidia.github.io/libnvidia-container/stable/deb/nvidia-container-toolkit.list \
+            | sed 's#deb https://#deb [signed-by=/etc/apt/keyrings/nvidia-container-toolkit-keyring.gpg] https://#g' \
+            | sudo tee /etc/apt/sources.list.d/nvidia-container-toolkit.list >/dev/null || {
+            msg_error "NVIDIA apt リポジトリの追加に失敗しました。"
+            return 1
+        }
+    else
+        msg_dry_run "curl ... | sed ... | sudo tee /etc/apt/sources.list.d/nvidia-container-toolkit.list"
+    fi
+
+    # ステップ 4: nvidia-container-toolkit のインストール
+    run_cmd sudo apt-get update -qq || {
+        msg_warn "apt update に失敗しました。"
+    }
+    run_cmd sudo apt-get install -y nvidia-container-toolkit || {
+        msg_error "nvidia-container-toolkit のインストールに失敗しました。"
+        return 1
+    }
+}
+
+# --- ヘルパー: NVIDIA ランタイムの設定 ---
+_docker_configure_nvidia_runtime() {
+    msg_step "NVIDIA ランタイムを Docker に設定します..."
+
+    run_cmd sudo nvidia-ctk runtime configure --runtime=docker || {
+        msg_error "NVIDIA ランタイムの設定に失敗しました。"
+        return 1
+    }
+
+    run_cmd sudo systemctl restart docker || {
+        msg_warn "Docker の再起動に失敗しました。"
+    }
+
+    run_cmd sudo install -m 0755 -d /etc/cdi || {
+        msg_warn "/etc/cdi の作成に失敗しました。"
+    }
+
+    run_cmd sudo nvidia-ctk cdi generate --output=/etc/cdi/nvidia.yaml || {
+        msg_warn "CDI スペックの生成に失敗しました。"
+    }
+}
+
 # --- セットアップ ---
 setup_docker() {
     msg_header "Docker"
@@ -251,6 +337,30 @@ setup_docker() {
         _docker_setup_group || return 1
     fi
 
+    # --- 3. NVIDIA Container Toolkit (GPU サポート) ---
+    if [[ "$env" == "linux" ]]; then
+        if _docker_has_nvidia_driver; then
+            if ! _docker_is_nvidia_toolkit_installed; then
+                msg_step "NVIDIA GPU ドライバーを検出しました。Container Toolkit をインストールします..."
+                if ! command -v apt-get >/dev/null 2>&1; then
+                    msg_warn "apt-get が見つかりません。NVIDIA Container Toolkit のインストールをスキップします。"
+                else
+                    _docker_install_nvidia_toolkit || {
+                        msg_warn "NVIDIA Container Toolkit のインストールに失敗しました。GPU サポートなしで続行します。"
+                    }
+                fi
+            else
+                msg_info "NVIDIA Container Toolkit は既にインストールされています。"
+            fi
+            # Always run configure if toolkit is installed (whether just installed or pre-existing)
+            if _docker_is_nvidia_toolkit_installed; then
+                _docker_configure_nvidia_runtime || {
+                    msg_warn "NVIDIA ランタイムの設定に失敗しました。"
+                }
+            fi
+        fi
+    fi
+
     # --- 完了メッセージ ---
     printf '\n'
     if (( DRY_RUN )); then
@@ -263,6 +373,12 @@ setup_docker() {
             local compose_ver
             compose_ver=$(docker compose version 2>/dev/null || true)
             [[ -n "$compose_ver" ]] && msg_step "Compose: ${compose_ver}"
+            # NVIDIA Container Toolkit バージョンの表示（利用可能な場合）
+            if _docker_is_nvidia_toolkit_installed; then
+                local nvidia_ver
+                nvidia_ver=$(nvidia-ctk --version 2>/dev/null || printf 'N/A')
+                printf '  NVIDIA Container Toolkit: %s\n' "$nvidia_ver"
+            fi
         fi
     fi
 
