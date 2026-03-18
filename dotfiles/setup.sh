@@ -1,38 +1,46 @@
-#!/usr/bin/env zsh
+#!/usr/bin/env bash
+set -euo pipefail
 
 # ---------------------------------------------
-# 開発環境セットアップスクリプト
+# Development environment setup script
 #
-# 使用法:
-#   zsh setup.sh                  インタラクティブモード（モジュール選択）
-#   zsh setup.sh --all            全モジュール一括インストール
-#   zsh setup.sh --select zsh     特定モジュールを指定（複数可）
-#   zsh setup.sh --dry-run        変更内容のプレビューのみ
-#   zsh setup.sh --uninstall      バックアップから復元
-#   zsh setup.sh --help           ヘルプ表示
+# Usage:
+#   bash setup.sh                  Interactive mode (module selection)
+#   bash setup.sh --all            Install all modules at once
+#   bash setup.sh --select zsh     Specify modules (multiple allowed)
+#   bash setup.sh --dry-run        Preview changes only
+#   bash setup.sh --uninstall      Restore from backups
+#   bash setup.sh --help           Show help
 #
-# モジュールは modules/ ディレクトリから動的に読み込まれます。
-# 新規モジュールの追加方法は modules/ 内の既存ファイルを参照してください。
+# Modules are dynamically loaded from the modules/ directory.
+# To add new modules, refer to existing files in modules/.
 # ---------------------------------------------
 
-# --- Zsh実行確認 ---
-if [ -z "$ZSH_VERSION" ]; then
-    print -P "%F{160}エラー: このスクリプトは Zsh で実行する必要があります。%f" >&2
-    print -P "実行例: zsh $0" >&2
-    exit 1
-fi
+# --- Script directory ---
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
+# --- Source helper libraries ---
+# shellcheck source=./lib/colors.sh
+source "${SCRIPT_DIR}/lib/colors.sh"
+# shellcheck source=./lib/array.sh
+source "${SCRIPT_DIR}/lib/array.sh"
+# shellcheck source=./lib/backup.sh
+source "${SCRIPT_DIR}/lib/backup.sh"
+# shellcheck source=./lib/tui.sh
+source "${SCRIPT_DIR}/lib/tui.sh"
+_setup_colors
 
 
 # ==============================================
-# 引数パース
+# Argument parsing
 # ==============================================
 DRY_RUN=0
 UNINSTALL=0
 ALL_FLAG=0
 HELP_FLAG=0
-typeset -a SELECT_MODULES
-typeset -A MODULE_DEPS_MAP
-typeset -A MODULE_ID_SET
+declare -a SELECT_MODULES=()
+declare -A MODULE_DEPS_MAP=()
+declare -A MODULE_ID_SET=()
 
 while (( $# > 0 )); do
     case "$1" in
@@ -47,7 +55,7 @@ while (( $# > 0 )); do
             ;;
         --select)
             if (( $# < 2 )); then
-                print -P "%F{160}エラー: --select にはモジュール名が必要です%f" >&2
+                msg_error "--select にはモジュール名が必要です"
                 exit 1
             fi
             shift
@@ -57,8 +65,8 @@ while (( $# > 0 )); do
             HELP_FLAG=1
             ;;
         *)
-            print -P "%F{160}エラー: 不明なオプション: $1%f" >&2
-            print -P "ヘルプ: zsh $0 --help" >&2
+            msg_error "不明なオプション: $1"
+            printf '  ヘルプ: bash %s --help\n' "$0" >&2
             exit 1
             ;;
     esac
@@ -67,87 +75,86 @@ done
 
 
 # ==============================================
-# 共通変数
+# Common variables
 # ==============================================
-SCRIPT_DIR="${0:a:h}"
 BACKUP_SUFFIX=".backup.$(command date +%Y%m%d%H%M%S)"
 
 
 # ==============================================
-# ヘルパー関数
+# Helper functions
 # ==============================================
 
-# dry-run 対応の実行ラッパー
-# DRY_RUN=1 の場合はコマンドを表示するだけで実行しない
+# Dry-run aware command wrapper
+# When DRY_RUN=1, print the command instead of executing it
 run_cmd() {
     if (( DRY_RUN )); then
-        print -P "%F{242}  [DRY-RUN] ${(q)@}%f"
+        msg_dry_run "$(printf '%q ' "$@")"
     else
         "$@"
     fi
 }
 
-# 設定ファイルのバックアップと配置を行うヘルパー（べき等性対応）
-# 引数: $1=配布元パス $2=配置先パス $3=表示名 $4=未検出時の補足メッセージ
+# Config file backup and deployment helper (idempotent)
+# Args: $1=source path $2=destination path $3=display name $4=hint when missing
 install_config() {
-    local src="$1" dst="$2" label="$3" missing_hint="$4"
+    local src="$1" dst="$2" label="$3" missing_hint="${4:-}"
 
-    # 配布元が存在しない場合は警告のみ
+    # Warn if source file does not exist
     if [[ ! -f "$src" ]]; then
         if [[ -n "$missing_hint" ]]; then
-            print -P "%F{220}警告: ${label} が見つかりません。${missing_hint}%f"
+            msg_warn "${label} が見つかりません。${missing_hint}"
         else
-            print -P "%F{160}エラー: 配布元の ${label} が見つかりません: ${src}%f" >&2
+            msg_error "配布元の ${label} が見つかりません: ${src}"
             exit 1
         fi
         return 0
     fi
 
-    # べき等性チェック: シンボリックリンクでなく、内容が同一ならスキップ
+    # Idempotency check: skip if not a symlink and content is identical
     if [[ -f "$dst" && ! -h "$dst" ]] && cmp -s "$src" "$dst"; then
-        print -P "情報: ${label} は既に最新の状態です。スキップします。"
+        msg_info "${label} は既に最新の状態です。スキップします。"
         return 0
     fi
 
-    # バックアップ処理（既存ファイルまたはシンボリックリンクがある場合）
+    # Backup existing file or symlink
     if [[ -f "$dst" || -h "$dst" ]]; then
         run_cmd command mv "$dst" "${dst}${BACKUP_SUFFIX}" || {
-            print -P "%F{160}エラー: ${label} のバックアップに失敗しました。%f" >&2
+            msg_error "${label} のバックアップに失敗しました。"
             exit 1
         }
         if (( DRY_RUN )); then
-            print -P "情報: 既存の ${label} を ${dst}${BACKUP_SUFFIX} にバックアップします（予定）。"
+            msg_info "既存の ${label} を ${dst}${BACKUP_SUFFIX} にバックアップします（予定）。"
         else
-            print -P "情報: 既存の ${label} を ${dst}${BACKUP_SUFFIX} にバックアップしました。"
+            msg_info "既存の ${label} を ${dst}${BACKUP_SUFFIX} にバックアップしました。"
         fi
     fi
 
-    # 配置処理
+    # Deploy file
     run_cmd command cp -p "$src" "$dst" || {
-        print -P "%F{160}エラー: ${label} の配置に失敗しました。%f" >&2
+        msg_error "${label} の配置に失敗しました。"
         if [[ -f "${dst}${BACKUP_SUFFIX}" ]]; then
-            print -P "  バックアップは ${dst}${BACKUP_SUFFIX} に保存されています。" >&2
-            print -P "  手動で復元するには: mv '${dst}${BACKUP_SUFFIX}' '$dst'" >&2
+            printf '  バックアップは %s に保存されています。\n' "${dst}${BACKUP_SUFFIX}" >&2
+            printf '  手動で復元するには: mv '\''%s'\'' '\''%s'\''\n' "${dst}${BACKUP_SUFFIX}" "$dst" >&2
         fi
         exit 1
     }
     if (( DRY_RUN )); then
-        print -P "情報: ${label} を配置予定です（dry-run）。"
+        msg_info "${label} を配置予定です（dry-run）。"
     else
-        print -P "情報: ${label} を配置しました。"
+        msg_info "${label} を配置しました。"
     fi
 }
 
-# Node.js と npm の存在を確認するヘルパー
-# 引数: $1=最低メジャーバージョン（省略時: 18）
-# 戻り値: 0=利用可能, 1=利用不可
+# Verify Node.js and npm availability
+# Args: $1=minimum major version (default: 18)
+# Returns: 0=available, 1=unavailable
 ensure_node() {
     local min_version="${1:-18}"
 
     if ! command -v node >/dev/null 2>&1; then
-        print -P "%F{160}エラー: Node.js がインストールされていません。%f" >&2
-        print -P "  nvm, fnm, volta 等で Node.js v${min_version} 以上をインストールしてください。" >&2
-        print -P "  例: curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.1/install.sh | bash" >&2
+        msg_error "Node.js がインストールされていません。"
+        printf '  nvm, fnm, volta 等で Node.js v%s 以上をインストールしてください。\n' "$min_version" >&2
+        printf '  例: curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.1/install.sh | bash\n' >&2
         return 1
     fi
 
@@ -156,23 +163,23 @@ ensure_node() {
 
     # Validate numeric values
     if [[ ! "$min_version" =~ ^[0-9]+$ ]]; then
-        print -P "%F{160}エラー: ensure_node に不正な引数が渡されました: ${min_version}%f" >&2
+        msg_error "ensure_node に不正な引数が渡されました: ${min_version}"
         return 1
     fi
     if [[ ! "$node_ver" =~ ^[0-9]+$ ]]; then
-        print -P "%F{160}エラー: Node.js のバージョンを取得できませんでした。%f" >&2
+        msg_error "Node.js のバージョンを取得できませんでした。"
         return 1
     fi
 
     if (( node_ver < min_version )); then
-        print -P "%F{160}エラー: Node.js v${min_version} 以上が必要です（現在: v${node_ver}）%f" >&2
-        print -P "  Node.js をアップグレードしてください。" >&2
+        msg_error "Node.js v${min_version} 以上が必要です（現在: v${node_ver}）"
+        printf '  Node.js をアップグレードしてください。\n' >&2
         return 1
     fi
 
     if ! command -v npm >/dev/null 2>&1; then
-        print -P "%F{160}エラー: npm がインストールされていません。%f" >&2
-        print -P "  Node.js に付属の npm が利用可能か確認してください。" >&2
+        msg_error "npm がインストールされていません。"
+        printf '  Node.js に付属の npm が利用可能か確認してください。\n' >&2
         return 1
     fi
 
@@ -181,305 +188,130 @@ ensure_node() {
 
 
 # ==============================================
-# チェックボックス選択UI（tput ベース + 再描画方式）
+# Dynamic module loading
 # ==============================================
 
-# チェックボックスメニューを表示し、選択結果を返す
-# 引数: メニュー項目の配列（"表示名|説明|デフォルト選択(0/1)" 形式）
-# 出力: 選択されたインデックス（1始まり）をスペース区切りで REPLY 変数に設定
-# 戻り値: 0=正常終了, 1=キャンセル（q キー）
-checkbox_menu() {
-    local -a items=("$@")
-    local item_count=${#items}
-    local cursor=1
-    local -a selected
-    local -a labels
-    local -a descs
-    local redraw=0
-
-    # メニュー項目をパース
-    for i in {1..$item_count}; do
-        labels[$i]="${items[$i][(ws:|:)1]}"
-        descs[$i]="${items[$i][(ws:|:)2]}"
-        selected[$i]="${items[$i][(ws:|:)3]}"
-    done
-
-    # ヘッダー行数（操作説明 + 空行）
-    local header_lines=2
-    # 合計描画行数（ヘッダー + メニュー項目）
-    local total_lines=$(( header_lines + item_count ))
-
-    # 端末状態の保護: 異常終了時にカーソルとリセットを復帰
-    trap '_checkbox_cleanup' INT TERM QUIT
-    tput civis 2>/dev/null  # カーソル非表示
-
-    # 画面下部でのスクロールスペースを事前確保
-    for i in {1..$total_lines}; do print ""; done
-    for i in {1..$total_lines}; do tput cuu1; done
-
-    # 描画ループ
-    while true; do
-        _checkbox_draw "$item_count" "$cursor" "$header_lines" "$redraw"
-        redraw=1
-
-        # キー入力待ち
-        local key=""
-        read -k 1 key
-
-        case "$key" in
-            $'\e')
-                # ESC シーケンスの解析（矢印キー対応）
-                local key2="" key3=""
-                read -k 1 -t 0.05 key2 2>/dev/null
-                if [[ "$key2" == "[" || "$key2" == "O" ]]; then
-                    read -k 1 -t 0.05 key3 2>/dev/null
-                    case "$key3" in
-                        A) # 上矢印
-                            (( cursor > 1 )) && (( cursor-- ))
-                            ;;
-                        B) # 下矢印
-                            (( cursor < item_count )) && (( cursor++ ))
-                            ;;
-                    esac
-                fi
-                ;;
-            k) # vim: 上移動
-                (( cursor > 1 )) && (( cursor-- ))
-                ;;
-            j) # vim: 下移動
-                (( cursor < item_count )) && (( cursor++ ))
-                ;;
-            ' ') # スペース: 選択トグル
-                if (( selected[$cursor] )); then
-                    selected[$cursor]=0
-                else
-                    selected[$cursor]=1
-                fi
-                ;;
-            a) # 全選択/全解除トグル
-                local all_selected=1
-                for i in {1..$item_count}; do
-                    if (( ! selected[$i] )); then
-                        all_selected=0
-                        break
-                    fi
-                done
-                local new_val=$(( ! all_selected ))
-                for i in {1..$item_count}; do
-                    selected[$i]=$new_val
-                done
-                ;;
-            q) # キャンセル
-                tput cnorm 2>/dev/null
-                trap - INT TERM QUIT
-                return 1
-                ;;
-            $'\n') # Enter: 確定
-                break
-                ;;
-        esac
-    done
-
-    # クリーンアップ
-    tput cnorm 2>/dev/null  # カーソル表示復帰
-    trap - INT TERM QUIT
-
-    # 選択されたインデックスを REPLY 変数に設定
-    REPLY=""
-    for i in {1..$item_count}; do
-        if (( selected[$i] )); then
-            REPLY+="$i "
-        fi
-    done
-    return 0
-}
-
-# チェックボックスメニューの描画（内部関数）
-_checkbox_draw() {
-    local item_count=$1 cursor=$2 header_lines=$3 redraw=$4
-    local total_lines=$(( header_lines + item_count ))
-    local max_width=${COLUMNS:-80}
-
-    # 再描画時は描画開始位置に戻る
-    if (( redraw )); then
-        for i in {1..$total_lines}; do tput cuu1; done
-    fi
-
-    # ヘッダー
-    tput el
-    print -P "%F{36}%B インストールするモジュールを選択してください:%b%f"
-    tput el
-    print -P "%F{242} (↑↓/jk: 移動, スペース: 選択, a: 全選択, Enter: 確定, q: キャンセル)%f"
-
-    # メニュー項目
-    for i in {1..$item_count}; do
-        tput el  # 行末クリア（前回描画の残りを消す）
-
-        local prefix=" "
-        local check="[ ]"
-        local label_color=""
-        local reset=""
-
-        if (( selected[$i] )); then
-            check="[x]"
-        fi
-
-        if (( i == cursor )); then
-            # カーソル行: シアン太字
-            tput bold 2>/dev/null
-            tput setaf 6 2>/dev/null
-            prefix=">"
-        fi
-
-        # 表示文字列を組み立て、端末幅に収める
-        local line=" ${prefix} ${check} ${labels[$i]}  ${descs[$i]}"
-        if (( ${#line} > max_width )); then
-            line="${line[1,$((max_width - 1))]}"
-        fi
-        print "$line"
-
-        if (( i == cursor )); then
-            tput sgr0 2>/dev/null
-        fi
-    done
-}
-
-# チェックボックスUIの異常終了時クリーンアップ
-_checkbox_cleanup() {
-    tput cnorm 2>/dev/null  # カーソル表示復帰
-    tput sgr0 2>/dev/null   # 装飾リセット
-    print ""
-    exit 130
-}
-
-
-# ==============================================
-# モジュール動的読み込み
-# ==============================================
-
-# modules/ ディレクトリからモジュールファイルを読み込み、
-# MODULES 配列と setup_*/uninstall_* 関数を動的に構築する
+# Load module files from modules/ directory,
+# building the MODULES array and setup_*/uninstall_* functions dynamically
 load_modules() {
     local modules_dir="$SCRIPT_DIR/modules"
 
     if [[ ! -d "$modules_dir" ]]; then
-        print -P "%F{160}エラー: modules/ ディレクトリが見つかりません: ${modules_dir}%f" >&2
+        msg_error "modules/ ディレクトリが見つかりません: ${modules_dir}"
         exit 1
     fi
 
-    typeset -a _unsorted
+    declare -a _unsorted=()
+    local module_file
 
-    for module_file in "$modules_dir"/*.sh(N); do
-        # 前回ループの残留関数をクリーンアップ
-        unset 'functions[module_setup]' 'functions[module_uninstall]' 2>/dev/null
+    # NOTE: Use glob + nullglob-style check instead of zsh (N) qualifier
+    for module_file in "$modules_dir"/*.sh; do
+        # Skip if glob did not match anything (no nullglob in bash)
+        [[ -e "$module_file" ]] || continue
 
-        # メタデータ変数をリセット
+        # Reset metadata variables
         local MODULE_ID="" MODULE_NAME="" MODULE_DESC="" MODULE_DEFAULT=0 MODULE_ORDER=50 MODULE_DEPS=""
 
-        # モジュールファイルをソース
+        # Source the module file
+        # shellcheck disable=SC1090
         if ! source "$module_file"; then
-            print -P "%F{220}警告: ${module_file:t} の読み込みに失敗しました（構文エラーの可能性）。スキップします。%f" >&2
+            local basename_file
+            basename_file="$(basename "$module_file")"
+            msg_warn "${basename_file} の読み込みに失敗しました（構文エラーの可能性）。スキップします。"
             continue
         fi
 
-        # バリデーション: 必須メタデータの確認
+        # Validation: check required metadata
         if [[ -z "$MODULE_ID" || -z "$MODULE_NAME" ]]; then
-            print -P "%F{220}警告: ${module_file:t} のメタデータが不正です。スキップします。%f"
+            local basename_file
+            basename_file="$(basename "$module_file")"
+            msg_warn "${basename_file} のメタデータが不正です。スキップします。"
             continue
         fi
 
-        # module_setup / module_uninstall が定義されているか確認
-        if [[ -z "${functions[module_setup]}" ]]; then
-            print -P "%F{220}警告: ${module_file:t} に module_setup が定義されていません。スキップします。%f"
-            continue
-        fi
-
-        # functions[] で関数をリネーム（名前衝突を回避）
+        # Check that setup_<safe_id> function is defined
         local safe_id="${MODULE_ID//-/_}"
 
-        # モジュール ID 衝突の検出（ハイフン/アンダースコア変換による衝突を含む）
-        if [[ -n "${functions[setup_${safe_id}]}" ]]; then
-            print -P "%F{160}エラー: モジュール '${MODULE_ID}' の関数名が既存モジュールと衝突しています。スキップします。%f" >&2
-            unset 'functions[module_setup]' 'functions[module_uninstall]'
+        if ! declare -f "setup_${safe_id}" >/dev/null 2>&1; then
+            local basename_file
+            basename_file="$(basename "$module_file")"
+            msg_warn "${basename_file} に setup_${safe_id} が定義されていません。スキップします。"
             continue
-        fi
-
-        functions[setup_${safe_id}]=$functions[module_setup]
-        unset 'functions[module_setup]'
-
-        if [[ -n "${functions[module_uninstall]}" ]]; then
-            functions[uninstall_${safe_id}]=$functions[module_uninstall]
-            unset 'functions[module_uninstall]'
         fi
 
         # Save dependency mapping
         MODULE_DEPS_MAP[$MODULE_ID]="$MODULE_DEPS"
         MODULE_ID_SET[$MODULE_ID]=1
 
-        # ORDER 付きで一時配列に格納（後でソート）
+        # Store with ORDER prefix for sorting later
         _unsorted+=("$(printf '%03d' "$MODULE_ORDER")|${MODULE_ID}|${MODULE_NAME}|${MODULE_DESC}|${MODULE_DEFAULT}")
     done
 
-    if (( ${#_unsorted} == 0 )); then
-        print -P "%F{160}エラー: 有効なモジュールが見つかりません。%f" >&2
+    if (( ${#_unsorted[@]} == 0 )); then
+        msg_error "有効なモジュールが見つかりません。"
         exit 1
     fi
 
-    # MODULE_ORDER でソートして MODULES 配列を構築
+    # Sort by MODULE_ORDER and build MODULES array
     MODULES=()
-    for entry in ${(o)_unsorted}; do
-        # ORDER 部分（先頭の "NNN|"）を除去
+    readarray -t _sorted < <(printf '%s\n' "${_unsorted[@]}" | sort)
+    local entry
+    for entry in "${_sorted[@]}"; do
+        # Remove ORDER prefix ("NNN|")
         MODULES+=("${entry#*|}")
     done
 }
 
-# モジュールを読み込む
+# Load modules
 load_modules
 
 
 # ==============================================
-# ヘルプ表示（モジュール読み込み後に動的生成）
+# Help display (dynamically generated after module loading)
 # ==============================================
 if (( HELP_FLAG )); then
-    print -P "使用法: zsh $0 [オプション]"
-    print -P ""
-    print -P "オプション:"
-    print -P "  --dry-run          変更内容のプレビューのみ（実際には変更しない）"
-    print -P "  --uninstall        全モジュールをアンインストール（バックアップから復元）"
-    print -P "  --all              全モジュールを一括インストール"
-    print -P "  --select MODULE    特定モジュールを指定（複数指定可）"
-    print -P "  --help, -h         このヘルプを表示"
-    print -P ""
-    print -P "モジュール:"
+    printf '使用法: bash %s [オプション]\n' "$0"
+    printf '\n'
+    printf 'オプション:\n'
+    printf '  --dry-run          変更内容のプレビューのみ（実際には変更しない）\n'
+    printf '  --uninstall        全モジュールをアンインストール（バックアップから復元）\n'
+    printf '  --all              全モジュールを一括インストール\n'
+    printf '  --select MODULE    特定モジュールを指定（複数指定可）\n'
+    printf '  --help, -h         このヘルプを表示\n'
+    printf '\n'
+    printf 'モジュール:\n'
     for entry in "${MODULES[@]}"; do
-        printf "  %-14s %s (%s)\n" "${entry[(ws:|:)1]}" "${entry[(ws:|:)2]}" "${entry[(ws:|:)3]}"
+        IFS='|' read -r mod_id mod_name mod_desc _mod_default <<< "$entry"
+        printf '  %-14s %s (%s)\n' "$mod_id" "$mod_name" "$mod_desc"
     done
-    print -P ""
-    print -P "例:"
-    print -P "  zsh $0                              インタラクティブ選択"
-    print -P "  zsh $0 --all                        全モジュール一括"
-    print -P "  zsh $0 --select zsh --select claude-code  複数指定"
-    print -P "  zsh $0 --all --dry-run              全モジュールをプレビュー"
+    printf '\n'
+    printf '例:\n'
+    printf '  bash %s                              インタラクティブ選択\n' "$0"
+    printf '  bash %s --all                        全モジュール一括\n' "$0"
+    printf '  bash %s --select zsh --select claude-code  複数指定\n' "$0"
+    printf '  bash %s --all --dry-run              全モジュールをプレビュー\n' "$0"
     exit 0
 fi
 
 
 # ==============================================
-# --select バリデーション（モジュール読み込み後に検証）
+# --select validation (verified after module loading)
 # ==============================================
 for mod_id in "${SELECT_MODULES[@]}"; do
-    typeset found=0
+    local_found=0
     for entry in "${MODULES[@]}"; do
-        if [[ "${entry[(ws:|:)1]}" == "$mod_id" ]]; then
-            found=1
+        IFS='|' read -r entry_id _rest <<< "$entry"
+        if [[ "$entry_id" == "$mod_id" ]]; then
+            local_found=1
             break
         fi
     done
-    if (( ! found )); then
-        print -P "%F{160}エラー: 不明なモジュール: ${mod_id}%f" >&2
-        print -P "利用可能なモジュール:" >&2
+    if (( ! local_found )); then
+        msg_error "不明なモジュール: ${mod_id}"
+        printf '利用可能なモジュール:\n' >&2
         for entry in "${MODULES[@]}"; do
-            print -P "  ${entry[(ws:|:)1]}" >&2
+            IFS='|' read -r entry_id _rest <<< "$entry"
+            printf '  %s\n' "$entry_id" >&2
         done
         exit 1
     fi
@@ -487,81 +319,84 @@ done
 
 
 # ==============================================
-# モジュール実行ディスパッチ
+# Module execution dispatch
 # ==============================================
 
-# モジュール ID からセットアップ関数を動的に実行
+# Dynamically execute setup function for a module ID
 run_module_setup() {
     local module_id="$1"
     local func_name="setup_${module_id//-/_}"
-    if [[ -n "${functions[$func_name]}" ]]; then
+    if declare -f "$func_name" >/dev/null 2>&1; then
         "$func_name"
     else
-        print -P "%F{160}エラー: 不明なモジュール: ${module_id}%f" >&2
+        msg_error "不明なモジュール: ${module_id}"
         return 1
     fi
 }
 
-# モジュール ID からアンインストール関数を動的に実行
-# NOTE: module_uninstall が未定義のモジュールは正常にスキップする
+# Dynamically execute uninstall function for a module ID
+# NOTE: Modules without uninstall_<safe_id> are silently skipped
 run_module_uninstall() {
     local module_id="$1"
     local func_name="uninstall_${module_id//-/_}"
-    if [[ -n "${functions[$func_name]}" ]]; then
+    if declare -f "$func_name" >/dev/null 2>&1; then
         "$func_name"
     else
-        print -P "情報: ${module_id} にはアンインストール処理が定義されていません。スキップします。"
+        msg_info "${module_id} にはアンインストール処理が定義されていません。スキップします。"
         return 0
     fi
 }
 
 
-# モジュール依存関係を解決し、不足している依存モジュールを自動追加する
-# 変更対象: selected_module_ids（不足する依存先を追加）
+# Resolve module dependencies and auto-add missing dependency modules
+# Modifies: selected_module_ids (adds missing dependencies)
 resolve_module_deps() {
     local -a added_deps=()
     local changed=1
 
-    # 推移的依存を解決するため、変更がなくなるまで繰り返す
+    # Iterate until no more transitive dependencies are found
     while (( changed )); do
         changed=0
         for mod_id in "${selected_module_ids[@]}"; do
-            local deps="${MODULE_DEPS_MAP[$mod_id]}"
+            local deps="${MODULE_DEPS_MAP[$mod_id]:-}"
             [[ -z "$deps" ]] && continue
 
             # MODULE_DEPS is a space-separated list
-            for dep in ${(s: :)deps}; do
+            read -ra _deps <<< "$deps"
+            local dep
+            for dep in "${_deps[@]}"; do
                 # Check if dep is already selected
-                if ! (( ${selected_module_ids[(Ie)$dep]} )); then
+                if ! array_contains "$dep" "${selected_module_ids[@]}"; then
                     # O(1) existence check
-                    if [[ -n "${MODULE_ID_SET[$dep]}" ]]; then
+                    if [[ -n "${MODULE_ID_SET[$dep]:-}" ]]; then
                         selected_module_ids+=("$dep")
                         added_deps+=("$dep")
                         changed=1
                     else
-                        print -P "%F{220}警告: モジュール '${mod_id}' の依存先 '${dep}' が見つかりません。%f" >&2
+                        msg_warn "モジュール '${mod_id}' の依存先 '${dep}' が見つかりません。"
                     fi
                 fi
             done
         done
     done
 
-    # 自動追加された依存をユーザーに通知
+    # Notify user of auto-added dependencies
     if (( ${#added_deps[@]} > 0 )); then
-        print -P ""
-        print -P "%F{36}依存関係の自動解決:%f"
+        printf '\n'
+        color_print "$C_CYAN" "依存関係の自動解決:"
         for dep in "${added_deps[@]}"; do
-            print -P "  + ${dep} (依存先として自動追加)"
+            printf '  + %s (依存先として自動追加)\n' "$dep"
         done
-        print -P ""
+        printf '\n'
     fi
 
-    # MODULE_ORDER 順に再ソート（依存先が先にインストールされるようにする）
+    # Re-sort by MODULE_ORDER so dependencies are installed first
     if (( ${#added_deps[@]} > 0 )); then
         local -a sorted_ids=()
+        local entry entry_id
         for entry in "${MODULES[@]}"; do
-            local entry_id="${entry%%|*}"
-            if (( ${selected_module_ids[(Ie)$entry_id]} )); then
+            entry_id="${entry%%|*}"
+            if array_contains "$entry_id" "${selected_module_ids[@]}"; then
                 sorted_ids+=("$entry_id")
             fi
         done
@@ -571,176 +406,182 @@ resolve_module_deps() {
 
 
 # ==============================================
-# アンインストールモード
-# NOTE: --uninstall は常に全モジュールを対象にする
+# Uninstall mode
+# NOTE: --uninstall always targets all modules
 # ==============================================
 if (( UNINSTALL )); then
-    print -P "全モジュールのアンインストール（復元）を開始します..."
-    print -P "============================================="
+    printf '%s\n' "全モジュールのアンインストール（復元）を開始します..."
+    printf '%s\n' "============================================="
 
     if (( DRY_RUN )); then
-        print -P "%F{33}[DRY-RUN モード] 実際には変更を行いません。%f"
-        print -P "---------------------------------------------"
+        color_print "${C_CYAN}" "[DRY-RUN モード] 実際には変更を行いません。"
+        print_separator
     fi
 
-    typeset -i uninstall_errors=0
+    declare -i uninstall_errors=0
 
-    # NOTE: セットアップと逆順（MODULE_ORDER 降順）でアンインストールする
-    for entry in "${(@Oa)MODULES}"; do
-        typeset mod_id="${entry[(ws:|:)1]}"
-        typeset mod_name="${entry[(ws:|:)2]}"
-        print -P ""
-        print -P "%F{36}%B[${mod_name}]%b%f"
-        print -P "---------------------------------------------"
+    # NOTE: Uninstall in reverse MODULE_ORDER (descending) order
+    readarray -t _reversed < <(printf '%s\n' "${MODULES[@]}" | tac)
+    for entry in "${_reversed[@]}"; do
+        IFS='|' read -r mod_id mod_name _rest <<< "$entry"
+        printf '\n'
+        printf '%s%s[%s]%s\n' "${C_CYAN}" "${C_BOLD}" "$mod_name" "${C_RESET}"
+        print_separator
         if ! run_module_uninstall "$mod_id"; then
-            (( uninstall_errors++ ))
+            (( uninstall_errors++ )) || true
         fi
     done
 
-    print -P ""
-    print -P "============================================="
+    printf '\n'
+    printf '%s\n' "============================================="
     if (( uninstall_errors > 0 )); then
-        print -P "%F{220}アンインストールが完了しましたが、${uninstall_errors} 件のモジュールでエラーが発生しました。%f"
-        print -P "============================================="
+        color_print "$C_YELLOW" "アンインストールが完了しましたが、${uninstall_errors} 件のモジュールでエラーが発生しました。"
+        printf '%s\n' "============================================="
         exit 1
     else
-        print -P "%F{34}アンインストールが完了しました。%f"
-        print -P "============================================="
+        msg_success "アンインストールが完了しました。"
+        printf '%s\n' "============================================="
         exit 0
     fi
 fi
 
 
 # ==============================================
-# 通常セットアップモード
+# Normal setup mode
 # ==============================================
-print -P ""
-print -P "%F{36}%B 開発環境セットアップ%b%f"
-print -P "============================================="
+printf '\n'
+printf '%s%s 開発環境セットアップ%s\n' "${C_CYAN}" "${C_BOLD}" "${C_RESET}"
+printf '%s\n' "============================================="
 
 if (( DRY_RUN )); then
-    print -P "%F{33}[DRY-RUN モード] 実際には変更を行いません。%f"
-    print -P "---------------------------------------------"
+    color_print "${C_CYAN}" "[DRY-RUN モード] 実際には変更を行いません。"
+    print_separator
 fi
 
-print -P "情報: Zsh で実行されています (バージョン: $ZSH_VERSION)"
-print -P "---------------------------------------------"
+printf '情報: Bash で実行されています (バージョン: %s)\n' "$BASH_VERSION"
+print_separator
 
-# --- モジュール選択 ---
-typeset -a selected_module_ids
+# --- Module selection ---
+declare -a selected_module_ids=()
 
 if (( ${#SELECT_MODULES[@]} > 0 )); then
-    # --select で明示指定された場合（MODULE_ORDER 順に並べ替え）
+    # Explicit --select: reorder to MODULE_ORDER
     for entry in "${MODULES[@]}"; do
-        typeset mod_id="${entry[(ws:|:)1]}"
-        if (( ${SELECT_MODULES[(I)$mod_id]} )); then
+        IFS='|' read -r mod_id _rest <<< "$entry"
+        if array_contains "$mod_id" "${SELECT_MODULES[@]}"; then
             selected_module_ids+=("$mod_id")
         fi
     done
     resolve_module_deps
 
 elif (( ALL_FLAG )); then
-    # --all の場合: 全モジュールを選択
+    # --all: select all modules
     for entry in "${MODULES[@]}"; do
-        selected_module_ids+=("${entry[(ws:|:)1]}")
+        IFS='|' read -r mod_id _rest <<< "$entry"
+        selected_module_ids+=("$mod_id")
     done
 
 elif [[ -t 0 ]]; then
-    # TTY 環境: インタラクティブ選択（チェックボックスUI）
-    print -P ""
+    # TTY environment: interactive selection (checkbox UI)
+    printf '\n'
 
     if ! command -v tput >/dev/null 2>&1; then
-        # tput が利用できない場合はデフォルト選択のモジュールのみインストール
-        print -P "%F{220}情報: tput が利用できないため、デフォルトのモジュールをインストールします。%f"
+        # tput unavailable: install only default-selected modules
+        msg_warn "tput が利用できないため、デフォルトのモジュールをインストールします。"
         for entry in "${MODULES[@]}"; do
-            if (( ${entry[(ws:|:)4]} == 1 )); then
-                selected_module_ids+=("${entry[(ws:|:)1]}")
+            IFS='|' read -r mod_id _mod_name _mod_desc mod_default <<< "$entry"
+            if (( mod_default == 1 )); then
+                selected_module_ids+=("$mod_id")
             fi
         done
     else
-        # チェックボックスメニュー用の項目を構築
-        typeset -a menu_items
+        # Build menu items for checkbox menu
+        declare -a menu_items=()
         for entry in "${MODULES[@]}"; do
-            typeset mod_name="${entry[(ws:|:)2]}"
-            typeset mod_desc="${entry[(ws:|:)3]}"
-            typeset mod_default="${entry[(ws:|:)4]}"
+            IFS='|' read -r _mod_id mod_name mod_desc mod_default <<< "$entry"
             menu_items+=("${mod_name}|${mod_desc}|${mod_default}")
         done
 
-        # チェックボックスメニュー表示
-        checkbox_menu "${menu_items[@]}"
-        typeset menu_status=$?
-        typeset selection="$REPLY"
+        # Display checkbox menu (lib/tui.sh version)
+        # NOTE: Use "|| true" to prevent set -e from exiting on cancel (return 1)
+        checkbox_menu "インストールするモジュールを選択してください:" "${menu_items[@]}" || menu_status=$?
+        menu_status="${menu_status:-0}"
+        selection="$REPLY"
 
         if (( menu_status != 0 )); then
-            print -P ""
-            print -P "%F{220}キャンセルされました。%f"
+            printf '\n'
+            msg_warn "キャンセルされました。"
             exit 0
         fi
 
         if [[ -z "$selection" ]]; then
-            print -P ""
-            print -P "%F{220}モジュールが選択されませんでした。終了します。%f"
+            printf '\n'
+            msg_warn "モジュールが選択されませんでした。終了します。"
             exit 0
         fi
 
-        # 選択されたインデックスからモジュール ID を取得
-        for idx in ${(s: :)selection}; do
-            selected_module_ids+=("${MODULES[$idx][(ws:|:)1]}")
+        # Convert 0-based selected indices to module IDs
+        read -ra _selected_indices <<< "$selection"
+        for idx in "${_selected_indices[@]}"; do
+            IFS='|' read -r mod_id _rest <<< "${MODULES[$idx]}"
+            selected_module_ids+=("$mod_id")
         done
     fi
     resolve_module_deps
 
-    print -P ""
+    printf '\n'
 else
-    # 非 TTY 環境（CI / パイプ）: --all と同等
-    print -P "情報: 非インタラクティブ環境を検出。全モジュールをインストールします。"
+    # Non-TTY environment (CI / pipe): equivalent to --all
+    msg_info "非インタラクティブ環境を検出。全モジュールをインストールします。"
     for entry in "${MODULES[@]}"; do
-        selected_module_ids+=("${entry[(ws:|:)1]}")
+        IFS='|' read -r mod_id _rest <<< "$entry"
+        selected_module_ids+=("$mod_id")
     done
 fi
 
-# 選択されたモジュールを表示
-print -P ""
-print -P "%F{36}選択されたモジュール:%f"
+# Display selected modules
+printf '\n'
+color_print "$C_CYAN" "選択されたモジュール:"
 for mod_id in "${selected_module_ids[@]}"; do
     for entry in "${MODULES[@]}"; do
-        if [[ "${entry[(ws:|:)1]}" == "$mod_id" ]]; then
-            print -P "  - ${entry[(ws:|:)2]} (${entry[(ws:|:)3]})"
+        IFS='|' read -r entry_id entry_name entry_desc _rest <<< "$entry"
+        if [[ "$entry_id" == "$mod_id" ]]; then
+            printf '  - %s (%s)\n' "$entry_name" "$entry_desc"
             break
         fi
     done
 done
-print -P "---------------------------------------------"
+print_separator
 
-# --- 選択されたモジュールを順次セットアップ ---
-typeset -i setup_errors=0
+# --- Execute selected module setups sequentially ---
+declare -i setup_errors=0
 for mod_id in "${selected_module_ids[@]}"; do
     if ! run_module_setup "$mod_id"; then
-        (( setup_errors++ ))
+        (( setup_errors++ )) || true
     fi
 done
 
-# --- 完了 ---
-print -P ""
-print -P "============================================="
+# --- Completion ---
+printf '\n'
+printf '%s\n' "============================================="
 if (( DRY_RUN )); then
-    print -P "%F{33}[DRY-RUN] 上記が実行される変更内容です。実際に適用するには --dry-run を外して再実行してください。%f"
+    color_print "${C_CYAN}" "[DRY-RUN] 上記が実行される変更内容です。実際に適用するには --dry-run を外して再実行してください。"
 elif (( setup_errors > 0 )); then
-    print -P "%F{220}セットアップが完了しましたが、${setup_errors} 件のモジュールでエラーが発生しました。%f"
+    color_print "$C_YELLOW" "セットアップが完了しましたが、${setup_errors} 件のモジュールでエラーが発生しました。"
 else
-    print -P "%F{34}セットアップが正常に完了しました。%f"
+    msg_success "セットアップが正常に完了しました。"
 
-    # Zsh が選択されていた場合のみシェル再起動を案内
+    # Show shell restart hint only if zsh module was selected
     for mod_id in "${selected_module_ids[@]}"; do
         if [[ "$mod_id" == "zsh" ]]; then
-            print -P "全ての変更を有効にするために、Zsh シェルを%B再起動%bするか '%Bexec zsh%b' を実行してください。"
-            print -P "(source ~/.zshrc は環境が汚れる場合があるため、exec zsh を推奨します)"
+            printf '全ての変更を有効にするために、シェルを%s再起動%sするか '\''%sexec zsh%s'\'' を実行してください。\n' \
+                "${C_BOLD}" "${C_BOLD_OFF}" "${C_BOLD}" "${C_BOLD_OFF}"
+            printf '(source ~/.zshrc は環境が汚れる場合があるため、exec zsh を推奨します)\n'
             break
         fi
     done
 fi
-print -P "============================================="
+printf '%s\n' "============================================="
 
 if (( setup_errors > 0 )); then
     exit 1

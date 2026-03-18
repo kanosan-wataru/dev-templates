@@ -75,57 +75,57 @@ _claude_mod_merge_mcp_servers() {
 
     # テンプレートファイルの存在確認
     if [[ ! -f "$template" ]]; then
-        print -P "%F{220}警告: MCP サーバーテンプレートが見つかりません: ${template}%f"
-        print -P "  MCP サーバー設定のマージをスキップします。"
+        msg_warn "MCP サーバーテンプレートが見つかりません: ${template}"
+        msg_step "MCP サーバー設定のマージをスキップします。"
         return 0
     fi
 
     # jq の存在確認
     if ! command -v jq >/dev/null 2>&1; then
-        print -P "%F{220}警告: jq がインストールされていないため、MCP サーバー設定のマージをスキップします。%f"
-        print -P "  手動で設定するか、jq をインストールして再実行してください:"
-        print -P "    sudo apt install jq  # Debian/Ubuntu"
-        print -P "    brew install jq      # macOS"
+        msg_warn "jq がインストールされていないため、MCP サーバー設定のマージをスキップします。"
+        msg_step "手動で設定するか、jq をインストールして再実行してください:"
+        msg_step "  sudo apt install jq  # Debian/Ubuntu"
+        msg_step "  brew install jq      # macOS"
         return 0
     fi
 
     # テンプレートの JSON バリデーション
     if ! jq empty "$template" 2>/dev/null; then
-        print -P "%F{160}エラー: MCP サーバーテンプレートの JSON が不正です: ${template}%f" >&2
+        msg_error "MCP サーバーテンプレートの JSON が不正です: ${template}"
         return 1
     fi
 
     # ターゲットファイルが存在しない場合: テンプレートの内容でそのまま作成
     if [[ ! -f "$target" ]]; then
         if (( DRY_RUN )); then
-            print -P "情報: ${target} を新規作成予定です（dry-run）。"
+            msg_info "${target} を新規作成予定です（dry-run）。"
         else
             # NOTE: jq でフォーマットしてから書き出す（一時ファイル経由でアトミックに書き込む）
             local tmpfile
             tmpfile=$(mktemp "${target}.tmp.XXXXXX") || {
-                print -P "%F{160}エラー: 一時ファイルの作成に失敗しました。%f" >&2
+                msg_error "一時ファイルの作成に失敗しました。"
                 return 1
             }
             jq '.' "$template" > "$tmpfile" || {
                 command rm -f "$tmpfile"
-                print -P "%F{160}エラー: ${target} の作成に失敗しました。%f" >&2
+                msg_error "${target} の作成に失敗しました。"
                 return 1
             }
             command mv "$tmpfile" "$target" || {
                 command rm -f "$tmpfile"
-                print -P "%F{160}エラー: ${target} への移動に失敗しました。%f" >&2
+                msg_error "${target} への移動に失敗しました。"
                 return 1
             }
             # NOTE: このモジュールで新規作成したことを記録するマーカーファイル
             touch "${target}.created-by-claude-mod"
-            print -P "情報: ${target} を新規作成しました（MCP サーバー設定）。"
+            msg_info "${target} を新規作成しました（MCP サーバー設定）。"
         fi
         return 0
     fi
 
     # 既存ファイルの JSON バリデーション
     if ! jq empty "$target" 2>/dev/null; then
-        print -P "%F{160}エラー: ${target} の JSON が不正です。手動で修正してください。%f" >&2
+        msg_error "${target} の JSON が不正です。手動で修正してください。"
         return 1
     fi
 
@@ -144,26 +144,26 @@ _claude_mod_merge_mcp_servers() {
             )
         ] | length > 0
     ' "$target" 2>/dev/null) || {
-        print -P "%F{160}エラー: MCP サーバー設定の比較に失敗しました。%f" >&2
+        msg_error "MCP サーバー設定の比較に失敗しました。"
         return 1
     }
 
     if [[ "$needs_update" == "false" ]]; then
-        print -P "情報: MCP サーバー設定は既に最新の状態です。スキップします。"
+        msg_info "MCP サーバー設定は既に最新の状態です。スキップします。"
         return 0
     fi
 
     # バックアップを作成してからマージ
     run_cmd command cp -p "$target" "${target}${BACKUP_SUFFIX}" || {
-        print -P "%F{160}エラー: ${target} のバックアップに失敗しました。%f" >&2
+        msg_error "${target} のバックアップに失敗しました。"
         return 1
     }
     if (( DRY_RUN )); then
-        print -P "情報: ${target} を ${target}${BACKUP_SUFFIX} にバックアップ予定です（dry-run）。"
-        print -P "情報: MCP サーバー設定をマージ予定です（dry-run）。"
+        msg_info "${target} を ${target}${BACKUP_SUFFIX} にバックアップ予定です（dry-run）。"
+        msg_info "MCP サーバー設定をマージ予定です（dry-run）。"
         return 0
     fi
-    print -P "情報: ${target} を ${target}${BACKUP_SUFFIX} にバックアップしました。"
+    msg_info "${target} を ${target}${BACKUP_SUFFIX} にバックアップしました。"
 
     # jq の再帰マージ (*) で mcpServers をマージ
     # NOTE: * 演算子はオブジェクトを再帰的にマージし、右辺（テンプレート）で上書きする
@@ -171,31 +171,31 @@ _claude_mod_merge_mcp_servers() {
     merged=$(jq --slurpfile tmpl "$template" '
         .mcpServers = ((.mcpServers // {}) * ($tmpl[0].mcpServers // {}))
     ' "$target" 2>/dev/null) || {
-        print -P "%F{160}エラー: MCP サーバー設定のマージに失敗しました。%f" >&2
-        print -P "  バックアップから復元するには: mv '${target}${BACKUP_SUFFIX}' '${target}'" >&2
+        msg_error "MCP サーバー設定のマージに失敗しました。"
+        printf '%s\n' "  バックアップから復元するには: mv '${target}${BACKUP_SUFFIX}' '${target}'" >&2
         return 1
     }
 
     # マージ結果を書き出し（一時ファイル経由でアトミックに書き込む）
     local tmpfile
     tmpfile=$(mktemp "${target}.tmp.XXXXXX") || {
-        print -P "%F{160}エラー: 一時ファイルの作成に失敗しました。%f" >&2
+        msg_error "一時ファイルの作成に失敗しました。"
         return 1
     }
     printf '%s\n' "$merged" > "$tmpfile" || {
         command rm -f "$tmpfile"
-        print -P "%F{160}エラー: ${target} への書き込みに失敗しました。%f" >&2
-        print -P "  バックアップから復元するには: mv '${target}${BACKUP_SUFFIX}' '${target}'" >&2
+        msg_error "${target} への書き込みに失敗しました。"
+        printf '%s\n' "  バックアップから復元するには: mv '${target}${BACKUP_SUFFIX}' '${target}'" >&2
         return 1
     }
     command mv "$tmpfile" "$target" || {
         command rm -f "$tmpfile"
-        print -P "%F{160}エラー: ${target} への移動に失敗しました。%f" >&2
-        print -P "  バックアップから復元するには: mv '${target}${BACKUP_SUFFIX}' '${target}'" >&2
+        msg_error "${target} への移動に失敗しました。"
+        printf '%s\n' "  バックアップから復元するには: mv '${target}${BACKUP_SUFFIX}' '${target}'" >&2
         return 1
     }
 
-    print -P "情報: MCP サーバー設定をマージしました。"
+    msg_info "MCP サーバー設定をマージしました。"
 }
 
 # --- MCP サーバー設定の削除 ---
@@ -207,25 +207,25 @@ _claude_mod_remove_mcp_servers() {
 
     # ターゲットファイルが存在しない場合はスキップ
     if [[ ! -f "$target" ]]; then
-        print -P "情報: ${target} が存在しません。MCP サーバー設定の削除をスキップします。"
+        msg_info "${target} が存在しません。MCP サーバー設定の削除をスキップします。"
         return 0
     fi
 
     # jq の存在確認
     if ! command -v jq >/dev/null 2>&1; then
-        print -P "%F{220}警告: jq がインストールされていないため、MCP サーバー設定の削除をスキップします。%f"
+        msg_warn "jq がインストールされていないため、MCP サーバー設定の削除をスキップします。"
         return 0
     fi
 
     # テンプレートが存在しない場合はスキップ
     if [[ ! -f "$template" ]]; then
-        print -P "%F{220}警告: MCP サーバーテンプレートが見つかりません。MCP サーバー設定の削除をスキップします。%f"
+        msg_warn "MCP サーバーテンプレートが見つかりません。MCP サーバー設定の削除をスキップします。"
         return 0
     fi
 
     # 既存ファイルの JSON バリデーション
     if ! jq empty "$target" 2>/dev/null; then
-        print -P "%F{220}警告: ${target} の JSON が不正です。MCP サーバー設定の削除をスキップします。%f"
+        msg_warn "${target} の JSON が不正です。MCP サーバー設定の削除をスキップします。"
         return 0
     fi
 
@@ -233,7 +233,7 @@ _claude_mod_remove_mcp_servers() {
     local has_mcp_servers
     has_mcp_servers=$(jq 'has("mcpServers")' "$target" 2>/dev/null)
     if [[ "$has_mcp_servers" != "true" ]]; then
-        print -P "情報: ${target} に mcpServers が存在しません。スキップします。"
+        msg_info "${target} に mcpServers が存在しません。スキップします。"
         return 0
     fi
 
@@ -243,7 +243,7 @@ _claude_mod_remove_mcp_servers() {
         server_names+=("$name")
     done < <(jq -r '.mcpServers | keys[]' "$template" 2>/dev/null)
     if (( ${#server_names[@]} == 0 )); then
-        print -P "情報: 削除対象の MCP サーバーがありません。スキップします。"
+        msg_info "削除対象の MCP サーバーがありません。スキップします。"
         return 0
     fi
 
@@ -259,21 +259,21 @@ _claude_mod_remove_mcp_servers() {
     done
 
     if (( ! has_any )); then
-        print -P "情報: 削除対象の MCP サーバーは存在しません。スキップします。"
+        msg_info "削除対象の MCP サーバーは存在しません。スキップします。"
         return 0
     fi
 
     # バックアップ
     run_cmd command cp -p "$target" "${target}${BACKUP_SUFFIX}" || {
-        print -P "%F{160}エラー: ${target} のバックアップに失敗しました。%f" >&2
+        msg_error "${target} のバックアップに失敗しました。"
         return 1
     }
     if (( DRY_RUN )); then
-        print -P "情報: ${target} を ${target}${BACKUP_SUFFIX} にバックアップ予定です（dry-run）。"
-        print -P "情報: MCP サーバー設定を削除予定です（dry-run）: ${server_names[*]}"
+        msg_info "${target} を ${target}${BACKUP_SUFFIX} にバックアップ予定です（dry-run）。"
+        msg_info "MCP サーバー設定を削除予定です（dry-run）: ${server_names[*]}"
         return 0
     fi
-    print -P "情報: ${target} を ${target}${BACKUP_SUFFIX} にバックアップしました。"
+    msg_info "${target} を ${target}${BACKUP_SUFFIX} にバックアップしました。"
 
     # jq でテンプレートに定義されたサーバーを一括削除
     # NOTE: jq の del() でキーを削除。サーバー名リストを JSON 配列として渡す
@@ -284,31 +284,31 @@ _claude_mod_remove_mcp_servers() {
     result=$(jq --argjson names "$names_json" '
         .mcpServers |= (. // {} | to_entries | map(select(.key as $k | $names | index($k) | not)) | from_entries)
     ' "$target" 2>/dev/null) || {
-        print -P "%F{160}エラー: MCP サーバー設定の削除に失敗しました。%f" >&2
-        print -P "  バックアップから復元するには: mv '${target}${BACKUP_SUFFIX}' '${target}'" >&2
+        msg_error "MCP サーバー設定の削除に失敗しました。"
+        printf '%s\n' "  バックアップから復元するには: mv '${target}${BACKUP_SUFFIX}' '${target}'" >&2
         return 1
     }
 
     # 結果を書き出し（一時ファイル経由でアトミックに書き込む）
     local tmpfile
     tmpfile=$(mktemp "${target}.tmp.XXXXXX") || {
-        print -P "%F{160}エラー: 一時ファイルの作成に失敗しました。%f" >&2
+        msg_error "一時ファイルの作成に失敗しました。"
         return 1
     }
     printf '%s\n' "$result" > "$tmpfile" || {
         command rm -f "$tmpfile"
-        print -P "%F{160}エラー: ${target} への書き込みに失敗しました。%f" >&2
-        print -P "  バックアップから復元するには: mv '${target}${BACKUP_SUFFIX}' '${target}'" >&2
+        msg_error "${target} への書き込みに失敗しました。"
+        printf '%s\n' "  バックアップから復元するには: mv '${target}${BACKUP_SUFFIX}' '${target}'" >&2
         return 1
     }
     command mv "$tmpfile" "$target" || {
         command rm -f "$tmpfile"
-        print -P "%F{160}エラー: ${target} への移動に失敗しました。%f" >&2
-        print -P "  バックアップから復元するには: mv '${target}${BACKUP_SUFFIX}' '${target}'" >&2
+        msg_error "${target} への移動に失敗しました。"
+        printf '%s\n' "  バックアップから復元するには: mv '${target}${BACKUP_SUFFIX}' '${target}'" >&2
         return 1
     }
 
-    print -P "情報: MCP サーバー設定を削除しました: ${server_names[*]}"
+    msg_info "MCP サーバー設定を削除しました: ${server_names[*]}"
 
     # このモジュールで作成したファイルで、mcpServers 以外のキーがなく mcpServers が空の場合のみ削除
     if [[ -f "${target}.created-by-claude-mod" ]]; then
@@ -318,20 +318,19 @@ _claude_mod_remove_mcp_servers() {
         # mcpServers のみ（キー数1）かつ中身が空の場合のみファイル削除
         if [[ "$total_keys" == "1" ]] && [[ "$remaining_servers" == "0" ]]; then
             command rm -f "$target" "${target}.created-by-claude-mod"
-            print -P "情報: ${target} はこのモジュールで作成されたため削除しました。"
+            msg_info "${target} はこのモジュールで作成されたため削除しました。"
         elif [[ "$remaining_servers" == "0" ]]; then
             # mcpServers は空だが他のキーが存在する場合はマーカーのみ削除
             command rm -f "${target}.created-by-claude-mod"
-            print -P "情報: ${target} の mcpServers は空ですが、他の設定が存在するためファイルは保持します。"
+            msg_info "${target} の mcpServers は空ですが、他の設定が存在するためファイルは保持します。"
         fi
     fi
 }
 
 # --- セットアップ ---
-module_setup() {
-    print -P ""
-    print -P "%F{36}%B[Claude Code]%b%f"
-    print -P "---------------------------------------------"
+setup_claude_code() {
+    msg_header "Claude Code"
+    print_separator
 
     # =========================================
     # CLI インストール
@@ -340,73 +339,70 @@ module_setup() {
     # べき等性チェック
     if command -v claude >/dev/null 2>&1; then
         local current_ver
-        current_ver=$(claude --version 2>/dev/null || print "unknown")
-        print -P "情報: Claude Code は既にインストールされています (${current_ver})。スキップします。"
+        current_ver=$(claude --version 2>/dev/null || printf '%s' "unknown")
+        msg_info "Claude Code は既にインストールされています (${current_ver})。スキップします。"
     else
         # Node.js / npm の確認
         if ! ensure_node; then
-            print -P "%F{220}スキップ: Claude Code のインストールには Node.js v18+ が必要です。%f"
+            msg_warn "Claude Code のインストールには Node.js v18+ が必要です。"
             return 1
         fi
 
-        print -P "Claude Code をインストールします..."
+        msg_info "Claude Code をインストールします..."
         run_cmd npm install -g @anthropic-ai/claude-code || {
-            print -P "%F{160}エラー: Claude Code のインストールに失敗しました。%f" >&2
-            print -P "  npm install -g の権限エラーの場合:" >&2
-            print -P "    npm config set prefix ~/.local" >&2
-            print -P "  または nvm/fnm をお使いの場合は sudo 不要です。" >&2
+            msg_error "Claude Code のインストールに失敗しました。"
+            msg_step "npm install -g の権限エラーの場合:" >&2
+            msg_step "  npm config set prefix ~/.local" >&2
+            msg_step "または nvm/fnm をお使いの場合は sudo 不要です。" >&2
             return 1
         }
 
         if (( DRY_RUN )); then
-            print -P "情報: Claude Code をインストール予定です（dry-run）。"
+            msg_info "Claude Code をインストール予定です（dry-run）。"
         else
-            print -P "%F{34}Claude Code のインストールが完了しました。%f"
-            print -P ""
-            print -P "初回セットアップ:"
-            print -P "  claude  # 対話的に API キーを設定"
-            print -P "  詳細: https://docs.anthropic.com/en/docs/claude-code"
+            msg_success "Claude Code のインストールが完了しました。"
+            printf '\n'
+            printf '%s\n' "初回セットアップ:"
+            msg_step "claude  # 対話的に API キーを設定"
+            msg_step "詳細: https://docs.anthropic.com/en/docs/claude-code"
         fi
     fi
 
     # =========================================
     # 設定ファイルの配置
     # =========================================
-    print -P ""
-    print -P "設定ファイルを配置します..."
+    printf '\n'
+    msg_info "設定ファイルを配置します..."
 
     # 必要なディレクトリを事前作成
     for dir in "${CLAUDE_MOD_REQUIRED_DIRS[@]}"; do
         if [[ ! -d "$dir" ]]; then
             run_cmd command mkdir -p "$dir" || {
-                print -P "%F{160}エラー: ${dir} の作成に失敗しました。%f" >&2
+                msg_error "${dir} の作成に失敗しました。"
                 return 1
             }
             if (( DRY_RUN )); then
-                print -P "情報: ${dir} を作成予定です（dry-run）。"
+                msg_info "${dir} を作成予定です（dry-run）。"
             else
-                print -P "情報: ${dir} を作成しました。"
+                msg_info "${dir} を作成しました。"
             fi
         fi
     done
 
     # 設定ファイルの配置
     for entry in "${CLAUDE_MOD_MANAGED_FILES[@]}"; do
-        local src="${entry[(ws:|:)1]}"
-        local dst="${entry[(ws:|:)2]}"
-        local label="${entry[(ws:|:)3]}"
-        local hint="${entry[(ws:|:)4]}"
+        IFS='|' read -r src dst label hint <<< "$entry"
         install_config "$src" "$dst" "$label" "$hint"
     done
 
     # MCP サーバー設定のマージ（~/.claude.json に追加）
     _claude_mod_merge_mcp_servers || return 1
 
-    print -P "%F{34}Claude Code 設定ファイルの配置が完了しました。%f"
+    msg_success "Claude Code 設定ファイルの配置が完了しました。"
 }
 
 # --- アンインストール ---
-module_uninstall() {
+uninstall_claude_code() {
     local restored=0
 
     # =========================================
@@ -418,31 +414,30 @@ module_uninstall() {
     # 設定ファイルの復元・削除
     # =========================================
     for entry in "${CLAUDE_MOD_MANAGED_FILES[@]}"; do
-        local dst="${entry[(ws:|:)2]}"
-        local label="${entry[(ws:|:)3]}"
+        IFS='|' read -r _src dst label _hint <<< "$entry"
 
-        # Zsh Glob 限定子で最新のバックアップを検索（Om: 更新日時の降順、[1]: 最初の1件）
-        local -a latest_backup
-        latest_backup=( "${dst}.backup."*(N^/Om[1]) )
+        # find_newest_backup で最新のバックアップを検索
+        local newest
+        newest=$(find_newest_backup "${dst}.backup."'*') || true
 
-        if (( ${#latest_backup[@]} > 0 )); then
-            print -P "復元: ${label} をバックアップ (${latest_backup[1]:t}) から戻します。"
-            run_cmd command mv "${latest_backup[1]}" "$dst" || {
-                print -P "%F{160}エラー: ${label} の復元に失敗しました。%f" >&2
+        if [[ -n "$newest" ]]; then
+            printf '%s\n' "復元: ${label} をバックアップ ($(basename "$newest")) から戻します。"
+            run_cmd command mv "$newest" "$dst" || {
+                msg_error "${label} の復元に失敗しました。"
                 return 1
             }
             restored=1
         elif [[ -f "$dst" || -h "$dst" ]]; then
-            print -P "%F{220}警告: ${label} のバックアップが見つかりません。手動で確認してください: ${dst}%f"
+            msg_warn "${label} のバックアップが見つかりません。手動で確認してください: ${dst}"
         else
-            print -P "情報: ${label} は配置されていません。スキップします。"
+            msg_info "${label} は配置されていません。スキップします。"
         fi
     done
 
     if (( restored )); then
-        print -P "%F{34}Claude Code 設定ファイルのアンインストールが完了しました。%f"
+        msg_success "Claude Code 設定ファイルのアンインストールが完了しました。"
     else
-        print -P "情報: Claude Code 設定ファイルの復元・削除対象はありませんでした。"
+        msg_info "Claude Code 設定ファイルの復元・削除対象はありませんでした。"
     fi
 
     # =========================================
@@ -451,23 +446,23 @@ module_uninstall() {
 
     # インストール状態を判定（コマンドの存在 or npm パッケージの存在）
     if ! command -v claude >/dev/null 2>&1; then
-        if ! { command -v npm >/dev/null 2>&1 && npm ls -g @anthropic-ai/claude-code >/dev/null 2>&1 }; then
-            print -P "情報: Claude Code はインストールされていません。スキップします。"
+        if ! { command -v npm >/dev/null 2>&1 && npm ls -g @anthropic-ai/claude-code >/dev/null 2>&1; }; then
+            msg_info "Claude Code はインストールされていません。スキップします。"
             return 0
         fi
     fi
 
     if ! command -v npm >/dev/null 2>&1; then
-        print -P "%F{220}スキップ: npm が見つからないため Claude Code をアンインストールできません。%f"
+        msg_warn "npm が見つからないため Claude Code をアンインストールできません。"
         return 1
     fi
 
-    print -P "Claude Code をアンインストールします..."
+    msg_info "Claude Code をアンインストールします..."
     run_cmd npm uninstall -g @anthropic-ai/claude-code || {
-        print -P "%F{160}エラー: Claude Code のアンインストールに失敗しました。%f" >&2
+        msg_error "Claude Code のアンインストールに失敗しました。"
         return 1
     }
-    print -P "%F{34}Claude Code をアンインストールしました。%f"
-    print -P "NOTE: ~/.claude/ ディレクトリの空ディレクトリは削除されていません。不要な場合は手動で削除してください:"
-    print -P "  rm -rf ~/.claude/skills/"
+    msg_success "Claude Code をアンインストールしました。"
+    printf '%s\n' "NOTE: ~/.claude/ ディレクトリの空ディレクトリは削除されていません。不要な場合は手動で削除してください:"
+    msg_step "rm -rf ~/.claude/skills/"
 }

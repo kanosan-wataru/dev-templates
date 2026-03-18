@@ -22,25 +22,21 @@ GIT_MOD_MANAGED_FILES=(
 )
 
 # --- セットアップ ---
-module_setup() {
-    print -P ""
-    print -P "%F{36}%B[Git グローバル設定]%b%f"
-    print -P "---------------------------------------------"
+setup_git() {
+    msg_header "Git グローバル設定"
+    print_separator
 
     # git コマンドの存在確認
     if ! command -v git >/dev/null 2>&1; then
-        print -P "%F{160}エラー: git コマンドが見つかりません。インストールしてください。%f" >&2
+        msg_error "git コマンドが見つかりません。インストールしてください。"
         return 1
     fi
-    print -P "情報: git が利用可能です ($(command git --version))"
+    msg_info "git が利用可能です ($(command git --version))"
 
     # 設定ファイルの配置
-    print -P "設定ファイルを配置します..."
+    msg_info "設定ファイルを配置します..."
     for entry in "${GIT_MOD_MANAGED_FILES[@]}"; do
-        local src="${entry[(ws:|:)1]}"
-        local dst="${entry[(ws:|:)2]}"
-        local label="${entry[(ws:|:)3]}"
-        local hint="${entry[(ws:|:)4]}"
+        IFS='|' read -r src dst label hint <<< "$entry"
         install_config "$src" "$dst" "$label" "$hint"
     done
 
@@ -51,9 +47,9 @@ module_setup() {
     _git_setup_excludes_file || return 1
 
     if (( DRY_RUN )); then
-        print -P "情報: Git グローバル設定をセットアップ予定です（dry-run）。"
+        msg_info "Git グローバル設定をセットアップ予定です（dry-run）。"
     else
-        print -P "%F{34}Git グローバル設定のセットアップが完了しました。%f"
+        msg_success "Git グローバル設定のセットアップが完了しました。"
     fi
 
     # user.name / user.email の設定ガイド
@@ -66,18 +62,18 @@ _git_setup_include_path() {
 
     # 既に設定済みか確認
     if git config --global --get-all include.path 2>/dev/null | grep -qF "$shared_path"; then
-        print -P "情報: include.path は既に設定されています。スキップします。"
+        msg_info "include.path は既に設定されています。スキップします。"
         return 0
     fi
 
     if (( DRY_RUN )); then
-        print -P "%F{242}  [DRY-RUN] git config --global --add include.path ${shared_path}%f"
+        msg_dry_run "git config --global --add include.path ${shared_path}"
     else
         git config --global --add include.path "$shared_path" || {
-            print -P "%F{160}エラー: include.path の設定に失敗しました。%f" >&2
+            msg_error "include.path の設定に失敗しました。"
             return 1
         }
-        print -P "情報: include.path に ${shared_path} を追加しました。"
+        msg_info "include.path に ${shared_path} を追加しました。"
     fi
 }
 
@@ -89,24 +85,24 @@ _git_setup_excludes_file() {
     local current_excludes
     current_excludes=$(git config --global core.excludesFile 2>/dev/null || true)
     if [[ "$current_excludes" == "$excludes_path" ]]; then
-        print -P "情報: core.excludesFile は既に設定されています。スキップします。"
+        msg_info "core.excludesFile は既に設定されています。スキップします。"
         return 0
     fi
 
     if (( DRY_RUN )); then
         if [[ -n "$current_excludes" && "$current_excludes" != "$excludes_path" ]]; then
-            print -P "%F{220}警告: core.excludesFile が ${current_excludes} から ${excludes_path} に変更されます。%f"
+            msg_warn "core.excludesFile が ${current_excludes} から ${excludes_path} に変更されます。"
         fi
-        print -P "%F{242}  [DRY-RUN] git config --global core.excludesFile ${excludes_path}%f"
+        msg_dry_run "git config --global core.excludesFile ${excludes_path}"
     else
         git config --global core.excludesFile "$excludes_path" || {
-            print -P "%F{160}エラー: core.excludesFile の設定に失敗しました。%f" >&2
+            msg_error "core.excludesFile の設定に失敗しました。"
             return 1
         }
         if [[ -n "$current_excludes" && "$current_excludes" != "$excludes_path" ]]; then
-            print -P "%F{220}警告: core.excludesFile を ${current_excludes} から ${excludes_path} に変更しました。%f"
+            msg_warn "core.excludesFile を ${current_excludes} から ${excludes_path} に変更しました。"
         else
-            print -P "情報: core.excludesFile に ${excludes_path} を設定しました。"
+            msg_info "core.excludesFile に ${excludes_path} を設定しました。"
         fi
     fi
 }
@@ -118,24 +114,24 @@ _git_show_user_guide() {
     user_email=$(git config --global user.email 2>/dev/null || true)
 
     if [[ -n "$user_name" && -n "$user_email" ]]; then
-        print -P ""
-        print -P "情報: Git ユーザー設定は既に構成されています。"
-        print -P "  user.name:  ${user_name}"
-        print -P "  user.email: ${user_email}"
+        printf '\n'
+        msg_info "Git ユーザー設定は既に構成されています。"
+        msg_step "user.name:  ${user_name}"
+        msg_step "user.email: ${user_email}"
     else
-        print -P ""
-        print -P "%F{220}NOTE: Git のユーザー情報が未設定です。以下を実行してください:%f"
+        printf '\n'
+        msg_warn "NOTE: Git のユーザー情報が未設定です。以下を実行してください:"
         if [[ -z "$user_name" ]]; then
-            print -P "  git config --global user.name \"Your Name\""
+            msg_step "git config --global user.name \"Your Name\""
         fi
         if [[ -z "$user_email" ]]; then
-            print -P "  git config --global user.email \"your@email.com\""
+            msg_step "git config --global user.email \"your@email.com\""
         fi
     fi
 }
 
 # --- アンインストール ---
-module_uninstall() {
+uninstall_git() {
     local restored=0
 
     # git config の解除（git が利用可能な場合のみ）
@@ -144,13 +140,13 @@ module_uninstall() {
         local shared_path="$GIT_MOD_BASE_DIR/.gitconfig.shared"
         if git config --global --get-all include.path 2>/dev/null | grep -qF "$shared_path"; then
             if (( DRY_RUN )); then
-                print -P "%F{242}  [DRY-RUN] git config --global --fixed-value --unset-all include.path ${shared_path}%f"
+                msg_dry_run "git config --global --fixed-value --unset-all include.path ${shared_path}"
             else
                 if git config --global --fixed-value --unset-all include.path "$shared_path" 2>/dev/null; then
-                    print -P "情報: include.path から ${shared_path} を削除しました。"
+                    msg_info "include.path から ${shared_path} を削除しました。"
                 else
-                    print -P "%F{220}警告: include.path の解除に失敗しました。手動で確認してください:%f"
-                    print -P "  git config --global --edit"
+                    msg_warn "include.path の解除に失敗しました。手動で確認してください:"
+                    msg_step "git config --global --edit"
                 fi
             fi
             restored=1
@@ -162,51 +158,50 @@ module_uninstall() {
         current_excludes=$(git config --global core.excludesFile 2>/dev/null || true)
         if [[ "$current_excludes" == "$excludes_path" ]]; then
             if (( DRY_RUN )); then
-                print -P "%F{242}  [DRY-RUN] git config --global --unset core.excludesFile%f"
+                msg_dry_run "git config --global --unset core.excludesFile"
             else
                 if git config --global --unset core.excludesFile 2>/dev/null; then
-                    print -P "情報: core.excludesFile の設定を解除しました。"
+                    msg_info "core.excludesFile の設定を解除しました。"
                 else
-                    print -P "%F{220}警告: core.excludesFile の解除に失敗しました。手動で確認してください:%f"
-                    print -P "  git config --global --edit"
+                    msg_warn "core.excludesFile の解除に失敗しました。手動で確認してください:"
+                    msg_step "git config --global --edit"
                 fi
             fi
             restored=1
         fi
     else
-        print -P "%F{220}警告: git が見つかりません。git config の解除をスキップします。%f"
+        msg_warn "git が見つかりません。git config の解除をスキップします。"
     fi
 
     # 管理対象ファイルのバックアップ復元 / 削除
     for entry in "${GIT_MOD_MANAGED_FILES[@]}"; do
-        local dst="${entry[(ws:|:)2]}"
-        local label="${entry[(ws:|:)3]}"
+        IFS='|' read -r _src dst label _hint <<< "$entry"
 
-        local -a latest_backup
-        latest_backup=( "${dst}.backup."*(N^/Om[1]) )
+        local newest
+        newest=$(find_newest_backup "${dst}.backup."'*') || true
 
-        if (( ${#latest_backup[@]} > 0 )); then
-            print -P "復元: ${label} をバックアップ (${latest_backup[1]:t}) から戻します。"
-            run_cmd command mv "${latest_backup[1]}" "$dst" || {
-                print -P "%F{160}エラー: ${label} の復元に失敗しました。%f" >&2
+        if [[ -n "$newest" ]]; then
+            printf '%s\n' "復元: ${label} をバックアップ ($(basename "$newest")) から戻します。"
+            run_cmd command mv "$newest" "$dst" || {
+                msg_error "${label} の復元に失敗しました。"
                 return 1
             }
             restored=1
         elif [[ -f "$dst" || -h "$dst" ]]; then
-            print -P "削除: ${label} を削除します。"
+            printf '%s\n' "削除: ${label} を削除します。"
             run_cmd command rm -f "$dst" || {
-                print -P "%F{160}エラー: ${label} の削除に失敗しました。%f" >&2
+                msg_error "${label} の削除に失敗しました。"
                 return 1
             }
             restored=1
         else
-            print -P "情報: ${label} は配置されていません。スキップします。"
+            msg_info "${label} は配置されていません。スキップします。"
         fi
     done
 
     if (( restored )); then
-        print -P "%F{34}Git グローバル設定のアンインストールが完了しました。%f"
+        msg_success "Git グローバル設定のアンインストールが完了しました。"
     else
-        print -P "情報: Git グローバル設定の復元・削除対象はありませんでした。"
+        msg_info "Git グローバル設定の復元・削除対象はありませんでした。"
     fi
 }
