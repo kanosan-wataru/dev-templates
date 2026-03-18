@@ -27,103 +27,98 @@ ZSH_MOD_MANAGED_FILES=(
 )
 
 # --- セットアップ ---
-module_setup() {
-    print -P ""
-    print -P "%F{36}%B[Zsh 設定一式]%b%f"
-    print -P "---------------------------------------------"
+setup_zsh() {
+    msg_header "Zsh 設定一式"
+    print_separator
 
     # 依存コマンドの確認
     if ! command -v git >/dev/null 2>&1; then
-        print -P "%F{160}エラー: git コマンドが見つかりません。インストールしてください。%f" >&2
+        msg_error "git コマンドが見つかりません。インストールしてください。"
         return 1
     fi
-    print -P "情報: git が利用可能です ($(command git --version))"
+    msg_info "git が利用可能です ($(command git --version))"
 
     # Zinit のインストール
-    print -P "Zinit の状態を確認・インストールします..."
+    msg_info "Zinit の状態を確認・インストールします..."
     if [[ ! -f "$ZSH_MOD_ZINIT_HOME/zinit.zsh" ]]; then
-        print -P "%F{33} %F{220}Zinit (%F{33}zdharma-continuum/zinit%F{220}) をインストール中...%f"
+        color_print "${C_YELLOW}" "Zinit (zdharma-continuum/zinit) をインストール中..."
         run_cmd command mkdir -p -m 700 "$(dirname "$ZSH_MOD_ZINIT_HOME")" || {
-            print -P "%F{160}エラー: Zinit 用ディレクトリの作成に失敗しました。%f" >&2
+            msg_error "Zinit 用ディレクトリの作成に失敗しました。"
             return 1
         }
         run_cmd command git clone --branch "$ZSH_MOD_ZINIT_VERSION" --depth 1 https://github.com/zdharma-continuum/zinit "$ZSH_MOD_ZINIT_HOME" || {
-            print -P "%F{160}エラー: Zinit の git clone に失敗しました。%f" >&2
+            msg_error "Zinit の git clone に失敗しました。"
             return 1
         }
         if (( DRY_RUN )); then
-            print -P "情報: Zinit ${ZSH_MOD_ZINIT_VERSION} をインストール予定です（dry-run）。"
+            msg_info "Zinit ${ZSH_MOD_ZINIT_VERSION} をインストール予定です（dry-run）。"
         else
-            print -P "%F{33} %F{34}Zinit ${ZSH_MOD_ZINIT_VERSION} のインストールに成功しました。%f"
+            msg_success "Zinit ${ZSH_MOD_ZINIT_VERSION} のインストールに成功しました。"
         fi
     else
-        print -P "情報: Zinit は既にインストールされています。"
+        msg_info "Zinit は既にインストールされています。"
     fi
 
     # 設定ディレクトリの作成
     if [[ ! -d "$ZSH_MOD_CONFIG_DIR" ]]; then
         run_cmd command mkdir -p -m 700 "$ZSH_MOD_CONFIG_DIR" || {
-            print -P "%F{160}エラー: $ZSH_MOD_CONFIG_DIR の作成に失敗しました。%f" >&2
+            msg_error "$ZSH_MOD_CONFIG_DIR の作成に失敗しました。"
             return 1
         }
         if (( DRY_RUN )); then
-            print -P "情報: $ZSH_MOD_CONFIG_DIR を作成予定です（dry-run）。"
+            msg_info "$ZSH_MOD_CONFIG_DIR を作成予定です（dry-run）。"
         else
-            print -P "情報: $ZSH_MOD_CONFIG_DIR を作成しました。"
+            msg_info "$ZSH_MOD_CONFIG_DIR を作成しました。"
         fi
     else
-        print -P "情報: $ZSH_MOD_CONFIG_DIR は既に存在します。"
+        msg_info "$ZSH_MOD_CONFIG_DIR は既に存在します。"
     fi
 
     # 設定ファイルの配置
-    print -P "設定ファイルを配置します..."
+    msg_info "設定ファイルを配置します..."
     for entry in "${ZSH_MOD_MANAGED_FILES[@]}"; do
-        local src="${entry[(ws:|:)1]}"
-        local dst="${entry[(ws:|:)2]}"
-        local label="${entry[(ws:|:)3]}"
-        local hint="${entry[(ws:|:)4]}"
+        IFS='|' read -r src dst label hint <<< "$entry"
         install_config "$src" "$dst" "$label" "$hint"
     done
 
-    print -P "%F{34}Zsh 設定一式のセットアップが完了しました。%f"
+    msg_success "Zsh 設定一式のセットアップが完了しました。"
 }
 
 # --- アンインストール ---
-module_uninstall() {
+uninstall_zsh() {
     local restored=0
 
     for entry in "${ZSH_MOD_MANAGED_FILES[@]}"; do
-        local dst="${entry[(ws:|:)2]}"
-        local label="${entry[(ws:|:)3]}"
+        IFS='|' read -r _src dst label _hint <<< "$entry"
 
-        # Zsh Glob 限定子で最新のバックアップを検索（シンボリックリンクも含む、ディレクトリは除外）
-        local -a latest_backup
-        latest_backup=( "${dst}.backup."*(N^/Om[1]) )
+        # find_newest_backup で最新のバックアップを検索
+        local newest
+        newest=$(find_newest_backup "${dst}.backup."'*') || true
 
-        if (( ${#latest_backup[@]} > 0 )); then
-            print -P "復元: ${label} をバックアップ (${latest_backup[1]:t}) から戻します。"
-            run_cmd command mv "${latest_backup[1]}" "$dst" || {
-                print -P "%F{160}エラー: ${label} の復元に失敗しました。%f" >&2
+        if [[ -n "$newest" ]]; then
+            printf '%s\n' "復元: ${label} をバックアップ ($(basename "$newest")) から戻します。"
+            run_cmd command mv "$newest" "$dst" || {
+                msg_error "${label} の復元に失敗しました。"
                 return 1
             }
             restored=1
         elif [[ -f "$dst" || -h "$dst" ]]; then
-            print -P "削除: ${label} を削除します（セットアップ前の状態に復元）。"
+            printf '%s\n' "削除: ${label} を削除します（セットアップ前の状態に復元）。"
             run_cmd command rm -f "$dst" || {
-                print -P "%F{160}エラー: ${label} の削除に失敗しました。%f" >&2
+                msg_error "${label} の削除に失敗しました。"
                 return 1
             }
             restored=1
         else
-            print -P "情報: ${label} は配置されていません。スキップします。"
+            msg_info "${label} は配置されていません。スキップします。"
         fi
     done
 
     if (( restored )); then
-        print -P "%F{34}Zsh 設定のアンインストールが完了しました。%f"
+        msg_success "Zsh 設定のアンインストールが完了しました。"
     else
-        print -P "情報: Zsh 設定の復元・削除対象はありませんでした。"
+        msg_info "Zsh 設定の復元・削除対象はありませんでした。"
     fi
-    print -P "NOTE: Zinit 本体は削除されていません。不要な場合は以下を手動で削除してください:"
-    print -P "  rm -rf ${ZSH_MOD_ZINIT_HOME:h}"
+    printf '%s\n' "NOTE: Zinit 本体は削除されていません。不要な場合は以下を手動で削除してください:"
+    msg_step "rm -rf $(dirname "$ZSH_MOD_ZINIT_HOME")"
 }
