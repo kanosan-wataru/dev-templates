@@ -25,36 +25,36 @@ OP_MOD_MANAGED_FILES=(
 _1password_detect_env() {
     case "$OSTYPE" in
         darwin*)
-            print "macos"
+            printf '%s' "macos"
             ;;
         linux*)
             if [[ -f /proc/version ]] && grep -qi 'microsoft' /proc/version 2>/dev/null; then
-                print "wsl"
+                printf '%s' "wsl"
             else
-                print "linux"
+                printf '%s' "linux"
             fi
             ;;
         *)
-            print "unknown"
+            printf '%s' "unknown"
             ;;
     esac
 }
 
 # --- ヘルパー: op CLI のインストール (Ubuntu/Debian) ---
 _1password_install_op_apt() {
-    print -P "  1Password CLI の apt リポジトリを設定します..."
+    msg_step "1Password CLI の apt リポジトリを設定します..."
 
     # 前提コマンドの確認
     local -a required_cmds=(curl gpg)
     for cmd in "${required_cmds[@]}"; do
         if ! command -v "$cmd" >/dev/null 2>&1; then
-            print -P "%F{160}エラー: ${cmd} がインストールされていません。%f" >&2
+            msg_error "${cmd} がインストールされていません。"
             return 1
         fi
     done
 
     run_cmd sudo mkdir -p /etc/apt/keyrings || {
-        print -P "%F{160}エラー: /etc/apt/keyrings の作成に失敗しました。%f" >&2
+        msg_error "/etc/apt/keyrings の作成に失敗しました。"
         return 1
     }
 
@@ -62,12 +62,12 @@ _1password_install_op_apt() {
         # GPG キーのダウンロードと変換を分離して個別にエラーチェック
         local tmp_key
         tmp_key=$(mktemp) || {
-            print -P "%F{160}エラー: 一時ファイルの作成に失敗しました。%f" >&2
+            msg_error "一時ファイルの作成に失敗しました。"
             return 1
         }
 
         if ! curl -sS -o "$tmp_key" https://downloads.1password.com/linux/keys/1password.asc; then
-            print -P "%F{160}エラー: 1Password の GPG キー取得に失敗しました。%f" >&2
+            msg_error "1Password の GPG キー取得に失敗しました。"
             rm -f "$tmp_key"
             return 1
         fi
@@ -76,15 +76,15 @@ _1password_install_op_apt() {
         [[ -f /etc/apt/keyrings/1password-archive-keyring.gpg ]] && sudo rm -f /etc/apt/keyrings/1password-archive-keyring.gpg
 
         sudo gpg --dearmor --output /etc/apt/keyrings/1password-archive-keyring.gpg "$tmp_key" 2>/dev/null || {
-            print -P "%F{160}エラー: GPG キー変換に失敗しました。%f" >&2
+            msg_error "GPG キー変換に失敗しました。"
             rm -f "$tmp_key"
             return 1
         }
 
         # apt ソースの追加
-        echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/1password-archive-keyring.gpg] https://downloads.1password.com/linux/debian/$(dpkg --print-architecture) stable main" \
+        printf '%s\n' "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/1password-archive-keyring.gpg] https://downloads.1password.com/linux/debian/$(dpkg --print-architecture) stable main" \
             | sudo tee /etc/apt/sources.list.d/1password.list >/dev/null || {
-            print -P "%F{160}エラー: 1Password の apt ソース追加に失敗しました。%f" >&2
+            msg_error "1Password の apt ソース追加に失敗しました。"
             rm -f "$tmp_key"
             return 1
         }
@@ -92,35 +92,35 @@ _1password_install_op_apt() {
         # debsig ポリシーの設定
         run_cmd sudo mkdir -p "/etc/debsig/policies/${OP_MOD_DEBSIG_KEY_ID}/"
         if ! curl -sS -o "$tmp_key" https://downloads.1password.com/linux/debian/debsig/1password.pol; then
-            print -P "%F{220}警告: debsig ポリシーのダウンロードに失敗しました（インストールは継続します）。%f"
+            msg_warn "debsig ポリシーのダウンロードに失敗しました（インストールは継続します）。"
         else
             sudo tee /etc/debsig/policies/${OP_MOD_DEBSIG_KEY_ID}/1password.pol < "$tmp_key" >/dev/null || {
-                print -P "%F{220}警告: debsig ポリシーの設定に失敗しました（インストールは継続します）。%f"
+                msg_warn "debsig ポリシーの設定に失敗しました（インストールは継続します）。"
             }
         fi
 
         run_cmd sudo mkdir -p "/usr/share/debsig/keyrings/${OP_MOD_DEBSIG_KEY_ID}"
         [[ -f /usr/share/debsig/keyrings/${OP_MOD_DEBSIG_KEY_ID}/debsig.gpg ]] && sudo rm -f /usr/share/debsig/keyrings/${OP_MOD_DEBSIG_KEY_ID}/debsig.gpg
         if ! curl -sS -o "$tmp_key" https://downloads.1password.com/linux/keys/1password.asc; then
-            print -P "%F{220}警告: debsig キーリング用キーの取得に失敗しました（インストールは継続します）。%f"
+            msg_warn "debsig キーリング用キーの取得に失敗しました（インストールは継続します）。"
         else
             sudo gpg --dearmor --output /usr/share/debsig/keyrings/${OP_MOD_DEBSIG_KEY_ID}/debsig.gpg "$tmp_key" 2>/dev/null || {
-                print -P "%F{220}警告: debsig キーリングの設定に失敗しました（インストールは継続します）。%f"
+                msg_warn "debsig キーリングの設定に失敗しました（インストールは継続します）。"
             }
         fi
 
         rm -f "$tmp_key"
     else
-        print -P "%F{242}  [DRY-RUN] curl ... | sudo gpg --dearmor -o /etc/apt/keyrings/1password-archive-keyring.gpg%f"
-        print -P "%F{242}  [DRY-RUN] echo 'deb ...' | sudo tee /etc/apt/sources.list.d/1password.list%f"
-        print -P "%F{242}  [DRY-RUN] debsig ポリシー設定%f"
+        msg_dry_run "curl ... | sudo gpg --dearmor -o /etc/apt/keyrings/1password-archive-keyring.gpg"
+        msg_dry_run "echo 'deb ...' | sudo tee /etc/apt/sources.list.d/1password.list"
+        msg_dry_run "debsig ポリシー設定"
     fi
 
     run_cmd sudo apt-get update -qq || {
-        print -P "%F{220}警告: apt update に失敗しました。%f"
+        msg_warn "apt update に失敗しました。"
     }
     run_cmd sudo apt-get install -y 1password-cli || {
-        print -P "%F{160}エラー: 1Password CLI のインストールに失敗しました。%f" >&2
+        msg_error "1Password CLI のインストールに失敗しました。"
         return 1
     }
 }
@@ -128,7 +128,7 @@ _1password_install_op_apt() {
 # --- ヘルパー: op CLI のインストール (macOS) ---
 _1password_install_op_brew() {
     run_cmd brew install --cask 1password-cli || {
-        print -P "%F{160}エラー: 1Password CLI のインストールに失敗しました。%f" >&2
+        msg_error "1Password CLI のインストールに失敗しました。"
         return 1
     }
 }
@@ -137,45 +137,45 @@ _1password_install_op_brew() {
 _1password_setup_ssh_agent() {
     local env="$1"
 
-    print -P ""
-    print -P "SSH エージェント設定:"
+    printf '\n'
+    printf '%s\n' "SSH エージェント設定:"
 
     case "$env" in
         wsl)
-            print -P "  WSL 環境を検出しました。"
-            print -P "  Windows 側の 1Password デスクトップアプリで SSH エージェントを有効にしてください。"
-            print -P "  1password.zsh により ssh/ssh-add が Windows 側にリダイレクトされます。"
-            print -P ""
-            print -P "  有効化:"
-            print -P "    export ENABLE_SSH_1PASSWORD=1  # ~/.zshenv 等に追加"
+            msg_step "WSL 環境を検出しました。"
+            msg_step "Windows 側の 1Password デスクトップアプリで SSH エージェントを有効にしてください。"
+            msg_step "1password.zsh により ssh/ssh-add が Windows 側にリダイレクトされます。"
+            printf '\n'
+            msg_step "有効化:"
+            msg_step "  export ENABLE_SSH_1PASSWORD=1  # ~/.zshenv 等に追加"
             ;;
         linux)
             local sock_path="$HOME/.1password/agent.sock"
-            print -P "  ネイティブ Linux 環境を検出しました。"
+            msg_step "ネイティブ Linux 環境を検出しました。"
             if [[ -S "$sock_path" ]]; then
-                print -P "  %F{34}SSH エージェントソケットが見つかりました。%f"
+                msg_step "$(printf '%s%s%s' "${C_GREEN}" "SSH エージェントソケットが見つかりました。" "${C_RESET}")"
             else
-                print -P "  %F{220}SSH エージェントソケットが見つかりません。%f"
-                print -P "  1Password デスクトップアプリで SSH エージェントを有効にしてください。"
-                print -P "    設定 → 開発者 → SSH エージェント → 有効にする"
+                msg_step "$(printf '%s%s%s' "${C_YELLOW}" "SSH エージェントソケットが見つかりません。" "${C_RESET}")"
+                msg_step "1Password デスクトップアプリで SSH エージェントを有効にしてください。"
+                msg_step "  設定 → 開発者 → SSH エージェント → 有効にする"
             fi
-            print -P ""
-            print -P "  有効化:"
-            print -P "    export ENABLE_SSH_1PASSWORD=1  # ~/.zshenv 等に追加"
+            printf '\n'
+            msg_step "有効化:"
+            msg_step "  export ENABLE_SSH_1PASSWORD=1  # ~/.zshenv 等に追加"
             ;;
         macos)
             local sock_path="$HOME/Library/Group Containers/2BUA8C4S2C.com.1password/t/agent.sock"
-            print -P "  macOS 環境を検出しました。"
+            msg_step "macOS 環境を検出しました。"
             if [[ -S "$sock_path" ]]; then
-                print -P "  %F{34}SSH エージェントソケットが見つかりました。%f"
+                msg_step "$(printf '%s%s%s' "${C_GREEN}" "SSH エージェントソケットが見つかりました。" "${C_RESET}")"
             else
-                print -P "  %F{220}SSH エージェントソケットが見つかりません。%f"
-                print -P "  1Password デスクトップアプリで SSH エージェントを有効にしてください。"
-                print -P "    設定 → 開発者 → SSH エージェント → 有効にする"
+                msg_step "$(printf '%s%s%s' "${C_YELLOW}" "SSH エージェントソケットが見つかりません。" "${C_RESET}")"
+                msg_step "1Password デスクトップアプリで SSH エージェントを有効にしてください。"
+                msg_step "  設定 → 開発者 → SSH エージェント → 有効にする"
             fi
-            print -P ""
-            print -P "  有効化:"
-            print -P "    export ENABLE_SSH_1PASSWORD=1  # ~/.zshenv 等に追加"
+            printf '\n'
+            msg_step "有効化:"
+            msg_step "  export ENABLE_SSH_1PASSWORD=1  # ~/.zshenv 等に追加"
             ;;
     esac
 }
@@ -184,11 +184,11 @@ _1password_setup_ssh_agent() {
 _1password_setup_git_signing() {
     local env="$1"
 
-    print -P ""
-    print -P "Git コミット署名設定:"
+    printf '\n'
+    printf '%s\n' "Git コミット署名設定:"
 
     if ! command -v git >/dev/null 2>&1; then
-        print -P "  %F{220}警告: git が見つかりません。Git 署名設定をスキップします。%f"
+        msg_step "$(printf '%s%s%s' "${C_YELLOW}" "警告: git が見つかりません。Git 署名設定をスキップします。" "${C_RESET}")"
         return 0
     fi
 
@@ -196,16 +196,16 @@ _1password_setup_git_signing() {
     local current_format
     current_format=$(git config --global gpg.format 2>/dev/null || true)
     if [[ "$current_format" == "ssh" ]]; then
-        print -P "  情報: gpg.format は既に ssh に設定されています。"
+        msg_step "情報: gpg.format は既に ssh に設定されています。"
         local current_program
         current_program=$(git config --global gpg.ssh.program 2>/dev/null || true)
         local current_key
         current_key=$(git config --global user.signingkey 2>/dev/null || true)
         local current_sign
         current_sign=$(git config --global commit.gpgsign 2>/dev/null || true)
-        [[ -n "$current_program" ]] && print -P "  gpg.ssh.program: ${current_program}"
-        [[ -n "$current_key" ]] && print -P "  user.signingkey:  ${current_key}"
-        [[ -n "$current_sign" ]] && print -P "  commit.gpgsign:   ${current_sign}"
+        [[ -n "$current_program" ]] && msg_step "gpg.ssh.program: ${current_program}"
+        [[ -n "$current_key" ]] && msg_step "user.signingkey:  ${current_key}"
+        [[ -n "$current_sign" ]] && msg_step "commit.gpgsign:   ${current_sign}"
         return 0
     fi
 
@@ -217,9 +217,9 @@ _1password_setup_git_signing() {
             local win_user
             win_user=$(cmd.exe /c "echo %USERNAME%" 2>/dev/null | tr -d '\r')
             if [[ -z "$win_user" ]]; then
-                print -P "  %F{220}警告: Windows ユーザー名を検出できませんでした。%f"
-                print -P "  手動で設定してください:"
-                print -P "    git config --global gpg.ssh.program '/mnt/c/Users/<ユーザー名>/AppData/Local/1Password/app/8/op-ssh-sign.exe'"
+                msg_step "$(printf '%s%s%s' "${C_YELLOW}" "警告: Windows ユーザー名を検出できませんでした。" "${C_RESET}")"
+                msg_step "手動で設定してください:"
+                msg_step "  git config --global gpg.ssh.program '/mnt/c/Users/<ユーザー名>/AppData/Local/1Password/app/8/op-ssh-sign.exe'"
                 return 0
             fi
             sign_program="/mnt/c/Users/${win_user}/AppData/Local/1Password/app/8/op-ssh-sign.exe"
@@ -234,97 +234,97 @@ _1password_setup_git_signing() {
 
     # gpg.format と commit.gpgsign を設定
     if (( DRY_RUN )); then
-        print -P "%F{242}  [DRY-RUN] git config --global gpg.format ssh%f"
-        print -P "%F{242}  [DRY-RUN] git config --global gpg.ssh.program ${sign_program}%f"
-        print -P "%F{242}  [DRY-RUN] git config --global commit.gpgsign true%f"
+        msg_dry_run "git config --global gpg.format ssh"
+        msg_dry_run "git config --global gpg.ssh.program ${sign_program}"
+        msg_dry_run "git config --global commit.gpgsign true"
     else
         git config --global gpg.format ssh || {
-            print -P "%F{160}エラー: gpg.format の設定に失敗しました。%f" >&2
+            msg_error "gpg.format の設定に失敗しました。"
             return 1
         }
         git config --global gpg.ssh.program "$sign_program" || {
-            print -P "%F{160}エラー: gpg.ssh.program の設定に失敗しました。%f" >&2
+            msg_error "gpg.ssh.program の設定に失敗しました。"
             return 1
         }
         git config --global commit.gpgsign true || {
-            print -P "%F{160}エラー: commit.gpgsign の設定に失敗しました。%f" >&2
+            msg_error "commit.gpgsign の設定に失敗しました。"
             return 1
         }
-        print -P "  %F{34}Git 署名設定を適用しました。%f"
-        print -P "  gpg.format:       ssh"
-        print -P "  gpg.ssh.program:  ${sign_program}"
-        print -P "  commit.gpgsign:   true"
+        msg_step "$(printf '%s%s%s' "${C_GREEN}" "Git 署名設定を適用しました。" "${C_RESET}")"
+        msg_step "gpg.format:       ssh"
+        msg_step "gpg.ssh.program:  ${sign_program}"
+        msg_step "commit.gpgsign:   true"
     fi
 
     # user.signingkey の案内
     local current_key
     current_key=$(git config --global user.signingkey 2>/dev/null || true)
     if [[ -z "$current_key" ]]; then
-        print -P ""
-        print -P "  %F{220}NOTE: user.signingkey が未設定です。以下を実行してください:%f"
-        print -P "    git config --global user.signingkey \"ssh-ed25519 AAAA...\""
-        print -P "  1Password → SSH キーの詳細 → 公開鍵をコピーして指定してください。"
+        printf '\n'
+        msg_step "$(printf '%s%s%s' "${C_YELLOW}" "NOTE: user.signingkey が未設定です。以下を実行してください:" "${C_RESET}")"
+        msg_step "  git config --global user.signingkey \"ssh-ed25519 AAAA...\""
+        msg_step "1Password → SSH キーの詳細 → 公開鍵をコピーして指定してください。"
     fi
 }
 
 # --- Helper: Service account token storage ---
 _1password_setup_service_account_token() {
-    print -P ""
-    print -P "サービスアカウントトークン設定:"
+    printf '\n'
+    printf '%s\n' "サービスアカウントトークン設定:"
 
     # Check if token file already exists
     if [[ -f "$OP_MOD_TOKEN_FILE" ]]; then
-        print -P "  情報: トークンファイルが既に存在します (${OP_MOD_TOKEN_FILE})。"
-        print -P -n "  上書きしますか？ [y/N]: "
+        msg_step "情報: トークンファイルが既に存在します (${OP_MOD_TOKEN_FILE})。"
+        printf '  上書きしますか？ [y/N]: '
         local overwrite
         read -r overwrite
         if [[ "$overwrite" != [yY] ]]; then
-            print -P "  スキップしました。"
+            msg_step "スキップしました。"
             return 0
         fi
     else
-        print -P -n "  サービスアカウントトークンを設定しますか？ [y/N]: "
+        printf '  サービスアカウントトークンを設定しますか？ [y/N]: '
         local configure
         read -r configure
         if [[ "$configure" != [yY] ]]; then
-            print -P "  スキップしました。"
+            msg_step "スキップしました。"
             return 0
         fi
     fi
 
     # Prompt for token value (silent input)
-    print -P -n "  トークンを入力してください: "
+    printf '  トークンを入力してください: '
     local token
     read -r -s token
-    print ""  # Newline after silent input
+    printf '\n'  # Newline after silent input
 
     if [[ -z "$token" ]]; then
-        print -P "  %F{220}警告: トークンが空です。スキップします。%f"
+        msg_step "$(printf '%s%s%s' "${C_YELLOW}" "警告: トークンが空です。スキップします。" "${C_RESET}")"
         return 0
     fi
 
     # Validate token characters (allow only safe characters to prevent injection)
     if [[ ! "$token" =~ ^[A-Za-z0-9_+/=.-]+$ ]]; then
-        print -P "%F{196}エラー: トークンに不正な文字が含まれています。%f"
+        msg_error "トークンに不正な文字が含まれています。"
         return 1
     fi
 
     # Warn if token seems too short
     if (( ${#token} < 10 )); then
-        print -P "%F{220}警告: トークンが短すぎます。正しい値か確認してください。%f"
+        msg_warn "トークンが短すぎます。正しい値か確認してください。"
     fi
 
     # Create directory with restricted permissions
     if [[ ! -d "$OP_MOD_TOKEN_DIR" ]]; then
         if (( DRY_RUN )); then
-            print -P "%F{242}  [DRY-RUN] mkdir -p ${OP_MOD_TOKEN_DIR} && chmod 700 ${OP_MOD_TOKEN_DIR}%f"
+            msg_dry_run "mkdir -p ${OP_MOD_TOKEN_DIR} && chmod 700 ${OP_MOD_TOKEN_DIR}"
         else
             mkdir -p "$OP_MOD_TOKEN_DIR" || {
-                print -P "%F{160}エラー: ${OP_MOD_TOKEN_DIR} の作成に失敗しました。%f" >&2
+                msg_error "${OP_MOD_TOKEN_DIR} の作成に失敗しました。"
                 return 1
             }
             chmod 700 "$OP_MOD_TOKEN_DIR" || {
-                print -P "%F{160}エラー: ${OP_MOD_TOKEN_DIR} のパーミッション設定に失敗しました。%f" >&2
+                msg_error "${OP_MOD_TOKEN_DIR} のパーミッション設定に失敗しました。"
                 return 1
             }
         fi
@@ -332,7 +332,7 @@ _1password_setup_service_account_token() {
 
     # Write token file with restricted permissions
     if (( DRY_RUN )); then
-        print -P "%F{242}  [DRY-RUN] トークンを ${OP_MOD_TOKEN_FILE} に保存 (chmod 600)%f"
+        msg_dry_run "トークンを ${OP_MOD_TOKEN_FILE} に保存 (chmod 600)"
     else
         # Write the token file atomically via a temp file
         # Set restrictive umask so mktemp creates files with safe permissions
@@ -342,27 +342,27 @@ _1password_setup_service_account_token() {
 
         local tmp_file
         tmp_file=$(mktemp "${OP_MOD_TOKEN_DIR}/.token.XXXXXX") || {
-            print -P "%F{160}エラー: 一時ファイルの作成に失敗しました。%f" >&2
+            msg_error "一時ファイルの作成に失敗しました。"
             umask "$old_umask"
             return 1
         }
 
         chmod 600 "$tmp_file" || {
-            print -P "%F{160}エラー: 一時ファイルのパーミッション設定に失敗しました。%f" >&2
+            msg_error "一時ファイルのパーミッション設定に失敗しました。"
             rm -f "$tmp_file"
             umask "$old_umask"
             return 1
         }
 
         printf "export OP_SERVICE_ACCOUNT_TOKEN='%s'\n" "$token" > "$tmp_file" || {
-            print -P "%F{160}エラー: トークンの書き込みに失敗しました。%f" >&2
+            msg_error "トークンの書き込みに失敗しました。"
             rm -f "$tmp_file"
             umask "$old_umask"
             return 1
         }
 
         mv "$tmp_file" "$OP_MOD_TOKEN_FILE" || {
-            print -P "%F{160}エラー: トークンファイルの配置に失敗しました。%f" >&2
+            msg_error "トークンファイルの配置に失敗しました。"
             rm -f "$tmp_file"
             umask "$old_umask"
             return 1
@@ -370,46 +370,45 @@ _1password_setup_service_account_token() {
 
         umask "$old_umask"
 
-        print -P "  %F{34}トークンを保存しました: ${OP_MOD_TOKEN_FILE}%f"
+        msg_step "$(printf '%s%s%s' "${C_GREEN}" "トークンを保存しました: ${OP_MOD_TOKEN_FILE}" "${C_RESET}")"
     fi
 }
 
 # --- セットアップ ---
 setup_1password() {
-    print -P ""
-    print -P "%F{36}%B[1Password]%b%f"
-    print -P "---------------------------------------------"
+    msg_header "1Password"
+    print_separator
 
     local env
     env=$(_1password_detect_env)
 
     case "$env" in
-        wsl)    print -P "情報: 環境を検出しました — WSL" ;;
-        linux)  print -P "情報: 環境を検出しました — ネイティブ Linux" ;;
-        macos)  print -P "情報: 環境を検出しました — macOS" ;;
+        wsl)    msg_info "環境を検出しました — WSL" ;;
+        linux)  msg_info "環境を検出しました — ネイティブ Linux" ;;
+        macos)  msg_info "環境を検出しました — macOS" ;;
         *)
-            print -P "%F{160}エラー: 未対応の OS です (OSTYPE=${OSTYPE})。%f" >&2
+            msg_error "未対応の OS です (OSTYPE=${OSTYPE})。"
             return 1
             ;;
     esac
 
     # --- 1. op CLI のインストール ---
     if command -v op >/dev/null 2>&1; then
-        print -P "情報: op CLI は既にインストールされています ($(op --version 2>/dev/null || echo '不明'))。スキップします。"
+        msg_info "op CLI は既にインストールされています ($(op --version 2>/dev/null || echo '不明'))。スキップします。"
     else
-        print -P "1Password CLI (op) をインストールします..."
+        msg_info "1Password CLI (op) をインストールします..."
         case "$env" in
             wsl|linux)
                 if ! command -v apt-get >/dev/null 2>&1; then
-                    print -P "%F{160}エラー: apt-get が見つかりません。Debian/Ubuntu 系のみ対応しています。%f" >&2
+                    msg_error "apt-get が見つかりません。Debian/Ubuntu 系のみ対応しています。"
                     return 1
                 fi
                 _1password_install_op_apt || return 1
                 ;;
             macos)
                 if ! command -v brew >/dev/null 2>&1; then
-                    print -P "%F{160}エラー: Homebrew がインストールされていません。%f" >&2
-                    print -P "  インストール: https://brew.sh/" >&2
+                    msg_error "Homebrew がインストールされていません。"
+                    msg_step "インストール: https://brew.sh/" >&2
                     return 1
                 fi
                 _1password_install_op_brew || return 1
@@ -418,22 +417,19 @@ setup_1password() {
 
         if (( ! DRY_RUN )); then
             if command -v op >/dev/null 2>&1; then
-                print -P "  %F{34}op CLI のインストールが完了しました ($(op --version 2>/dev/null))。%f"
+                msg_step "$(printf '%s%s%s' "${C_GREEN}" "op CLI のインストールが完了しました ($(op --version 2>/dev/null))。" "${C_RESET}")"
             else
-                print -P "%F{160}エラー: op CLI のインストール後にコマンドが見つかりません。%f" >&2
+                msg_error "op CLI のインストール後にコマンドが見つかりません。"
                 return 1
             fi
         fi
     fi
 
     # --- 2. 設定ファイルの配置 ---
-    print -P ""
-    print -P "設定ファイルを配置します..."
+    printf '\n'
+    msg_info "設定ファイルを配置します..."
     for entry in "${OP_MOD_MANAGED_FILES[@]}"; do
-        local src="${entry[(ws:|:)1]}"
-        local dst="${entry[(ws:|:)2]}"
-        local label="${entry[(ws:|:)3]}"
-        local hint="${entry[(ws:|:)4]}"
+        IFS='|' read -r src dst label hint <<< "$entry"
         install_config "$src" "$dst" "$label" "$hint"
     done
 
@@ -447,16 +443,16 @@ setup_1password() {
     _1password_setup_service_account_token
 
     # --- 完了メッセージ ---
-    print -P ""
+    printf '\n'
     if (( DRY_RUN )); then
-        print -P "情報: 1Password セットアップ予定です（dry-run）。"
+        msg_info "1Password セットアップ予定です（dry-run）。"
     else
-        print -P "%F{34}1Password のセットアップが完了しました。%f"
+        msg_success "1Password のセットアップが完了しました。"
     fi
 
-    print -P ""
-    print -P "NOTE: 1Password デスクトップアプリが必要です。CLI 単体では認証できません。"
-    print -P "  初回は 'op signin' でサインインしてください。"
+    printf '\n'
+    printf '%s\n' "NOTE: 1Password デスクトップアプリが必要です。CLI 単体では認証できません。"
+    msg_step "初回は 'op signin' でサインインしてください。"
 }
 
 # --- アンインストール ---
@@ -469,19 +465,19 @@ uninstall_1password() {
         current_format=$(git config --global gpg.format 2>/dev/null || true)
         if [[ "$current_format" == "ssh" ]]; then
             if (( DRY_RUN )); then
-                print -P "%F{242}  [DRY-RUN] git config --global --unset gpg.format%f"
-                print -P "%F{242}  [DRY-RUN] git config --global --unset gpg.ssh.program%f"
-                print -P "%F{242}  [DRY-RUN] git config --global --unset commit.gpgsign%f"
+                msg_dry_run "git config --global --unset gpg.format"
+                msg_dry_run "git config --global --unset gpg.ssh.program"
+                msg_dry_run "git config --global --unset commit.gpgsign"
             else
                 git config --global --unset gpg.format 2>/dev/null
                 git config --global --unset gpg.ssh.program 2>/dev/null
                 git config --global --unset commit.gpgsign 2>/dev/null
-                print -P "情報: Git 署名設定を解除しました。"
+                msg_info "Git 署名設定を解除しました。"
                 local remaining_key
                 remaining_key=$(git config --global user.signingkey 2>/dev/null || true)
                 if [[ -n "$remaining_key" ]]; then
-                    print -P "  NOTE: user.signingkey ('${remaining_key}') は残っています。"
-                    print -P "  不要な場合は: git config --global --unset user.signingkey"
+                    msg_step "NOTE: user.signingkey ('${remaining_key}') は残っています。"
+                    msg_step "不要な場合は: git config --global --unset user.signingkey"
                 fi
             fi
             restored=1
@@ -490,82 +486,81 @@ uninstall_1password() {
 
     # サービスアカウントトークンの削除
     if [[ -f "$OP_MOD_TOKEN_FILE" ]]; then
-        print -P -n "サービスアカウントトークンを削除しますか？ (${OP_MOD_TOKEN_FILE}) [y/N]: "
+        printf 'サービスアカウントトークンを削除しますか？ (%s) [y/N]: ' "$OP_MOD_TOKEN_FILE"
         local remove_token
         read -r remove_token
         if [[ "$remove_token" == [yY] ]]; then
             if (( DRY_RUN )); then
-                print -P "%F{242}  [DRY-RUN] rm -f ${OP_MOD_TOKEN_FILE}%f"
+                msg_dry_run "rm -f ${OP_MOD_TOKEN_FILE}"
             else
                 # Use shred for secure deletion if available
                 if command -v shred >/dev/null 2>&1; then
                     shred -u "$OP_MOD_TOKEN_FILE" || {
-                        print -P "%F{160}エラー: トークンファイルの安全な削除に失敗しました。%f" >&2
+                        msg_error "トークンファイルの安全な削除に失敗しました。"
                         return 1
                     }
                 else
                     rm -f "$OP_MOD_TOKEN_FILE" || {
-                        print -P "%F{160}エラー: トークンファイルの削除に失敗しました。%f" >&2
+                        msg_error "トークンファイルの削除に失敗しました。"
                         return 1
                     }
                 fi
-                print -P "情報: サービスアカウントトークンを削除しました。"
+                msg_info "サービスアカウントトークンを削除しました。"
             fi
             restored=1
         else
-            print -P "情報: トークンファイルは残しました。手動で削除する場合: rm ${OP_MOD_TOKEN_FILE}"
+            msg_info "トークンファイルは残しました。手動で削除する場合: rm ${OP_MOD_TOKEN_FILE}"
         fi
     fi
 
     # 管理対象ファイルのバックアップ復元 / 削除
     for entry in "${OP_MOD_MANAGED_FILES[@]}"; do
-        local dst="${entry[(ws:|:)2]}"
-        local label="${entry[(ws:|:)3]}"
+        IFS='|' read -r _src dst label _hint <<< "$entry"
 
-        local -a latest_backup
-        latest_backup=( "${dst}.backup."*(N^/Om[1]) )
+        local newest
+        newest=$(find_newest_backup "${dst}.backup."'*') || true
 
-        if (( ${#latest_backup[@]} > 0 )); then
-            print -P "復元: ${label} をバックアップ (${latest_backup[1]:t}) から戻します。"
-            run_cmd command mv "${latest_backup[1]}" "$dst" || {
-                print -P "%F{160}エラー: ${label} の復元に失敗しました。%f" >&2
+        if [[ -n "$newest" ]]; then
+            printf '%s\n' "復元: ${label} をバックアップ ($(basename "$newest")) から戻します。"
+            run_cmd command mv "$newest" "$dst" || {
+                msg_error "${label} の復元に失敗しました。"
                 return 1
             }
             restored=1
         elif [[ -f "$dst" || -h "$dst" ]]; then
-            print -P "削除: ${label} を削除します。"
+            printf '%s\n' "削除: ${label} を削除します。"
             run_cmd command rm -f "$dst" || {
-                print -P "%F{160}エラー: ${label} の削除に失敗しました。%f" >&2
+                msg_error "${label} の削除に失敗しました。"
                 return 1
             }
             restored=1
         else
-            print -P "情報: ${label} は配置されていません。スキップします。"
+            msg_info "${label} は配置されていません。スキップします。"
         fi
     done
 
     if (( restored )); then
-        print -P "%F{34}1Password のアンインストールが完了しました。%f"
+        msg_success "1Password のアンインストールが完了しました。"
     else
-        print -P "情報: 1Password の復元・削除対象はありませんでした。"
+        msg_info "1Password の復元・削除対象はありませんでした。"
     fi
 
-    print -P ""
-    print -P "NOTE: 1Password CLI 本体は削除されていません。不要な場合は手動で削除してください:"
+    printf '\n'
+    printf '%s\n' "NOTE: 1Password CLI 本体は削除されていません。不要な場合は手動で削除してください:"
 
     local env
     env=$(_1password_detect_env)
     case "$env" in
         wsl|linux)
-            print -P "  sudo apt-get remove 1password-cli"
-            print -P "  sudo rm -f /etc/apt/sources.list.d/1password.list"
-            print -P "  sudo rm -f /etc/apt/keyrings/1password-archive-keyring.gpg"
+            msg_step "sudo apt-get remove 1password-cli"
+            msg_step "sudo rm -f /etc/apt/sources.list.d/1password.list"
+            msg_step "sudo rm -f /etc/apt/keyrings/1password-archive-keyring.gpg"
             ;;
         macos)
-            print -P "  brew uninstall --cask 1password-cli"
+            msg_step "brew uninstall --cask 1password-cli"
             ;;
         *)
-            print -P "  OS に応じたパッケージマネージャーで削除してください。"
+            msg_step "OS に応じたパッケージマネージャーで削除してください。"
             ;;
     esac
 }

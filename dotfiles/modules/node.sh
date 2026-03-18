@@ -25,34 +25,33 @@ NODE_MOD_MANAGED_FILES=(
 # --- ヘルパー: OS 判定 ---
 _node_detect_os() {
     case "$OSTYPE" in
-        darwin*) print "macos" ;;
-        linux*)  print "linux" ;;
-        *)       print "unknown" ;;
+        darwin*) printf '%s' "macos" ;;
+        linux*)  printf '%s' "linux" ;;
+        *)       printf '%s' "unknown" ;;
     esac
 }
 
 # --- ヘルパー: アーキテクチャ判定 ---
 _node_detect_arch() {
     case "$(uname -m)" in
-        x86_64)  print "x64" ;;
-        aarch64) print "arm64" ;;
-        arm64)   print "arm64" ;;
-        *)       print "unknown" ;;
+        x86_64)  printf '%s' "x64" ;;
+        aarch64) printf '%s' "arm64" ;;
+        arm64)   printf '%s' "arm64" ;;
+        *)       printf '%s' "unknown" ;;
     esac
 }
 
 # --- セットアップ ---
 setup_node() {
-    print -P ""
-    print -P "%F{36}%B[Node.js 開発環境]%b%f"
-    print -P "---------------------------------------------"
+    msg_header "Node.js 開発環境"
+    print_separator
 
     # べき等性チェック
     local fnm_exists=0
     if command -v fnm >/dev/null 2>&1; then
         local current_ver
-        current_ver=$(fnm --version 2>/dev/null || print "unknown")
-        print -P "情報: fnm は既にインストールされています (${current_ver})。スキップします。"
+        current_ver=$(fnm --version 2>/dev/null || printf '%s' "unknown")
+        msg_info "fnm は既にインストールされています (${current_ver})。スキップします。"
         fnm_exists=1
     fi
 
@@ -68,7 +67,7 @@ setup_node() {
                 _node_setup_linux || return 1
                 ;;
             *)
-                print -P "%F{160}エラー: 未対応の OS です (OSTYPE=${OSTYPE})。%f" >&2
+                msg_error "未対応の OS です (OSTYPE=${OSTYPE})。"
                 return 1
                 ;;
         esac
@@ -84,8 +83,8 @@ setup_node() {
 
     # Node.js LTS のインストール（失敗しても fnm 自体は利用可能なので警告に留める）
     _node_install_lts || {
-        print -P "%F{220}警告: Node.js LTS のインストールに失敗しましたが、fnm は利用可能です。%f"
-        print -P "  手動でインストールしてください: fnm install --lts"
+        msg_warn "Node.js LTS のインストールに失敗しましたが、fnm は利用可能です。"
+        msg_step "手動でインストールしてください: fnm install --lts"
     }
 
     # 設定ファイルの配置
@@ -95,32 +94,32 @@ setup_node() {
     (( ! DRY_RUN )) && hash -r
 
     if (( DRY_RUN )); then
-        print -P "情報: Node.js 開発環境をセットアップ予定です（dry-run）。"
+        msg_info "Node.js 開発環境をセットアップ予定です（dry-run）。"
     else
-        print -P "%F{34}Node.js 開発環境のセットアップが完了しました。%f"
+        msg_success "Node.js 開発環境のセットアップが完了しました。"
         if command -v node >/dev/null 2>&1; then
-            print -P "  Node.js: $(node -v 2>/dev/null || print 'N/A')"
-            print -P "  npm: $(npm -v 2>/dev/null || print 'N/A')"
+            msg_step "Node.js: $(node -v 2>/dev/null || printf '%s' 'N/A')"
+            msg_step "npm: $(npm -v 2>/dev/null || printf '%s' 'N/A')"
         fi
-        print -P ""
-        print -P "使い方:"
-        print -P "  fnm install 22            # 特定バージョンをインストール"
-        print -P "  fnm use 22                # バージョンを切り替え"
-        print -P "  fnm default 22            # デフォルトバージョンを設定"
+        printf '\n'
+        printf '%s\n' "使い方:"
+        msg_step "fnm install 22            # 特定バージョンをインストール"
+        msg_step "fnm use 22                # バージョンを切り替え"
+        msg_step "fnm default 22            # デフォルトバージョンを設定"
     fi
 }
 
 # --- macOS セットアップ ---
 _node_setup_macos() {
     if ! command -v brew >/dev/null 2>&1; then
-        print -P "%F{160}エラー: Homebrew がインストールされていません。%f" >&2
-        print -P "  インストール: https://brew.sh/" >&2
+        msg_error "Homebrew がインストールされていません。"
+        msg_step "インストール: https://brew.sh/" >&2
         return 1
     fi
 
-    print -P "fnm を Homebrew でインストールします..."
+    msg_info "fnm を Homebrew でインストールします..."
     run_cmd brew install fnm || {
-        print -P "%F{160}エラー: fnm のインストールに失敗しました。%f" >&2
+        msg_error "fnm のインストールに失敗しました。"
         return 1
     }
 }
@@ -136,17 +135,17 @@ _node_setup_linux() {
     done
 
     if (( ${#missing_cmds[@]} > 0 )); then
-        print -P "${missing_cmds[*]} をインストールします..."
+        printf '%s\n' "${missing_cmds[*]} をインストールします..."
         if command -v apt-get >/dev/null 2>&1; then
             run_cmd sudo apt-get update -qq || {
-                print -P "%F{220}警告: apt update に失敗しました。後続のインストールに失敗する可能性があります。%f"
+                msg_warn "apt update に失敗しました。後続のインストールに失敗する可能性があります。"
             }
             run_cmd sudo apt-get install -y "${missing_cmds[@]}" || {
-                print -P "%F{160}エラー: ${missing_cmds[*]} のインストールに失敗しました。%f" >&2
+                msg_error "${missing_cmds[*]} のインストールに失敗しました。"
                 return 1
             }
         else
-            print -P "%F{160}エラー: ${missing_cmds[*]} がインストールされていません。手動でインストールしてください。%f" >&2
+            msg_error "${missing_cmds[*]} がインストールされていません。手動でインストールしてください。"
             return 1
         fi
     fi
@@ -155,7 +154,7 @@ _node_setup_linux() {
     local arch
     arch=$(_node_detect_arch)
     if [[ "$arch" == "unknown" ]]; then
-        print -P "%F{160}エラー: 未対応のアーキテクチャです ($(uname -m))。%f" >&2
+        msg_error "未対応のアーキテクチャです ($(uname -m))。"
         return 1
     fi
 
@@ -165,46 +164,46 @@ _node_setup_linux() {
     # バイナリ配置先の作成
     if [[ ! -d "$NODE_MOD_FNM_BIN_DIR" ]]; then
         run_cmd command mkdir -p "$NODE_MOD_FNM_BIN_DIR" || {
-            print -P "%F{160}エラー: $NODE_MOD_FNM_BIN_DIR の作成に失敗しました。%f" >&2
+            msg_error "$NODE_MOD_FNM_BIN_DIR の作成に失敗しました。"
             return 1
         }
     fi
 
     # 不完全なインストールの検出
     if [[ -f "$NODE_MOD_FNM_BIN_DIR/fnm" && ! -x "$NODE_MOD_FNM_BIN_DIR/fnm" ]]; then
-        print -P "%F{220}警告: fnm バイナリは存在しますが実行権限がありません。再インストールします。%f"
+        msg_warn "fnm バイナリは存在しますが実行権限がありません。再インストールします。"
         run_cmd command rm -f "$NODE_MOD_FNM_BIN_DIR/fnm" || {
-            print -P "%F{160}エラー: 既存の fnm バイナリの削除に失敗しました。%f" >&2
-            print -P "  手動で削除してください: rm -f $NODE_MOD_FNM_BIN_DIR/fnm" >&2
+            msg_error "既存の fnm バイナリの削除に失敗しました。"
+            msg_step "手動で削除してください: rm -f $NODE_MOD_FNM_BIN_DIR/fnm" >&2
             return 1
         }
     fi
 
-    print -P "fnm を GitHub Releases からダウンロードします (${arch})..."
+    msg_info "fnm を GitHub Releases からダウンロードします (${arch})..."
 
     if (( DRY_RUN )); then
-        print -P "%F{242}  [DRY-RUN] curl -fsSL ${download_url} -o /tmp/${zip_name}%f"
-        print -P "%F{242}  [DRY-RUN] unzip -o /tmp/${zip_name} -d ${NODE_MOD_FNM_BIN_DIR}%f"
-        print -P "%F{242}  [DRY-RUN] chmod +x ${NODE_MOD_FNM_BIN_DIR}/fnm%f"
+        msg_dry_run "curl -fsSL ${download_url} -o /tmp/${zip_name}"
+        msg_dry_run "unzip -o /tmp/${zip_name} -d ${NODE_MOD_FNM_BIN_DIR}"
+        msg_dry_run "chmod +x ${NODE_MOD_FNM_BIN_DIR}/fnm"
     else
         # 安全な一時ファイルの作成（予測可能なパスを避ける）
         local tmp_zip
         tmp_zip=$(mktemp /tmp/fnm-XXXXXXXXXX.zip) || {
-            print -P "%F{160}エラー: 一時ファイルの作成に失敗しました。%f" >&2
+            msg_error "一時ファイルの作成に失敗しました。"
             return 1
         }
 
         # ダウンロード
         curl -fsSL "$download_url" -o "$tmp_zip" || {
-            print -P "%F{160}エラー: fnm のダウンロードに失敗しました。%f" >&2
-            print -P "  URL: ${download_url}" >&2
+            msg_error "fnm のダウンロードに失敗しました。"
+            printf '%s\n' "  URL: ${download_url}" >&2
             rm -f "$tmp_zip"
             return 1
         }
 
         # 解凍
         unzip -o "$tmp_zip" -d "$NODE_MOD_FNM_BIN_DIR" || {
-            print -P "%F{160}エラー: fnm の解凍に失敗しました。%f" >&2
+            msg_error "fnm の解凍に失敗しました。"
             rm -f "$tmp_zip"
             return 1
         }
@@ -212,7 +211,7 @@ _node_setup_linux() {
 
         # 実行権限の付与
         chmod +x "$NODE_MOD_FNM_BIN_DIR/fnm" || {
-            print -P "%F{160}エラー: fnm の実行権限の付与に失敗しました。%f" >&2
+            msg_error "fnm の実行権限の付与に失敗しました。"
             return 1
         }
     fi
@@ -221,13 +220,13 @@ _node_setup_linux() {
 # --- Node.js LTS インストール ---
 _node_install_lts() {
     if (( DRY_RUN )); then
-        print -P "%F{242}  [DRY-RUN] fnm install --lts%f"
-        print -P "%F{242}  [DRY-RUN] fnm default lts-latest%f"
+        msg_dry_run "fnm install --lts"
+        msg_dry_run "fnm default lts-latest"
         return 0
     fi
 
     if ! command -v fnm >/dev/null 2>&1; then
-        print -P "%F{220}警告: fnm が PATH に見つかりません。Node.js LTS のインストールをスキップします。%f"
+        msg_warn "fnm が PATH に見つかりません。Node.js LTS のインストールをスキップします。"
         return 0
     fi
 
@@ -241,26 +240,26 @@ _node_install_lts() {
             node_major="${node_major%%.*}"
         fi
 
-        if [[ "$node_major" == <-> ]] && (( node_major >= 18 )); then
-            print -P "情報: Node.js は既にインストールされています (${node_ver})。スキップします。"
+        if [[ "$node_major" =~ ^[0-9]+$ ]] && (( node_major >= 18 )); then
+            msg_info "Node.js は既にインストールされています (${node_ver})。スキップします。"
             return 0
-        elif [[ "$node_major" == <-> ]] && (( node_major < 18 )); then
-            print -P "%F{220}警告: 既存の Node.js (${node_ver}) は推奨バージョン (v18 以上) 未満です。fnm で LTS をインストールします。%f"
+        elif [[ "$node_major" =~ ^[0-9]+$ ]] && (( node_major < 18 )); then
+            msg_warn "既存の Node.js (${node_ver}) は推奨バージョン (v18 以上) 未満です。fnm で LTS をインストールします。"
         else
-            print -P "%F{220}警告: Node.js のバージョンを特定できません (${node_ver:-unknown})。fnm で LTS をインストールします。%f"
+            msg_warn "Node.js のバージョンを特定できません (${node_ver:-unknown})。fnm で LTS をインストールします。"
         fi
     fi
 
-    print -P "Node.js LTS をインストールします..."
+    msg_info "Node.js LTS をインストールします..."
     fnm install --lts || {
-        print -P "%F{160}エラー: Node.js LTS のインストールに失敗しました。%f" >&2
-        print -P "  手動でインストールしてください: fnm install --lts" >&2
+        msg_error "Node.js LTS のインストールに失敗しました。"
+        msg_step "手動でインストールしてください: fnm install --lts" >&2
         return 1
     }
 
     # デフォルトバージョンに設定
     fnm default lts-latest 2>/dev/null || {
-        print -P "%F{220}警告: デフォルトバージョンの設定に失敗しました。%f"
+        msg_warn "デフォルトバージョンの設定に失敗しました。"
     }
 
     # fnm env を再評価して node を PATH に通す
@@ -269,12 +268,9 @@ _node_install_lts() {
 
 # --- 設定ファイル配置ヘルパー ---
 _node_install_config() {
-    print -P "設定ファイルを配置します..."
+    msg_info "設定ファイルを配置します..."
     for entry in "${NODE_MOD_MANAGED_FILES[@]}"; do
-        local src="${entry[(ws:|:)1]}"
-        local dst="${entry[(ws:|:)2]}"
-        local label="${entry[(ws:|:)3]}"
-        local hint="${entry[(ws:|:)4]}"
+        IFS='|' read -r src dst label hint <<< "$entry"
         install_config "$src" "$dst" "$label" "$hint"
     done
 }
@@ -284,48 +280,47 @@ uninstall_node() {
     local restored=0
 
     for entry in "${NODE_MOD_MANAGED_FILES[@]}"; do
-        local dst="${entry[(ws:|:)2]}"
-        local label="${entry[(ws:|:)3]}"
+        IFS='|' read -r _src dst label _hint <<< "$entry"
 
-        local -a latest_backup
-        latest_backup=( "${dst}.backup."*(N^/Om[1]) )
+        local newest
+        newest=$(find_newest_backup "${dst}.backup."'*') || true
 
-        if (( ${#latest_backup[@]} > 0 )); then
-            print -P "復元: ${label} をバックアップ (${latest_backup[1]:t}) から戻します。"
-            run_cmd command mv "${latest_backup[1]}" "$dst" || {
-                print -P "%F{160}エラー: ${label} の復元に失敗しました。%f" >&2
+        if [[ -n "$newest" ]]; then
+            printf '%s\n' "復元: ${label} をバックアップ ($(basename "$newest")) から戻します。"
+            run_cmd command mv "$newest" "$dst" || {
+                msg_error "${label} の復元に失敗しました。"
                 return 1
             }
             restored=1
         elif [[ -f "$dst" || -h "$dst" ]]; then
-            print -P "削除: ${label} を削除します。"
+            printf '%s\n' "削除: ${label} を削除します。"
             run_cmd command rm -f "$dst" || {
-                print -P "%F{160}エラー: ${label} の削除に失敗しました。%f" >&2
+                msg_error "${label} の削除に失敗しました。"
                 return 1
             }
             restored=1
         else
-            print -P "情報: ${label} は配置されていません。スキップします。"
+            msg_info "${label} は配置されていません。スキップします。"
         fi
     done
 
     if (( restored )); then
-        print -P "%F{34}Node.js 開発環境の設定を削除しました。%f"
+        msg_success "Node.js 開発環境の設定を削除しました。"
     else
-        print -P "情報: Node.js 開発環境の復元・削除対象はありませんでした。"
+        msg_info "Node.js 開発環境の復元・削除対象はありませんでした。"
     fi
 
-    print -P ""
-    print -P "NOTE: fnm 本体と Node.js バージョンは削除されていません。不要な場合は以下を手動で削除してください:"
+    printf '\n'
+    printf '%s\n' "NOTE: fnm 本体と Node.js バージョンは削除されていません。不要な場合は以下を手動で削除してください:"
     local os
     os=$(_node_detect_os)
     case "$os" in
         macos)
-            print -P "  brew uninstall fnm"
+            msg_step "brew uninstall fnm"
             ;;
         *)
-            print -P "  rm -f ${NODE_MOD_FNM_BIN_DIR}/fnm"
+            msg_step "rm -f ${NODE_MOD_FNM_BIN_DIR}/fnm"
             ;;
     esac
-    print -P "  rm -rf ${XDG_DATA_HOME:-$HOME/.local/share}/fnm"
+    msg_step "rm -rf ${XDG_DATA_HOME:-$HOME/.local/share}/fnm"
 }

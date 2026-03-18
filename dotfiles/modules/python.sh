@@ -43,23 +43,22 @@ PY_MOD_MANAGED_FILES=(
 # --- ヘルパー: OS 判定 ---
 _py_detect_os() {
     case "$OSTYPE" in
-        darwin*) print "macos" ;;
-        linux*)  print "linux" ;;
-        *)       print "unknown" ;;
+        darwin*) printf '%s' "macos" ;;
+        linux*)  printf '%s' "linux" ;;
+        *)       printf '%s' "unknown" ;;
     esac
 }
 
 # --- セットアップ ---
 setup_python() {
-    print -P ""
-    print -P "%F{36}%B[Python 開発環境]%b%f"
-    print -P "---------------------------------------------"
+    msg_header "Python 開発環境"
+    print_separator
 
     # べき等性チェック
     if command -v pyenv >/dev/null 2>&1; then
         local current_ver
-        current_ver=$(pyenv --version 2>/dev/null || print "unknown")
-        print -P "情報: pyenv は既にインストールされています (${current_ver})。スキップします。"
+        current_ver=$(pyenv --version 2>/dev/null || printf '%s' "unknown")
+        msg_info "pyenv は既にインストールされています (${current_ver})。スキップします。"
         # 設定ファイルのみ更新確認
         _py_install_config
         return 0
@@ -76,7 +75,7 @@ setup_python() {
             _py_setup_linux || return 1
             ;;
         *)
-            print -P "%F{160}エラー: 未対応の OS です (OSTYPE=${OSTYPE})。%f" >&2
+            msg_error "未対応の OS です (OSTYPE=${OSTYPE})。"
             return 1
             ;;
     esac
@@ -85,56 +84,56 @@ setup_python() {
     _py_install_config
 
     if (( DRY_RUN )); then
-        print -P "情報: Python 開発環境をセットアップ予定です（dry-run）。"
+        msg_info "Python 開発環境をセットアップ予定です（dry-run）。"
     else
-        print -P "%F{34}Python 開発環境のセットアップが完了しました。%f"
-        print -P ""
-        print -P "次のステップ:"
-        print -P "  exec zsh                    # シェルを再起動"
-        print -P "  pyenv install 3.13.2        # Python をインストール"
-        print -P "  pyenv global 3.13.2         # デフォルトバージョンを設定"
+        msg_success "Python 開発環境のセットアップが完了しました。"
+        printf '\n'
+        printf '%s\n' "次のステップ:"
+        msg_step "exec zsh                    # シェルを再起動"
+        msg_step "pyenv install 3.13.2        # Python をインストール"
+        msg_step "pyenv global 3.13.2         # デフォルトバージョンを設定"
     fi
 }
 
 # --- macOS セットアップ ---
 _py_setup_macos() {
     if ! command -v brew >/dev/null 2>&1; then
-        print -P "%F{160}エラー: Homebrew がインストールされていません。%f" >&2
-        print -P "  インストール: https://brew.sh/" >&2
+        msg_error "Homebrew がインストールされていません。"
+        msg_step "インストール: https://brew.sh/" >&2
         return 1
     fi
 
-    print -P "pyenv を Homebrew でインストールします..."
+    msg_info "pyenv を Homebrew でインストールします..."
     run_cmd brew install pyenv || {
-        print -P "%F{160}エラー: pyenv のインストールに失敗しました。%f" >&2
+        msg_error "pyenv のインストールに失敗しました。"
         return 1
     }
 
-    print -P "pyenv-virtualenv を Homebrew でインストールします..."
+    msg_info "pyenv-virtualenv を Homebrew でインストールします..."
     run_cmd brew install pyenv-virtualenv || {
-        print -P "%F{220}警告: pyenv-virtualenv のインストールに失敗しました。pyenv 本体は利用可能です。%f"
+        msg_warn "pyenv-virtualenv のインストールに失敗しました。pyenv 本体は利用可能です。"
     }
 }
 
 # --- Linux セットアップ ---
 _py_setup_linux() {
     if ! command -v apt-get >/dev/null 2>&1; then
-        print -P "%F{160}エラー: apt-get が見つかりません。Debian/Ubuntu 系のみ対応しています。%f" >&2
+        msg_error "apt-get が見つかりません。Debian/Ubuntu 系のみ対応しています。"
         return 1
     fi
 
     if ! command -v git >/dev/null 2>&1; then
-        print -P "%F{160}エラー: git がインストールされていません。%f" >&2
+        msg_error "git がインストールされていません。"
         return 1
     fi
 
     # ビルド依存パッケージのインストール
-    print -P "Python ビルド依存パッケージをインストールします..."
+    msg_info "Python ビルド依存パッケージをインストールします..."
     run_cmd sudo apt-get update -qq || {
-        print -P "%F{220}警告: apt update に失敗しました。後続のパッケージインストールに失敗する可能性があります。%f"
+        msg_warn "apt update に失敗しました。後続のパッケージインストールに失敗する可能性があります。"
     }
     run_cmd sudo apt-get install -y "${PY_MOD_DEPS[@]}" || {
-        print -P "%F{160}エラー: ビルド依存パッケージのインストールに失敗しました。%f" >&2
+        msg_error "ビルド依存パッケージのインストールに失敗しました。"
         return 1
     }
 
@@ -142,20 +141,20 @@ _py_setup_linux() {
     if [[ -d "$PY_MOD_PYENV_ROOT" ]]; then
         # 不完全なクローンの検出（前回の git clone が途中で失敗した場合）
         if [[ ! -x "$PY_MOD_PYENV_ROOT/bin/pyenv" && ! -x "$PY_MOD_PYENV_ROOT/libexec/pyenv" ]]; then
-            print -P "%F{220}警告: $PY_MOD_PYENV_ROOT は存在しますが不完全です。再インストールします。%f"
+            msg_warn "$PY_MOD_PYENV_ROOT は存在しますが不完全です。再インストールします。"
             run_cmd command rm -rf "$PY_MOD_PYENV_ROOT" || {
-                print -P "%F{160}エラー: 不完全な pyenv ディレクトリの削除に失敗しました。%f" >&2
-                print -P "  手動で削除してください: rm -rf $PY_MOD_PYENV_ROOT" >&2
+                msg_error "不完全な pyenv ディレクトリの削除に失敗しました。"
+                msg_step "手動で削除してください: rm -rf $PY_MOD_PYENV_ROOT" >&2
                 return 1
             }
         else
-            print -P "情報: $PY_MOD_PYENV_ROOT は既に存在します。スキップします。"
+            msg_info "$PY_MOD_PYENV_ROOT は既に存在します。スキップします。"
         fi
     fi
     if [[ ! -d "$PY_MOD_PYENV_ROOT" ]]; then
-        print -P "pyenv を git clone でインストールします..."
+        msg_info "pyenv を git clone でインストールします..."
         run_cmd git clone --depth 1 "$PY_MOD_PYENV_REPO" "$PY_MOD_PYENV_ROOT" || {
-            print -P "%F{160}エラー: pyenv の git clone に失敗しました。%f" >&2
+            msg_error "pyenv の git clone に失敗しました。"
             return 1
         }
     fi
@@ -163,23 +162,20 @@ _py_setup_linux() {
     # pyenv-virtualenv のインストール
     local virtualenv_dir="$PY_MOD_PYENV_ROOT/plugins/pyenv-virtualenv"
     if [[ -d "$virtualenv_dir" ]]; then
-        print -P "情報: pyenv-virtualenv は既にインストールされています。スキップします。"
+        msg_info "pyenv-virtualenv は既にインストールされています。スキップします。"
     else
-        print -P "pyenv-virtualenv を git clone でインストールします..."
+        msg_info "pyenv-virtualenv を git clone でインストールします..."
         run_cmd git clone --depth 1 "$PY_MOD_VIRTUALENV_REPO" "$virtualenv_dir" || {
-            print -P "%F{220}警告: pyenv-virtualenv のインストールに失敗しました。pyenv 本体は利用可能です。%f"
+            msg_warn "pyenv-virtualenv のインストールに失敗しました。pyenv 本体は利用可能です。"
         }
     fi
 }
 
 # --- 設定ファイル配置ヘルパー ---
 _py_install_config() {
-    print -P "設定ファイルを配置します..."
+    msg_info "設定ファイルを配置します..."
     for entry in "${PY_MOD_MANAGED_FILES[@]}"; do
-        local src="${entry[(ws:|:)1]}"
-        local dst="${entry[(ws:|:)2]}"
-        local label="${entry[(ws:|:)3]}"
-        local hint="${entry[(ws:|:)4]}"
+        IFS='|' read -r src dst label hint <<< "$entry"
         install_config "$src" "$dst" "$label" "$hint"
     done
 }
@@ -189,42 +185,41 @@ uninstall_python() {
     local restored=0
 
     for entry in "${PY_MOD_MANAGED_FILES[@]}"; do
-        local dst="${entry[(ws:|:)2]}"
-        local label="${entry[(ws:|:)3]}"
+        IFS='|' read -r _src dst label _hint <<< "$entry"
 
-        local -a latest_backup
-        latest_backup=( "${dst}.backup."*(N^/Om[1]) )
+        local newest
+        newest=$(find_newest_backup "${dst}.backup."'*') || true
 
-        if (( ${#latest_backup[@]} > 0 )); then
-            print -P "復元: ${label} をバックアップ (${latest_backup[1]:t}) から戻します。"
-            run_cmd command mv "${latest_backup[1]}" "$dst" || {
-                print -P "%F{160}エラー: ${label} の復元に失敗しました。%f" >&2
+        if [[ -n "$newest" ]]; then
+            printf '%s\n' "復元: ${label} をバックアップ ($(basename "$newest")) から戻します。"
+            run_cmd command mv "$newest" "$dst" || {
+                msg_error "${label} の復元に失敗しました。"
                 return 1
             }
             restored=1
         elif [[ -f "$dst" || -h "$dst" ]]; then
-            print -P "削除: ${label} を削除します。"
+            printf '%s\n' "削除: ${label} を削除します。"
             run_cmd command rm -f "$dst" || {
-                print -P "%F{160}エラー: ${label} の削除に失敗しました。%f" >&2
+                msg_error "${label} の削除に失敗しました。"
                 return 1
             }
             restored=1
         else
-            print -P "情報: ${label} は配置されていません。スキップします。"
+            msg_info "${label} は配置されていません。スキップします。"
         fi
     done
 
     if (( restored )); then
-        print -P "%F{34}Python 開発環境の設定を削除しました。%f"
+        msg_success "Python 開発環境の設定を削除しました。"
     else
-        print -P "情報: Python 開発環境の復元・削除対象はありませんでした。"
+        msg_info "Python 開発環境の復元・削除対象はありませんでした。"
     fi
 
-    print -P ""
-    print -P "NOTE: pyenv 本体は削除されていません。不要な場合は以下を手動で削除してください:"
-    print -P "  rm -rf ${PY_MOD_PYENV_ROOT}"
+    printf '\n'
+    printf '%s\n' "NOTE: pyenv 本体は削除されていません。不要な場合は以下を手動で削除してください:"
+    msg_step "rm -rf ${PY_MOD_PYENV_ROOT}"
     if command -v brew >/dev/null 2>&1; then
-        print -P "  # macOS の場合:"
-        print -P "  brew uninstall pyenv pyenv-virtualenv"
+        msg_step "# macOS の場合:"
+        msg_step "brew uninstall pyenv pyenv-virtualenv"
     fi
 }
