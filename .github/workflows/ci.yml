@@ -69,7 +69,7 @@ jobs:
       - name: Check shell format
         run: |
           status=0
-          # .zsh/*.zsh and modules/*.sh をチェック（Zsh特有構文を含む .zshrc と setup.sh は除外）
+          # Check .zsh/*.zsh only (shfmt does not support Zsh-specific syntax in modules/*.sh)
           while IFS= read -r -d '' f; do
             echo "::group::$f"
             if shfmt -d "$f"; then
@@ -79,7 +79,7 @@ jobs:
               status=1
             fi
             echo "::endgroup::"
-          done < <(find dotfiles/.zsh dotfiles/modules -type f \( -name '*.zsh' -o -name '*.sh' \) ! -name '.p10k.zsh' -print0)
+          done < <(find dotfiles/.zsh -type f -name '*.zsh' ! -name '.p10k.zsh' -print0)
           exit $status
 
   bats-test:
@@ -90,7 +90,7 @@ jobs:
       - name: Install BATS
         run: |
           sudo apt-get update -qq
-          sudo apt-get install -y bats
+          sudo apt-get install -y bats zsh
 
       - name: Run BATS tests
         run: bats dotfiles/tests/*.bats
