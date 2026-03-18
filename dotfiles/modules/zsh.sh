@@ -21,7 +21,7 @@ ZSH_MOD_ZINIT_VERSION="v3.14.0"
 # NOTE: 配列の各要素は "src|dst|label|hint" の形式
 ZSH_MOD_MANAGED_FILES=(
     "$SCRIPT_DIR/.zshrc|$ZSH_MOD_BASE_DIR/.zshrc|.zshrc|"
-    "$SCRIPT_DIR/.bashrc|$ZSH_MOD_BASE_DIR/.bashrc|.bashrc|"
+    "$SCRIPT_DIR/.bashrc|$HOME/.bashrc|.bashrc|"
     "$SCRIPT_DIR/.zsh/.p10k.zsh|$ZSH_MOD_CONFIG_DIR/.p10k.zsh|.p10k.zsh|Powerlevel10k のデフォルト設定が使用されます。"
     "$SCRIPT_DIR/.zsh/plugins.zsh|$ZSH_MOD_CONFIG_DIR/plugins.zsh|plugins.zsh|プラグインは手動で設定してください。"
     "$SCRIPT_DIR/.shell/aliases.sh|$HOME/.shell/aliases.sh|aliases.sh|エイリアスは手動で設定してください。"

@@ -269,6 +269,7 @@ _node_install_lts() {
 # --- 設定ファイル配置ヘルパー ---
 _node_install_config() {
     msg_info "設定ファイルを配置します..."
+    run_cmd mkdir -p "$HOME/.shell"
     for entry in "${NODE_MOD_MANAGED_FILES[@]}"; do
         IFS='|' read -r src dst label hint <<< "$entry"
         install_config "$src" "$dst" "$label" "$hint"

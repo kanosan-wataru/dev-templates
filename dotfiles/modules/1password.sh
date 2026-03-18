@@ -428,6 +428,7 @@ setup_1password() {
     # --- 2. 設定ファイルの配置 ---
     printf '\n'
     msg_info "設定ファイルを配置します..."
+    run_cmd mkdir -p "$HOME/.shell"
     for entry in "${OP_MOD_MANAGED_FILES[@]}"; do
         IFS='|' read -r src dst label hint <<< "$entry"
         install_config "$src" "$dst" "$label" "$hint"

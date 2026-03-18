@@ -174,6 +174,7 @@ _py_setup_linux() {
 # --- 設定ファイル配置ヘルパー ---
 _py_install_config() {
     msg_info "設定ファイルを配置します..."
+    run_cmd mkdir -p "$HOME/.shell"
     for entry in "${PY_MOD_MANAGED_FILES[@]}"; do
         IFS='|' read -r src dst label hint <<< "$entry"
         install_config "$src" "$dst" "$label" "$hint"
