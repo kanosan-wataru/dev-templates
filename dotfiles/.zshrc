@@ -27,7 +27,16 @@ setopt HIST_IGNORE_SPACE
 # ----------------------------
 # モジュールの読み込み
 # ----------------------------
-# 設定ファイルの基準ディレクトリ
+
+# Source shared configs (bash/zsh compatible)
+SHELL_CONFIG_DIR="${HOME}/.shell"
+if [[ -d "$SHELL_CONFIG_DIR" ]]; then
+    for config_file in "$SHELL_CONFIG_DIR"/*.sh(N); do
+        source "$config_file"
+    done
+fi
+
+# Source zsh-specific configs
 ZSH_CONFIG_DIR="${ZDOTDIR:-$HOME}/.zsh"
 
 # プラグイン設定（Zinit + 各プラグインの読み込み）
@@ -42,8 +51,7 @@ else
     autoload -Uz compinit && compinit
 fi
 
-# モジュール設定の自動読み込み
-# plugins.zsh は上で読み込み済み、.p10k.zsh は Zinit 経由で読み込み
+# zsh-only module configs (plugins.zsh loaded above, .p10k.zsh loaded via Zinit)
 for _zsh_config_file in "$ZSH_CONFIG_DIR"/*.zsh(N); do
     case "${_zsh_config_file:t}" in
         plugins.zsh|.p10k.zsh) continue ;;

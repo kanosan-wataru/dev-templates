@@ -1,8 +1,8 @@
 # ----------------------------
-# .env ファイルの読み込み
+# .env file loading
 # ----------------------------
-# ~/.claude/.env から環境変数を読み込む（MCP サーバー設定等で使用）
-# 無効化: export DISABLE_DOTENV=1 を .zshenv 等で設定
+# Load environment variables from ~/.claude/.env (used for MCP server config, etc.)
+# Disable: set export DISABLE_DOTENV=1 in .zshenv/.bashrc etc.
 # ----------------------------
 if [[ "${DISABLE_DOTENV:-0}" != "1" ]]; then
     if [[ -f "$HOME/.claude/.env" ]]; then

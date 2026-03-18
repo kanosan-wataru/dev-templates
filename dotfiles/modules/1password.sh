@@ -17,7 +17,7 @@ OP_MOD_TOKEN_FILE="${OP_MOD_TOKEN_DIR}/.env"
 
 # 管理対象ファイル（配布元パス, 配置先パス, 表示名, 未検出時メッセージ）
 OP_MOD_MANAGED_FILES=(
-    "$SCRIPT_DIR/.zsh/1password.zsh|$HOME/.zsh/1password.zsh|1password.zsh|"
+    "$SCRIPT_DIR/.shell/1password.sh|$HOME/.shell/1password.sh|1password.sh|"
 )
 
 # --- ヘルパー: 環境判定 ---
@@ -428,6 +428,7 @@ setup_1password() {
     # --- 2. 設定ファイルの配置 ---
     printf '\n'
     msg_info "設定ファイルを配置します..."
+    run_cmd mkdir -p "$HOME/.shell"
     for entry in "${OP_MOD_MANAGED_FILES[@]}"; do
         IFS='|' read -r src dst label hint <<< "$entry"
         install_config "$src" "$dst" "$label" "$hint"

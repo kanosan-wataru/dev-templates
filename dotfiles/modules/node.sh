@@ -19,7 +19,7 @@ NODE_MOD_FNM_REPO="https://github.com/Schniz/fnm/releases/download/${NODE_MOD_FN
 
 # 管理対象ファイル（配布元パス, 配置先パス, 表示名, 未検出時メッセージ）
 NODE_MOD_MANAGED_FILES=(
-    "$SCRIPT_DIR/.zsh/node.zsh|${ZDOTDIR:-$HOME}/.zsh/node.zsh|node.zsh|"
+    "$SCRIPT_DIR/.shell/node.sh|${HOME}/.shell/node.sh|node.sh|"
 )
 
 # --- ヘルパー: OS 判定 ---
@@ -269,6 +269,7 @@ _node_install_lts() {
 # --- 設定ファイル配置ヘルパー ---
 _node_install_config() {
     msg_info "設定ファイルを配置します..."
+    run_cmd mkdir -p "$HOME/.shell"
     for entry in "${NODE_MOD_MANAGED_FILES[@]}"; do
         IFS='|' read -r src dst label hint <<< "$entry"
         install_config "$src" "$dst" "$label" "$hint"
