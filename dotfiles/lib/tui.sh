@@ -112,6 +112,11 @@ _cb_draw() {
 #   0 = confirmed (Enter)
 #   1 = cancelled (q)
 checkbox_menu() {
+    if [[ $# -lt 2 ]]; then
+        msg_error "checkbox_menu: 引数が不足しています (プロンプト + 1つ以上の項目が必要)"
+        return 1
+    fi
+
     _CB_PROMPT="$1"
     shift
 
@@ -155,7 +160,7 @@ checkbox_menu() {
     local key
     while true; do
         # Read single character (silent, raw)
-        IFS= read -rsn1 key
+        IFS= read -rsn1 key || { _cb_cleanup; return 1; }
 
         case "$key" in
             $'\e')

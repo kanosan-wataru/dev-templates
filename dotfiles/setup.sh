@@ -88,7 +88,7 @@ BACKUP_SUFFIX=".backup.$(command date +%Y%m%d%H%M%S)"
 # When DRY_RUN=1, print the command instead of executing it
 run_cmd() {
     if (( DRY_RUN )); then
-        msg_dry_run "$*"
+        msg_dry_run "$(printf '%q ' "$@")"
     else
         "$@"
     fi
