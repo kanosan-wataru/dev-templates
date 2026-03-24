@@ -190,19 +190,19 @@ checkbox_menu() {
             ;;
         ' ') # Space: toggle selection
             if ((_CB_SELECTED[_CB_CURSOR])); then
-                _CB_SELECTED[$_CB_CURSOR]=0
+                _CB_SELECTED[_CB_CURSOR]=0
             else
-                _CB_SELECTED[$_CB_CURSOR]=1
+                _CB_SELECTED[_CB_CURSOR]=1
             fi
             ;;
         a) # Select all
             for ((i = 0; i < _CB_COUNT; i++)); do
-                _CB_SELECTED[$i]=1
+                _CB_SELECTED[i]=1
             done
             ;;
         n) # Deselect all
             for ((i = 0; i < _CB_COUNT; i++)); do
-                _CB_SELECTED[$i]=0
+                _CB_SELECTED[i]=0
             done
             ;;
         q)                   # Cancel
