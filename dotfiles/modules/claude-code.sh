@@ -97,7 +97,7 @@ _claude_mod_merge_mcp_servers() {
 
     # ターゲットファイルが存在しない場合: テンプレートの内容でそのまま作成
     if [[ ! -f "$target" ]]; then
-        if (( DRY_RUN )); then
+        if ((DRY_RUN)); then
             msg_info "${target} を新規作成予定です（dry-run）。"
         else
             # NOTE: jq でフォーマットしてから書き出す（一時ファイル経由でアトミックに書き込む）
@@ -106,7 +106,7 @@ _claude_mod_merge_mcp_servers() {
                 msg_error "一時ファイルの作成に失敗しました。"
                 return 1
             }
-            jq '.' "$template" > "$tmpfile" || {
+            jq '.' "$template" >"$tmpfile" || {
                 command rm -f "$tmpfile"
                 msg_error "${target} の作成に失敗しました。"
                 return 1
@@ -158,7 +158,7 @@ _claude_mod_merge_mcp_servers() {
         msg_error "${target} のバックアップに失敗しました。"
         return 1
     }
-    if (( DRY_RUN )); then
+    if ((DRY_RUN)); then
         msg_info "${target} を ${target}${BACKUP_SUFFIX} にバックアップ予定です（dry-run）。"
         msg_info "MCP サーバー設定をマージ予定です（dry-run）。"
         return 0
@@ -182,7 +182,7 @@ _claude_mod_merge_mcp_servers() {
         msg_error "一時ファイルの作成に失敗しました。"
         return 1
     }
-    printf '%s\n' "$merged" > "$tmpfile" || {
+    printf '%s\n' "$merged" >"$tmpfile" || {
         command rm -f "$tmpfile"
         msg_error "${target} への書き込みに失敗しました。"
         printf '%s\n' "  バックアップから復元するには: mv '${target}${BACKUP_SUFFIX}' '${target}'" >&2
@@ -242,7 +242,7 @@ _claude_mod_remove_mcp_servers() {
     while IFS= read -r name; do
         server_names+=("$name")
     done < <(jq -r '.mcpServers | keys[]' "$template" 2>/dev/null)
-    if (( ${#server_names[@]} == 0 )); then
+    if ((${#server_names[@]} == 0)); then
         msg_info "削除対象の MCP サーバーがありません。スキップします。"
         return 0
     fi
@@ -258,7 +258,7 @@ _claude_mod_remove_mcp_servers() {
         fi
     done
 
-    if (( ! has_any )); then
+    if ((!has_any)); then
         msg_info "削除対象の MCP サーバーは存在しません。スキップします。"
         return 0
     fi
@@ -268,7 +268,7 @@ _claude_mod_remove_mcp_servers() {
         msg_error "${target} のバックアップに失敗しました。"
         return 1
     }
-    if (( DRY_RUN )); then
+    if ((DRY_RUN)); then
         msg_info "${target} を ${target}${BACKUP_SUFFIX} にバックアップ予定です（dry-run）。"
         msg_info "MCP サーバー設定を削除予定です（dry-run）: ${server_names[*]}"
         return 0
@@ -295,7 +295,7 @@ _claude_mod_remove_mcp_servers() {
         msg_error "一時ファイルの作成に失敗しました。"
         return 1
     }
-    printf '%s\n' "$result" > "$tmpfile" || {
+    printf '%s\n' "$result" >"$tmpfile" || {
         command rm -f "$tmpfile"
         msg_error "${target} への書き込みに失敗しました。"
         printf '%s\n' "  バックアップから復元するには: mv '${target}${BACKUP_SUFFIX}' '${target}'" >&2
@@ -357,7 +357,7 @@ setup_claude_code() {
             return 1
         }
 
-        if (( DRY_RUN )); then
+        if ((DRY_RUN)); then
             msg_info "Claude Code をインストール予定です（dry-run）。"
         else
             msg_success "Claude Code のインストールが完了しました。"
@@ -381,7 +381,7 @@ setup_claude_code() {
                 msg_error "${dir} の作成に失敗しました。"
                 return 1
             }
-            if (( DRY_RUN )); then
+            if ((DRY_RUN)); then
                 msg_info "${dir} を作成予定です（dry-run）。"
             else
                 msg_info "${dir} を作成しました。"
@@ -391,7 +391,7 @@ setup_claude_code() {
 
     # 設定ファイルの配置
     for entry in "${CLAUDE_MOD_MANAGED_FILES[@]}"; do
-        IFS='|' read -r src dst label hint <<< "$entry"
+        IFS='|' read -r src dst label hint <<<"$entry"
         install_config "$src" "$dst" "$label" "$hint"
     done
 
@@ -414,7 +414,7 @@ uninstall_claude_code() {
     # 設定ファイルの復元・削除
     # =========================================
     for entry in "${CLAUDE_MOD_MANAGED_FILES[@]}"; do
-        IFS='|' read -r _src dst label _hint <<< "$entry"
+        IFS='|' read -r _src dst label _hint <<<"$entry"
 
         # find_newest_backup で最新のバックアップを検索
         local newest
@@ -427,14 +427,14 @@ uninstall_claude_code() {
                 return 1
             }
             restored=1
-        elif [[ -f "$dst" || -h "$dst" ]]; then
+        elif [[ -f "$dst" || -L "$dst" ]]; then
             msg_warn "${label} のバックアップが見つかりません。手動で確認してください: ${dst}"
         else
             msg_info "${label} は配置されていません。スキップします。"
         fi
     done
 
-    if (( restored )); then
+    if ((restored)); then
         msg_success "Claude Code 設定ファイルのアンインストールが完了しました。"
     else
         msg_info "Claude Code 設定ファイルの復元・削除対象はありませんでした。"

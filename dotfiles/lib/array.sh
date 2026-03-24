@@ -26,6 +26,7 @@ array_sort() {
 # Sort array descending
 # Usage: array_sort_desc sorted_var "${array[@]}"
 array_sort_desc() {
+    # shellcheck disable=SC2178
     local -n _result="$1"
     shift
     readarray -t _result < <(printf '%s\n' "$@" | sort -r)
@@ -34,9 +35,10 @@ array_sort_desc() {
 # Split string by delimiter into array
 # Usage: string_split result_var "delimiter" "string"
 string_split() {
+    # shellcheck disable=SC2178
     local -n _result="$1"
     local delimiter="$2" string="$3"
     local old_ifs="$IFS"
-    IFS="$delimiter" read -ra _result <<< "$string"
+    IFS="$delimiter" read -ra _result <<<"$string"
     IFS="$old_ifs"
 }

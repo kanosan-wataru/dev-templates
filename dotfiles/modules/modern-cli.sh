@@ -25,9 +25,9 @@ MCLI_MOD_TOOLS=(
 # 戻り値: "macos" / "linux" / "unknown"
 _mcli_detect_os() {
     case "$OSTYPE" in
-        darwin*) printf '%s' "macos" ;;
-        linux*)  printf '%s' "linux" ;;
-        *)       printf '%s' "unknown" ;;
+    darwin*) printf '%s' "macos" ;;
+    linux*) printf '%s' "linux" ;;
+    *) printf '%s' "unknown" ;;
     esac
 }
 
@@ -54,7 +54,7 @@ _mcli_install_eza_apt() {
         return 1
     }
 
-    if (( ! DRY_RUN )); then
+    if ((!DRY_RUN)); then
         # GPG キーのダウンロードと変換を分離して個別にエラーチェック
         local tmp_key
         tmp_key=$(mktemp) || {
@@ -88,8 +88,8 @@ _mcli_install_eza_apt() {
 
         # apt ソースの追加
         # NOTE: 公式リポジトリが HTTPS 未提供のため http を使用（GPG 署名で検証済み）
-        printf '%s\n' "deb [signed-by=/etc/apt/keyrings/eza.gpg] http://deb.gierens.de stable main" \
-            | sudo tee /etc/apt/sources.list.d/eza.list >/dev/null || {
+        printf '%s\n' "deb [signed-by=/etc/apt/keyrings/eza.gpg] http://deb.gierens.de stable main" |
+            sudo tee /etc/apt/sources.list.d/eza.list >/dev/null || {
             msg_error "eza の apt ソース追加に失敗しました。"
             return 1
         }
@@ -125,29 +125,29 @@ setup_modern_cli() {
 
     # パッケージマネージャーの確認
     case "$os" in
-        macos)
-            if ! command -v brew >/dev/null 2>&1; then
-                msg_error "Homebrew がインストールされていません。"
-                msg_step "インストール: https://brew.sh/" >&2
-                return 1
-            fi
-            ;;
-        linux)
-            if ! command -v apt-get >/dev/null 2>&1; then
-                msg_error "apt-get が見つかりません。Debian/Ubuntu 系のみ対応しています。"
-                return 1
-            fi
-            ;;
-        *)
-            msg_error "未対応の OS です (OSTYPE=${OSTYPE})。"
+    macos)
+        if ! command -v brew >/dev/null 2>&1; then
+            msg_error "Homebrew がインストールされていません。"
+            msg_step "インストール: https://brew.sh/" >&2
             return 1
-            ;;
+        fi
+        ;;
+    linux)
+        if ! command -v apt-get >/dev/null 2>&1; then
+            msg_error "apt-get が見つかりません。Debian/Ubuntu 系のみ対応しています。"
+            return 1
+        fi
+        ;;
+    *)
+        msg_error "未対応の OS です (OSTYPE=${OSTYPE})。"
+        return 1
+        ;;
     esac
 
     declare -i installed=0 skipped=0 failed=0
 
     for tool_entry in "${MCLI_MOD_TOOLS[@]}"; do
-        IFS='|' read -r cmd_name brew_pkg apt_pkg desc <<< "$tool_entry"
+        IFS='|' read -r cmd_name brew_pkg apt_pkg desc <<<"$tool_entry"
 
         # Ubuntu の別名バイナリも確認（batcat, fdfind）
         local alt_cmd=""
@@ -157,55 +157,55 @@ setup_modern_cli() {
         # べき等性チェック
         if command -v "$cmd_name" >/dev/null 2>&1; then
             msg_info "${cmd_name} は既にインストールされています。スキップします。"
-            (( skipped++ ))
+            ((skipped++))
             continue
         fi
         if [[ -n "$alt_cmd" ]] && command -v "$alt_cmd" >/dev/null 2>&1; then
             msg_info "${alt_cmd} (${cmd_name}) は既にインストールされています。スキップします。"
-            (( skipped++ ))
+            ((skipped++))
             continue
         fi
 
         printf '%s\n' "${cmd_name} をインストールします... (${desc})"
 
         case "$os" in
-            macos)
-                run_cmd brew install "$brew_pkg" || {
-                    msg_error "${cmd_name} のインストールに失敗しました。"
-                    (( failed++ ))
+        macos)
+            run_cmd brew install "$brew_pkg" || {
+                msg_error "${cmd_name} のインストールに失敗しました。"
+                ((failed++))
+                continue
+            }
+            ;;
+        linux)
+            if [[ "$cmd_name" == "eza" ]]; then
+                # eza は公式 apt リポジトリの追加が必要
+                _mcli_install_eza_apt || {
+                    ((failed++))
                     continue
                 }
-                ;;
-            linux)
-                if [[ "$cmd_name" == "eza" ]]; then
-                    # eza は公式 apt リポジトリの追加が必要
-                    _mcli_install_eza_apt || {
-                        (( failed++ ))
-                        continue
-                    }
-                else
-                    run_cmd sudo apt-get install -y "$apt_pkg" || {
-                        msg_error "${cmd_name} (${apt_pkg}) のインストールに失敗しました。"
-                        (( failed++ ))
-                        continue
-                    }
-                fi
-                ;;
+            else
+                run_cmd sudo apt-get install -y "$apt_pkg" || {
+                    msg_error "${cmd_name} (${apt_pkg}) のインストールに失敗しました。"
+                    ((failed++))
+                    continue
+                }
+            fi
+            ;;
         esac
 
-        (( installed++ ))
+        ((installed++))
     done
 
     # サマリー表示
     printf '\n'
-    if (( failed > 0 )); then
+    if ((failed > 0)); then
         msg_warn "モダン CLI ツール: ${installed} 件インストール, ${skipped} 件スキップ, ${failed} 件失敗"
         return 1
-    elif (( DRY_RUN )); then
+    elif ((DRY_RUN)); then
         msg_info "モダン CLI ツールをインストール予定です（dry-run）。"
     else
         msg_success "モダン CLI ツール: ${installed} 件インストール, ${skipped} 件スキップ"
-        if (( installed > 0 )); then
+        if ((installed > 0)); then
             printf '\n'
             printf '%s\n' "エイリアス設定は aliases.zsh に含まれています。"
             printf '%s\n' "シェルを再起動すると自動的に有効になります。"
@@ -223,17 +223,17 @@ uninstall_modern_cli() {
     os=$(_mcli_detect_os)
 
     case "$os" in
-        macos)
-            msg_step "brew uninstall eza bat fd ripgrep"
-            ;;
-        linux)
-            msg_step "sudo apt-get remove eza bat fd-find ripgrep"
-            msg_step "# eza の apt ソースも削除する場合:"
-            msg_step "sudo rm -f /etc/apt/sources.list.d/eza.list"
-            msg_step "sudo rm -f /etc/apt/keyrings/eza.gpg"
-            ;;
-        *)
-            msg_step "OS に応じたパッケージマネージャーで削除してください。"
-            ;;
+    macos)
+        msg_step "brew uninstall eza bat fd ripgrep"
+        ;;
+    linux)
+        msg_step "sudo apt-get remove eza bat fd-find ripgrep"
+        msg_step "# eza の apt ソースも削除する場合:"
+        msg_step "sudo rm -f /etc/apt/sources.list.d/eza.list"
+        msg_step "sudo rm -f /etc/apt/keyrings/eza.gpg"
+        ;;
+    *)
+        msg_step "OS に応じたパッケージマネージャーで削除してください。"
+        ;;
     esac
 }

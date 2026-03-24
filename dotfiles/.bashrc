@@ -9,6 +9,7 @@
 SHELL_CONFIG_DIR="${HOME}/.shell"
 if [[ -d "$SHELL_CONFIG_DIR" ]]; then
     for config_file in "$SHELL_CONFIG_DIR"/*.sh; do
+        # shellcheck disable=SC1090
         [[ -f "$config_file" ]] && source "$config_file"
     done
 fi

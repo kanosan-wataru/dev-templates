@@ -14,22 +14,22 @@ _setup_colors() {
         C_BOLD_OFF=$'\e[22m'
         C_DIM=$'\e[2m'
         # Match zsh %F{N} color numbers
-        C_RED=$'\e[38;5;160m'       # %F{160}
-        C_GREEN=$'\e[38;5;34m'      # %F{34}
-        C_YELLOW=$'\e[38;5;220m'    # %F{220}
-        C_CYAN=$'\e[38;5;36m'       # %F{36}
-        C_GRAY=$'\e[38;5;242m'      # %F{242}
+        C_RED=$'\e[38;5;160m'    # %F{160}
+        C_GREEN=$'\e[38;5;34m'   # %F{34}
+        C_YELLOW=$'\e[38;5;220m' # %F{220}
+        C_CYAN=$'\e[38;5;36m'    # %F{36}
+        C_GRAY=$'\e[38;5;242m'   # %F{242}
     fi
 }
 
 # Message helpers
-msg_error()   { printf '%s%sエラー: %s%s\n' "${C_RED}" "${C_BOLD}" "$1" "${C_RESET}" >&2; }
-msg_warn()    { printf '%s警告: %s%s\n' "${C_YELLOW}" "$1" "${C_RESET}"; }
-msg_info()    { printf '情報: %s\n' "$1"; }
+msg_error() { printf '%s%sエラー: %s%s\n' "${C_RED}" "${C_BOLD}" "$1" "${C_RESET}" >&2; }
+msg_warn() { printf '%s警告: %s%s\n' "${C_YELLOW}" "$1" "${C_RESET}"; }
+msg_info() { printf '情報: %s\n' "$1"; }
 msg_success() { printf '%s%s%s\n' "${C_GREEN}" "$1" "${C_RESET}"; }
-msg_header()  { printf '\n%s%s[%s]%s\n' "${C_CYAN}" "${C_BOLD}" "$1" "${C_RESET}"; }
+msg_header() { printf '\n%s%s[%s]%s\n' "${C_CYAN}" "${C_BOLD}" "$1" "${C_RESET}"; }
 msg_dry_run() { printf '%s  [DRY-RUN] %s%s\n' "${C_GRAY}" "$1" "${C_RESET}"; }
-msg_step()    { printf '  %s\n' "$1"; }
+msg_step() { printf '  %s\n' "$1"; }
 
 # Formatted output (for custom color needs)
 # Usage: color_print "$C_RED" "text"

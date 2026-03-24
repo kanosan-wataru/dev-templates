@@ -51,7 +51,7 @@ setup_zsh() {
             msg_error "Zinit の git clone に失敗しました。"
             return 1
         }
-        if (( DRY_RUN )); then
+        if ((DRY_RUN)); then
             msg_info "Zinit ${ZSH_MOD_ZINIT_VERSION} をインストール予定です（dry-run）。"
         else
             msg_success "Zinit ${ZSH_MOD_ZINIT_VERSION} のインストールに成功しました。"
@@ -68,7 +68,7 @@ setup_zsh() {
                 msg_error "$_zsh_mod_dir の作成に失敗しました。"
                 return 1
             }
-            if (( DRY_RUN )); then
+            if ((DRY_RUN)); then
                 msg_info "$_zsh_mod_dir を作成予定です（dry-run）。"
             else
                 msg_info "$_zsh_mod_dir を作成しました。"
@@ -81,7 +81,7 @@ setup_zsh() {
     # 設定ファイルの配置
     msg_info "設定ファイルを配置します..."
     for entry in "${ZSH_MOD_MANAGED_FILES[@]}"; do
-        IFS='|' read -r src dst label hint <<< "$entry"
+        IFS='|' read -r src dst label hint <<<"$entry"
         install_config "$src" "$dst" "$label" "$hint"
     done
 
@@ -93,7 +93,7 @@ uninstall_zsh() {
     local restored=0
 
     for entry in "${ZSH_MOD_MANAGED_FILES[@]}"; do
-        IFS='|' read -r _src dst label _hint <<< "$entry"
+        IFS='|' read -r _src dst label _hint <<<"$entry"
 
         # find_newest_backup で最新のバックアップを検索
         local newest
@@ -106,7 +106,7 @@ uninstall_zsh() {
                 return 1
             }
             restored=1
-        elif [[ -f "$dst" || -h "$dst" ]]; then
+        elif [[ -f "$dst" || -L "$dst" ]]; then
             printf '%s\n' "削除: ${label} を削除します（セットアップ前の状態に復元）。"
             run_cmd command rm -f "$dst" || {
                 msg_error "${label} の削除に失敗しました。"
@@ -118,7 +118,7 @@ uninstall_zsh() {
         fi
     done
 
-    if (( restored )); then
+    if ((restored)); then
         msg_success "Zsh 設定のアンインストールが完了しました。"
     else
         msg_info "Zsh 設定の復元・削除対象はありませんでした。"

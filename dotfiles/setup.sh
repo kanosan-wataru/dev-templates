@@ -30,7 +30,6 @@ source "${SCRIPT_DIR}/lib/backup.sh"
 source "${SCRIPT_DIR}/lib/tui.sh"
 _setup_colors
 
-
 # ==============================================
 # Argument parsing
 # ==============================================
@@ -42,43 +41,41 @@ declare -a SELECT_MODULES=()
 declare -A MODULE_DEPS_MAP=()
 declare -A MODULE_ID_SET=()
 
-while (( $# > 0 )); do
+while (($# > 0)); do
     case "$1" in
-        --dry-run)
-            DRY_RUN=1
-            ;;
-        --uninstall)
-            UNINSTALL=1
-            ;;
-        --all)
-            ALL_FLAG=1
-            ;;
-        --select)
-            if (( $# < 2 )); then
-                msg_error "--select にはモジュール名が必要です"
-                exit 1
-            fi
-            shift
-            SELECT_MODULES+=("$1")
-            ;;
-        --help|-h)
-            HELP_FLAG=1
-            ;;
-        *)
-            msg_error "不明なオプション: $1"
-            printf '  ヘルプ: bash %s --help\n' "$0" >&2
+    --dry-run)
+        DRY_RUN=1
+        ;;
+    --uninstall)
+        UNINSTALL=1
+        ;;
+    --all)
+        ALL_FLAG=1
+        ;;
+    --select)
+        if (($# < 2)); then
+            msg_error "--select にはモジュール名が必要です"
             exit 1
-            ;;
+        fi
+        shift
+        SELECT_MODULES+=("$1")
+        ;;
+    --help | -h)
+        HELP_FLAG=1
+        ;;
+    *)
+        msg_error "不明なオプション: $1"
+        printf '  ヘルプ: bash %s --help\n' "$0" >&2
+        exit 1
+        ;;
     esac
     shift
 done
-
 
 # ==============================================
 # Common variables
 # ==============================================
 BACKUP_SUFFIX=".backup.$(command date +%Y%m%d%H%M%S)"
-
 
 # ==============================================
 # Helper functions
@@ -87,7 +84,7 @@ BACKUP_SUFFIX=".backup.$(command date +%Y%m%d%H%M%S)"
 # Dry-run aware command wrapper
 # When DRY_RUN=1, print the command instead of executing it
 run_cmd() {
-    if (( DRY_RUN )); then
+    if ((DRY_RUN)); then
         msg_dry_run "$(printf '%q ' "$@")"
     else
         "$@"
@@ -111,18 +108,18 @@ install_config() {
     fi
 
     # Idempotency check: skip if not a symlink and content is identical
-    if [[ -f "$dst" && ! -h "$dst" ]] && cmp -s "$src" "$dst"; then
+    if [[ -f "$dst" && ! -L "$dst" ]] && cmp -s "$src" "$dst"; then
         msg_info "${label} は既に最新の状態です。スキップします。"
         return 0
     fi
 
     # Backup existing file or symlink
-    if [[ -f "$dst" || -h "$dst" ]]; then
+    if [[ -f "$dst" || -L "$dst" ]]; then
         run_cmd command mv "$dst" "${dst}${BACKUP_SUFFIX}" || {
             msg_error "${label} のバックアップに失敗しました。"
             exit 1
         }
-        if (( DRY_RUN )); then
+        if ((DRY_RUN)); then
             msg_info "既存の ${label} を ${dst}${BACKUP_SUFFIX} にバックアップします（予定）。"
         else
             msg_info "既存の ${label} を ${dst}${BACKUP_SUFFIX} にバックアップしました。"
@@ -138,7 +135,7 @@ install_config() {
         fi
         exit 1
     }
-    if (( DRY_RUN )); then
+    if ((DRY_RUN)); then
         msg_info "${label} を配置予定です（dry-run）。"
     else
         msg_info "${label} を配置しました。"
@@ -171,7 +168,7 @@ ensure_node() {
         return 1
     fi
 
-    if (( node_ver < min_version )); then
+    if ((node_ver < min_version)); then
         msg_error "Node.js v${min_version} 以上が必要です（現在: v${node_ver}）"
         printf '  Node.js をアップグレードしてください。\n' >&2
         return 1
@@ -185,7 +182,6 @@ ensure_node() {
 
     return 0
 }
-
 
 # ==============================================
 # Dynamic module loading
@@ -247,7 +243,7 @@ load_modules() {
         _unsorted+=("$(printf '%03d' "$MODULE_ORDER")|${MODULE_ID}|${MODULE_NAME}|${MODULE_DESC}|${MODULE_DEFAULT}")
     done
 
-    if (( ${#_unsorted[@]} == 0 )); then
+    if ((${#_unsorted[@]} == 0)); then
         msg_error "有効なモジュールが見つかりません。"
         exit 1
     fi
@@ -265,11 +261,10 @@ load_modules() {
 # Load modules
 load_modules
 
-
 # ==============================================
 # Help display (dynamically generated after module loading)
 # ==============================================
-if (( HELP_FLAG )); then
+if ((HELP_FLAG)); then
     printf '使用法: bash %s [オプション]\n' "$0"
     printf '\n'
     printf 'オプション:\n'
@@ -281,7 +276,7 @@ if (( HELP_FLAG )); then
     printf '\n'
     printf 'モジュール:\n'
     for entry in "${MODULES[@]}"; do
-        IFS='|' read -r mod_id mod_name mod_desc _mod_default <<< "$entry"
+        IFS='|' read -r mod_id mod_name mod_desc _mod_default <<<"$entry"
         printf '  %-14s %s (%s)\n' "$mod_id" "$mod_name" "$mod_desc"
     done
     printf '\n'
@@ -293,30 +288,28 @@ if (( HELP_FLAG )); then
     exit 0
 fi
 
-
 # ==============================================
 # --select validation (verified after module loading)
 # ==============================================
 for mod_id in "${SELECT_MODULES[@]}"; do
     local_found=0
     for entry in "${MODULES[@]}"; do
-        IFS='|' read -r entry_id _rest <<< "$entry"
+        IFS='|' read -r entry_id _rest <<<"$entry"
         if [[ "$entry_id" == "$mod_id" ]]; then
             local_found=1
             break
         fi
     done
-    if (( ! local_found )); then
+    if ((!local_found)); then
         msg_error "不明なモジュール: ${mod_id}"
         printf '利用可能なモジュール:\n' >&2
         for entry in "${MODULES[@]}"; do
-            IFS='|' read -r entry_id _rest <<< "$entry"
+            IFS='|' read -r entry_id _rest <<<"$entry"
             printf '  %s\n' "$entry_id" >&2
         done
         exit 1
     fi
 done
-
 
 # ==============================================
 # Module execution dispatch
@@ -347,7 +340,6 @@ run_module_uninstall() {
     fi
 }
 
-
 # Resolve module dependencies and auto-add missing dependency modules
 # Modifies: selected_module_ids (adds missing dependencies)
 resolve_module_deps() {
@@ -355,14 +347,14 @@ resolve_module_deps() {
     local changed=1
 
     # Iterate until no more transitive dependencies are found
-    while (( changed )); do
+    while ((changed)); do
         changed=0
         for mod_id in "${selected_module_ids[@]}"; do
             local deps="${MODULE_DEPS_MAP[$mod_id]:-}"
             [[ -z "$deps" ]] && continue
 
             # MODULE_DEPS is a space-separated list
-            read -ra _deps <<< "$deps"
+            read -ra _deps <<<"$deps"
             local dep
             for dep in "${_deps[@]}"; do
                 # Check if dep is already selected
@@ -381,7 +373,7 @@ resolve_module_deps() {
     done
 
     # Notify user of auto-added dependencies
-    if (( ${#added_deps[@]} > 0 )); then
+    if ((${#added_deps[@]} > 0)); then
         printf '\n'
         color_print "$C_CYAN" "依存関係の自動解決:"
         for dep in "${added_deps[@]}"; do
@@ -391,7 +383,7 @@ resolve_module_deps() {
     fi
 
     # Re-sort by MODULE_ORDER so dependencies are installed first
-    if (( ${#added_deps[@]} > 0 )); then
+    if ((${#added_deps[@]} > 0)); then
         local -a sorted_ids=()
         local entry entry_id
         for entry in "${MODULES[@]}"; do
@@ -404,16 +396,15 @@ resolve_module_deps() {
     fi
 }
 
-
 # ==============================================
 # Uninstall mode
 # NOTE: --uninstall always targets all modules
 # ==============================================
-if (( UNINSTALL )); then
+if ((UNINSTALL)); then
     printf '%s\n' "全モジュールのアンインストール（復元）を開始します..."
     printf '%s\n' "============================================="
 
-    if (( DRY_RUN )); then
+    if ((DRY_RUN)); then
         color_print "${C_CYAN}" "[DRY-RUN モード] 実際には変更を行いません。"
         print_separator
     fi
@@ -423,18 +414,18 @@ if (( UNINSTALL )); then
     # NOTE: Uninstall in reverse MODULE_ORDER (descending) order
     readarray -t _reversed < <(printf '%s\n' "${MODULES[@]}" | tac)
     for entry in "${_reversed[@]}"; do
-        IFS='|' read -r mod_id mod_name _rest <<< "$entry"
+        IFS='|' read -r mod_id mod_name _rest <<<"$entry"
         printf '\n'
         printf '%s%s[%s]%s\n' "${C_CYAN}" "${C_BOLD}" "$mod_name" "${C_RESET}"
         print_separator
         if ! run_module_uninstall "$mod_id"; then
-            (( uninstall_errors++ )) || true
+            ((uninstall_errors++)) || true
         fi
     done
 
     printf '\n'
     printf '%s\n' "============================================="
-    if (( uninstall_errors > 0 )); then
+    if ((uninstall_errors > 0)); then
         color_print "$C_YELLOW" "アンインストールが完了しましたが、${uninstall_errors} 件のモジュールでエラーが発生しました。"
         printf '%s\n' "============================================="
         exit 1
@@ -445,7 +436,6 @@ if (( UNINSTALL )); then
     fi
 fi
 
-
 # ==============================================
 # Normal setup mode
 # ==============================================
@@ -453,7 +443,7 @@ printf '\n'
 printf '%s%s 開発環境セットアップ%s\n' "${C_CYAN}" "${C_BOLD}" "${C_RESET}"
 printf '%s\n' "============================================="
 
-if (( DRY_RUN )); then
+if ((DRY_RUN)); then
     color_print "${C_CYAN}" "[DRY-RUN モード] 実際には変更を行いません。"
     print_separator
 fi
@@ -464,20 +454,20 @@ print_separator
 # --- Module selection ---
 declare -a selected_module_ids=()
 
-if (( ${#SELECT_MODULES[@]} > 0 )); then
+if ((${#SELECT_MODULES[@]} > 0)); then
     # Explicit --select: reorder to MODULE_ORDER
     for entry in "${MODULES[@]}"; do
-        IFS='|' read -r mod_id _rest <<< "$entry"
+        IFS='|' read -r mod_id _rest <<<"$entry"
         if array_contains "$mod_id" "${SELECT_MODULES[@]}"; then
             selected_module_ids+=("$mod_id")
         fi
     done
     resolve_module_deps
 
-elif (( ALL_FLAG )); then
+elif ((ALL_FLAG)); then
     # --all: select all modules
     for entry in "${MODULES[@]}"; do
-        IFS='|' read -r mod_id _rest <<< "$entry"
+        IFS='|' read -r mod_id _rest <<<"$entry"
         selected_module_ids+=("$mod_id")
     done
 
@@ -489,8 +479,8 @@ elif [[ -t 0 ]]; then
         # tput unavailable: install only default-selected modules
         msg_warn "tput が利用できないため、デフォルトのモジュールをインストールします。"
         for entry in "${MODULES[@]}"; do
-            IFS='|' read -r mod_id _mod_name _mod_desc mod_default <<< "$entry"
-            if (( mod_default == 1 )); then
+            IFS='|' read -r mod_id _mod_name _mod_desc mod_default <<<"$entry"
+            if ((mod_default == 1)); then
                 selected_module_ids+=("$mod_id")
             fi
         done
@@ -498,7 +488,7 @@ elif [[ -t 0 ]]; then
         # Build menu items for checkbox menu
         declare -a menu_items=()
         for entry in "${MODULES[@]}"; do
-            IFS='|' read -r _mod_id mod_name mod_desc mod_default <<< "$entry"
+            IFS='|' read -r _mod_id mod_name mod_desc mod_default <<<"$entry"
             menu_items+=("${mod_name}|${mod_desc}|${mod_default}")
         done
 
@@ -508,7 +498,7 @@ elif [[ -t 0 ]]; then
         menu_status="${menu_status:-0}"
         selection="$REPLY"
 
-        if (( menu_status != 0 )); then
+        if ((menu_status != 0)); then
             printf '\n'
             msg_warn "キャンセルされました。"
             exit 0
@@ -521,9 +511,9 @@ elif [[ -t 0 ]]; then
         fi
 
         # Convert 0-based selected indices to module IDs
-        read -ra _selected_indices <<< "$selection"
+        read -ra _selected_indices <<<"$selection"
         for idx in "${_selected_indices[@]}"; do
-            IFS='|' read -r mod_id _rest <<< "${MODULES[$idx]}"
+            IFS='|' read -r mod_id _rest <<<"${MODULES[$idx]}"
             selected_module_ids+=("$mod_id")
         done
     fi
@@ -534,7 +524,7 @@ else
     # Non-TTY environment (CI / pipe): equivalent to --all
     msg_info "非インタラクティブ環境を検出。全モジュールをインストールします。"
     for entry in "${MODULES[@]}"; do
-        IFS='|' read -r mod_id _rest <<< "$entry"
+        IFS='|' read -r mod_id _rest <<<"$entry"
         selected_module_ids+=("$mod_id")
     done
 fi
@@ -544,7 +534,7 @@ printf '\n'
 color_print "$C_CYAN" "選択されたモジュール:"
 for mod_id in "${selected_module_ids[@]}"; do
     for entry in "${MODULES[@]}"; do
-        IFS='|' read -r entry_id entry_name entry_desc _rest <<< "$entry"
+        IFS='|' read -r entry_id entry_name entry_desc _rest <<<"$entry"
         if [[ "$entry_id" == "$mod_id" ]]; then
             printf '  - %s (%s)\n' "$entry_name" "$entry_desc"
             break
@@ -557,16 +547,16 @@ print_separator
 declare -i setup_errors=0
 for mod_id in "${selected_module_ids[@]}"; do
     if ! run_module_setup "$mod_id"; then
-        (( setup_errors++ )) || true
+        ((setup_errors++)) || true
     fi
 done
 
 # --- Completion ---
 printf '\n'
 printf '%s\n' "============================================="
-if (( DRY_RUN )); then
+if ((DRY_RUN)); then
     color_print "${C_CYAN}" "[DRY-RUN] 上記が実行される変更内容です。実際に適用するには --dry-run を外して再実行してください。"
-elif (( setup_errors > 0 )); then
+elif ((setup_errors > 0)); then
     color_print "$C_YELLOW" "セットアップが完了しましたが、${setup_errors} 件のモジュールでエラーが発生しました。"
 else
     msg_success "セットアップが正常に完了しました。"
@@ -583,7 +573,7 @@ else
 fi
 printf '%s\n' "============================================="
 
-if (( setup_errors > 0 )); then
+if ((setup_errors > 0)); then
     exit 1
 fi
 exit 0
