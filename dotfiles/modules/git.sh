@@ -36,7 +36,7 @@ setup_git() {
     # 設定ファイルの配置
     msg_info "設定ファイルを配置します..."
     for entry in "${GIT_MOD_MANAGED_FILES[@]}"; do
-        IFS='|' read -r src dst label hint <<< "$entry"
+        IFS='|' read -r src dst label hint <<<"$entry"
         install_config "$src" "$dst" "$label" "$hint"
     done
 
@@ -46,7 +46,7 @@ setup_git() {
     # core.excludesFile でグローバル gitignore を紐付け
     _git_setup_excludes_file || return 1
 
-    if (( DRY_RUN )); then
+    if ((DRY_RUN)); then
         msg_info "Git グローバル設定をセットアップ予定です（dry-run）。"
     else
         msg_success "Git グローバル設定のセットアップが完了しました。"
@@ -66,7 +66,7 @@ _git_setup_include_path() {
         return 0
     fi
 
-    if (( DRY_RUN )); then
+    if ((DRY_RUN)); then
         msg_dry_run "git config --global --add include.path ${shared_path}"
     else
         git config --global --add include.path "$shared_path" || {
@@ -89,7 +89,7 @@ _git_setup_excludes_file() {
         return 0
     fi
 
-    if (( DRY_RUN )); then
+    if ((DRY_RUN)); then
         if [[ -n "$current_excludes" && "$current_excludes" != "$excludes_path" ]]; then
             msg_warn "core.excludesFile が ${current_excludes} から ${excludes_path} に変更されます。"
         fi
@@ -139,7 +139,7 @@ uninstall_git() {
         # include.path のリンク解除
         local shared_path="$GIT_MOD_BASE_DIR/.gitconfig.shared"
         if git config --global --get-all include.path 2>/dev/null | grep -qF "$shared_path"; then
-            if (( DRY_RUN )); then
+            if ((DRY_RUN)); then
                 msg_dry_run "git config --global --fixed-value --unset-all include.path ${shared_path}"
             else
                 if git config --global --fixed-value --unset-all include.path "$shared_path" 2>/dev/null; then
@@ -157,7 +157,7 @@ uninstall_git() {
         local current_excludes
         current_excludes=$(git config --global core.excludesFile 2>/dev/null || true)
         if [[ "$current_excludes" == "$excludes_path" ]]; then
-            if (( DRY_RUN )); then
+            if ((DRY_RUN)); then
                 msg_dry_run "git config --global --unset core.excludesFile"
             else
                 if git config --global --unset core.excludesFile 2>/dev/null; then
@@ -175,7 +175,7 @@ uninstall_git() {
 
     # 管理対象ファイルのバックアップ復元 / 削除
     for entry in "${GIT_MOD_MANAGED_FILES[@]}"; do
-        IFS='|' read -r _src dst label _hint <<< "$entry"
+        IFS='|' read -r _src dst label _hint <<<"$entry"
 
         local newest
         newest=$(find_newest_backup "${dst}.backup."'*') || true
@@ -187,7 +187,7 @@ uninstall_git() {
                 return 1
             }
             restored=1
-        elif [[ -f "$dst" || -h "$dst" ]]; then
+        elif [[ -f "$dst" || -L "$dst" ]]; then
             printf '%s\n' "削除: ${label} を削除します。"
             run_cmd command rm -f "$dst" || {
                 msg_error "${label} の削除に失敗しました。"
@@ -199,7 +199,7 @@ uninstall_git() {
         fi
     done
 
-    if (( restored )); then
+    if ((restored)); then
         msg_success "Git グローバル設定のアンインストールが完了しました。"
     else
         msg_info "Git グローバル設定の復元・削除対象はありませんでした。"

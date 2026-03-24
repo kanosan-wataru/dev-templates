@@ -65,7 +65,7 @@ setup_gemini_cli() {
             return 1
         }
 
-        if (( DRY_RUN )); then
+        if ((DRY_RUN)); then
             msg_info "Gemini CLI をインストール予定です（dry-run）。"
         else
             msg_success "Gemini CLI のインストールが完了しました。"
@@ -94,7 +94,7 @@ setup_gemini_cli() {
                 msg_error "${dir} の権限設定に失敗しました。"
                 return 1
             }
-            if (( DRY_RUN )); then
+            if ((DRY_RUN)); then
                 msg_info "${dir} を作成予定です（dry-run）。"
             else
                 msg_info "${dir} を作成しました。"
@@ -104,7 +104,7 @@ setup_gemini_cli() {
 
     # 設定ファイルの配置
     for entry in "${GEMINI_MOD_MANAGED_FILES[@]}"; do
-        IFS='|' read -r src dst label hint <<< "$entry"
+        IFS='|' read -r src dst label hint <<<"$entry"
         install_config "$src" "$dst" "$label" "$hint"
     done
 
@@ -119,7 +119,7 @@ uninstall_gemini_cli() {
     # 設定ファイルの復元
     # =========================================
     for entry in "${GEMINI_MOD_MANAGED_FILES[@]}"; do
-        IFS='|' read -r _src dst label _hint <<< "$entry"
+        IFS='|' read -r _src dst label _hint <<<"$entry"
 
         # find_newest_backup で最新のバックアップを検索
         local newest
@@ -132,14 +132,14 @@ uninstall_gemini_cli() {
                 return 1
             }
             restored=1
-        elif [[ -f "$dst" || -h "$dst" ]]; then
+        elif [[ -f "$dst" || -L "$dst" ]]; then
             msg_warn "${label} のバックアップが見つかりません。手動で確認してください: ${dst}"
         else
             msg_info "${label} は配置されていません。スキップします。"
         fi
     done
 
-    if (( restored )); then
+    if ((restored)); then
         msg_success "Gemini CLI 設定ファイルのアンインストールが完了しました。"
     else
         msg_info "Gemini CLI 設定ファイルの復元・削除対象はありませんでした。"

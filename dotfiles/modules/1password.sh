@@ -24,19 +24,19 @@ OP_MOD_MANAGED_FILES=(
 # 戻り値: "wsl" / "linux" / "macos" / "unknown"
 _1password_detect_env() {
     case "$OSTYPE" in
-        darwin*)
-            printf '%s' "macos"
-            ;;
-        linux*)
-            if [[ -f /proc/version ]] && grep -qi 'microsoft' /proc/version 2>/dev/null; then
-                printf '%s' "wsl"
-            else
-                printf '%s' "linux"
-            fi
-            ;;
-        *)
-            printf '%s' "unknown"
-            ;;
+    darwin*)
+        printf '%s' "macos"
+        ;;
+    linux*)
+        if [[ -f /proc/version ]] && grep -qi 'microsoft' /proc/version 2>/dev/null; then
+            printf '%s' "wsl"
+        else
+            printf '%s' "linux"
+        fi
+        ;;
+    *)
+        printf '%s' "unknown"
+        ;;
     esac
 }
 
@@ -58,7 +58,7 @@ _1password_install_op_apt() {
         return 1
     }
 
-    if (( ! DRY_RUN )); then
+    if ((!DRY_RUN)); then
         # GPG キーのダウンロードと変換を分離して個別にエラーチェック
         local tmp_key
         tmp_key=$(mktemp) || {
@@ -82,8 +82,8 @@ _1password_install_op_apt() {
         }
 
         # apt ソースの追加
-        printf '%s\n' "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/1password-archive-keyring.gpg] https://downloads.1password.com/linux/debian/$(dpkg --print-architecture) stable main" \
-            | sudo tee /etc/apt/sources.list.d/1password.list >/dev/null || {
+        printf '%s\n' "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/1password-archive-keyring.gpg] https://downloads.1password.com/linux/debian/$(dpkg --print-architecture) stable main" |
+            sudo tee /etc/apt/sources.list.d/1password.list >/dev/null || {
             msg_error "1Password の apt ソース追加に失敗しました。"
             rm -f "$tmp_key"
             return 1
@@ -94,7 +94,8 @@ _1password_install_op_apt() {
         if ! curl -sS -o "$tmp_key" https://downloads.1password.com/linux/debian/debsig/1password.pol; then
             msg_warn "debsig ポリシーのダウンロードに失敗しました（インストールは継続します）。"
         else
-            sudo tee /etc/debsig/policies/${OP_MOD_DEBSIG_KEY_ID}/1password.pol < "$tmp_key" >/dev/null || {
+            # shellcheck disable=SC2024
+            sudo tee /etc/debsig/policies/${OP_MOD_DEBSIG_KEY_ID}/1password.pol <"$tmp_key" >/dev/null || {
                 msg_warn "debsig ポリシーの設定に失敗しました（インストールは継続します）。"
             }
         fi
@@ -141,42 +142,42 @@ _1password_setup_ssh_agent() {
     printf '%s\n' "SSH エージェント設定:"
 
     case "$env" in
-        wsl)
-            msg_step "WSL 環境を検出しました。"
-            msg_step "Windows 側の 1Password デスクトップアプリで SSH エージェントを有効にしてください。"
-            msg_step "1password.zsh により ssh/ssh-add が Windows 側にリダイレクトされます。"
-            printf '\n'
-            msg_step "有効化:"
-            msg_step "  export ENABLE_SSH_1PASSWORD=1  # ~/.zshenv 等に追加"
-            ;;
-        linux)
-            local sock_path="$HOME/.1password/agent.sock"
-            msg_step "ネイティブ Linux 環境を検出しました。"
-            if [[ -S "$sock_path" ]]; then
-                msg_step "$(printf '%s%s%s' "${C_GREEN}" "SSH エージェントソケットが見つかりました。" "${C_RESET}")"
-            else
-                msg_step "$(printf '%s%s%s' "${C_YELLOW}" "SSH エージェントソケットが見つかりません。" "${C_RESET}")"
-                msg_step "1Password デスクトップアプリで SSH エージェントを有効にしてください。"
-                msg_step "  設定 → 開発者 → SSH エージェント → 有効にする"
-            fi
-            printf '\n'
-            msg_step "有効化:"
-            msg_step "  export ENABLE_SSH_1PASSWORD=1  # ~/.zshenv 等に追加"
-            ;;
-        macos)
-            local sock_path="$HOME/Library/Group Containers/2BUA8C4S2C.com.1password/t/agent.sock"
-            msg_step "macOS 環境を検出しました。"
-            if [[ -S "$sock_path" ]]; then
-                msg_step "$(printf '%s%s%s' "${C_GREEN}" "SSH エージェントソケットが見つかりました。" "${C_RESET}")"
-            else
-                msg_step "$(printf '%s%s%s' "${C_YELLOW}" "SSH エージェントソケットが見つかりません。" "${C_RESET}")"
-                msg_step "1Password デスクトップアプリで SSH エージェントを有効にしてください。"
-                msg_step "  設定 → 開発者 → SSH エージェント → 有効にする"
-            fi
-            printf '\n'
-            msg_step "有効化:"
-            msg_step "  export ENABLE_SSH_1PASSWORD=1  # ~/.zshenv 等に追加"
-            ;;
+    wsl)
+        msg_step "WSL 環境を検出しました。"
+        msg_step "Windows 側の 1Password デスクトップアプリで SSH エージェントを有効にしてください。"
+        msg_step "1password.zsh により ssh/ssh-add が Windows 側にリダイレクトされます。"
+        printf '\n'
+        msg_step "有効化:"
+        msg_step "  export ENABLE_SSH_1PASSWORD=1  # ~/.zshenv 等に追加"
+        ;;
+    linux)
+        local sock_path="$HOME/.1password/agent.sock"
+        msg_step "ネイティブ Linux 環境を検出しました。"
+        if [[ -S "$sock_path" ]]; then
+            msg_step "$(printf '%s%s%s' "${C_GREEN}" "SSH エージェントソケットが見つかりました。" "${C_RESET}")"
+        else
+            msg_step "$(printf '%s%s%s' "${C_YELLOW}" "SSH エージェントソケットが見つかりません。" "${C_RESET}")"
+            msg_step "1Password デスクトップアプリで SSH エージェントを有効にしてください。"
+            msg_step "  設定 → 開発者 → SSH エージェント → 有効にする"
+        fi
+        printf '\n'
+        msg_step "有効化:"
+        msg_step "  export ENABLE_SSH_1PASSWORD=1  # ~/.zshenv 等に追加"
+        ;;
+    macos)
+        local sock_path="$HOME/Library/Group Containers/2BUA8C4S2C.com.1password/t/agent.sock"
+        msg_step "macOS 環境を検出しました。"
+        if [[ -S "$sock_path" ]]; then
+            msg_step "$(printf '%s%s%s' "${C_GREEN}" "SSH エージェントソケットが見つかりました。" "${C_RESET}")"
+        else
+            msg_step "$(printf '%s%s%s' "${C_YELLOW}" "SSH エージェントソケットが見つかりません。" "${C_RESET}")"
+            msg_step "1Password デスクトップアプリで SSH エージェントを有効にしてください。"
+            msg_step "  設定 → 開発者 → SSH エージェント → 有効にする"
+        fi
+        printf '\n'
+        msg_step "有効化:"
+        msg_step "  export ENABLE_SSH_1PASSWORD=1  # ~/.zshenv 等に追加"
+        ;;
     esac
 }
 
@@ -212,28 +213,28 @@ _1password_setup_git_signing() {
     # op-ssh-sign のパスを環境に応じて決定
     local sign_program=""
     case "$env" in
-        wsl)
-            # WSL: Windows ユーザー名を自動検出して op-ssh-sign.exe のパスを決定
-            local win_user
-            win_user=$(cmd.exe /c "echo %USERNAME%" 2>/dev/null | tr -d '\r')
-            if [[ -z "$win_user" ]]; then
-                msg_step "$(printf '%s%s%s' "${C_YELLOW}" "警告: Windows ユーザー名を検出できませんでした。" "${C_RESET}")"
-                msg_step "手動で設定してください:"
-                msg_step "  git config --global gpg.ssh.program '/mnt/c/Users/<ユーザー名>/AppData/Local/1Password/app/8/op-ssh-sign.exe'"
-                return 0
-            fi
-            sign_program="/mnt/c/Users/${win_user}/AppData/Local/1Password/app/8/op-ssh-sign.exe"
-            ;;
-        linux)
-            sign_program="/opt/1Password/op-ssh-sign"
-            ;;
-        macos)
-            sign_program="/Applications/1Password.app/Contents/MacOS/op-ssh-sign"
-            ;;
+    wsl)
+        # WSL: Windows ユーザー名を自動検出して op-ssh-sign.exe のパスを決定
+        local win_user
+        win_user=$(cmd.exe /c "echo %USERNAME%" 2>/dev/null | tr -d '\r')
+        if [[ -z "$win_user" ]]; then
+            msg_step "$(printf '%s%s%s' "${C_YELLOW}" "警告: Windows ユーザー名を検出できませんでした。" "${C_RESET}")"
+            msg_step "手動で設定してください:"
+            msg_step "  git config --global gpg.ssh.program '/mnt/c/Users/<ユーザー名>/AppData/Local/1Password/app/8/op-ssh-sign.exe'"
+            return 0
+        fi
+        sign_program="/mnt/c/Users/${win_user}/AppData/Local/1Password/app/8/op-ssh-sign.exe"
+        ;;
+    linux)
+        sign_program="/opt/1Password/op-ssh-sign"
+        ;;
+    macos)
+        sign_program="/Applications/1Password.app/Contents/MacOS/op-ssh-sign"
+        ;;
     esac
 
     # gpg.format と commit.gpgsign を設定
-    if (( DRY_RUN )); then
+    if ((DRY_RUN)); then
         msg_dry_run "git config --global gpg.format ssh"
         msg_dry_run "git config --global gpg.ssh.program ${sign_program}"
         msg_dry_run "git config --global commit.gpgsign true"
@@ -296,7 +297,7 @@ _1password_setup_service_account_token() {
     printf '  トークンを入力してください: '
     local token
     read -r -s token
-    printf '\n'  # Newline after silent input
+    printf '\n' # Newline after silent input
 
     if [[ -z "$token" ]]; then
         msg_step "$(printf '%s%s%s' "${C_YELLOW}" "警告: トークンが空です。スキップします。" "${C_RESET}")"
@@ -310,13 +311,13 @@ _1password_setup_service_account_token() {
     fi
 
     # Warn if token seems too short
-    if (( ${#token} < 10 )); then
+    if ((${#token} < 10)); then
         msg_warn "トークンが短すぎます。正しい値か確認してください。"
     fi
 
     # Create directory with restricted permissions
     if [[ ! -d "$OP_MOD_TOKEN_DIR" ]]; then
-        if (( DRY_RUN )); then
+        if ((DRY_RUN)); then
             msg_dry_run "mkdir -p ${OP_MOD_TOKEN_DIR} && chmod 700 ${OP_MOD_TOKEN_DIR}"
         else
             mkdir -p "$OP_MOD_TOKEN_DIR" || {
@@ -331,7 +332,7 @@ _1password_setup_service_account_token() {
     fi
 
     # Write token file with restricted permissions
-    if (( DRY_RUN )); then
+    if ((DRY_RUN)); then
         msg_dry_run "トークンを ${OP_MOD_TOKEN_FILE} に保存 (chmod 600)"
     else
         # Write the token file atomically via a temp file
@@ -354,7 +355,7 @@ _1password_setup_service_account_token() {
             return 1
         }
 
-        printf "export OP_SERVICE_ACCOUNT_TOKEN='%s'\n" "$token" > "$tmp_file" || {
+        printf "export OP_SERVICE_ACCOUNT_TOKEN='%s'\n" "$token" >"$tmp_file" || {
             msg_error "トークンの書き込みに失敗しました。"
             rm -f "$tmp_file"
             umask "$old_umask"
@@ -383,13 +384,13 @@ setup_1password() {
     env=$(_1password_detect_env)
 
     case "$env" in
-        wsl)    msg_info "環境を検出しました — WSL" ;;
-        linux)  msg_info "環境を検出しました — ネイティブ Linux" ;;
-        macos)  msg_info "環境を検出しました — macOS" ;;
-        *)
-            msg_error "未対応の OS です (OSTYPE=${OSTYPE})。"
-            return 1
-            ;;
+    wsl) msg_info "環境を検出しました — WSL" ;;
+    linux) msg_info "環境を検出しました — ネイティブ Linux" ;;
+    macos) msg_info "環境を検出しました — macOS" ;;
+    *)
+        msg_error "未対応の OS です (OSTYPE=${OSTYPE})。"
+        return 1
+        ;;
     esac
 
     # --- 1. op CLI のインストール ---
@@ -398,24 +399,24 @@ setup_1password() {
     else
         msg_info "1Password CLI (op) をインストールします..."
         case "$env" in
-            wsl|linux)
-                if ! command -v apt-get >/dev/null 2>&1; then
-                    msg_error "apt-get が見つかりません。Debian/Ubuntu 系のみ対応しています。"
-                    return 1
-                fi
-                _1password_install_op_apt || return 1
-                ;;
-            macos)
-                if ! command -v brew >/dev/null 2>&1; then
-                    msg_error "Homebrew がインストールされていません。"
-                    msg_step "インストール: https://brew.sh/" >&2
-                    return 1
-                fi
-                _1password_install_op_brew || return 1
-                ;;
+        wsl | linux)
+            if ! command -v apt-get >/dev/null 2>&1; then
+                msg_error "apt-get が見つかりません。Debian/Ubuntu 系のみ対応しています。"
+                return 1
+            fi
+            _1password_install_op_apt || return 1
+            ;;
+        macos)
+            if ! command -v brew >/dev/null 2>&1; then
+                msg_error "Homebrew がインストールされていません。"
+                msg_step "インストール: https://brew.sh/" >&2
+                return 1
+            fi
+            _1password_install_op_brew || return 1
+            ;;
         esac
 
-        if (( ! DRY_RUN )); then
+        if ((!DRY_RUN)); then
             if command -v op >/dev/null 2>&1; then
                 msg_step "$(printf '%s%s%s' "${C_GREEN}" "op CLI のインストールが完了しました ($(op --version 2>/dev/null))。" "${C_RESET}")"
             else
@@ -430,7 +431,7 @@ setup_1password() {
     msg_info "設定ファイルを配置します..."
     run_cmd mkdir -p "$HOME/.shell"
     for entry in "${OP_MOD_MANAGED_FILES[@]}"; do
-        IFS='|' read -r src dst label hint <<< "$entry"
+        IFS='|' read -r src dst label hint <<<"$entry"
         install_config "$src" "$dst" "$label" "$hint"
     done
 
@@ -445,7 +446,7 @@ setup_1password() {
 
     # --- 完了メッセージ ---
     printf '\n'
-    if (( DRY_RUN )); then
+    if ((DRY_RUN)); then
         msg_info "1Password セットアップ予定です（dry-run）。"
     else
         msg_success "1Password のセットアップが完了しました。"
@@ -465,7 +466,7 @@ uninstall_1password() {
         local current_format
         current_format=$(git config --global gpg.format 2>/dev/null || true)
         if [[ "$current_format" == "ssh" ]]; then
-            if (( DRY_RUN )); then
+            if ((DRY_RUN)); then
                 msg_dry_run "git config --global --unset gpg.format"
                 msg_dry_run "git config --global --unset gpg.ssh.program"
                 msg_dry_run "git config --global --unset commit.gpgsign"
@@ -491,7 +492,7 @@ uninstall_1password() {
         local remove_token
         read -r remove_token
         if [[ "$remove_token" == [yY] ]]; then
-            if (( DRY_RUN )); then
+            if ((DRY_RUN)); then
                 msg_dry_run "rm -f ${OP_MOD_TOKEN_FILE}"
             else
                 # Use shred for secure deletion if available
@@ -516,7 +517,7 @@ uninstall_1password() {
 
     # 管理対象ファイルのバックアップ復元 / 削除
     for entry in "${OP_MOD_MANAGED_FILES[@]}"; do
-        IFS='|' read -r _src dst label _hint <<< "$entry"
+        IFS='|' read -r _src dst label _hint <<<"$entry"
 
         local newest
         newest=$(find_newest_backup "${dst}.backup."'*') || true
@@ -528,7 +529,7 @@ uninstall_1password() {
                 return 1
             }
             restored=1
-        elif [[ -f "$dst" || -h "$dst" ]]; then
+        elif [[ -f "$dst" || -L "$dst" ]]; then
             printf '%s\n' "削除: ${label} を削除します。"
             run_cmd command rm -f "$dst" || {
                 msg_error "${label} の削除に失敗しました。"
@@ -540,7 +541,7 @@ uninstall_1password() {
         fi
     done
 
-    if (( restored )); then
+    if ((restored)); then
         msg_success "1Password のアンインストールが完了しました。"
     else
         msg_info "1Password の復元・削除対象はありませんでした。"
@@ -552,16 +553,16 @@ uninstall_1password() {
     local env
     env=$(_1password_detect_env)
     case "$env" in
-        wsl|linux)
-            msg_step "sudo apt-get remove 1password-cli"
-            msg_step "sudo rm -f /etc/apt/sources.list.d/1password.list"
-            msg_step "sudo rm -f /etc/apt/keyrings/1password-archive-keyring.gpg"
-            ;;
-        macos)
-            msg_step "brew uninstall --cask 1password-cli"
-            ;;
-        *)
-            msg_step "OS に応じたパッケージマネージャーで削除してください。"
-            ;;
+    wsl | linux)
+        msg_step "sudo apt-get remove 1password-cli"
+        msg_step "sudo rm -f /etc/apt/sources.list.d/1password.list"
+        msg_step "sudo rm -f /etc/apt/keyrings/1password-archive-keyring.gpg"
+        ;;
+    macos)
+        msg_step "brew uninstall --cask 1password-cli"
+        ;;
+    *)
+        msg_step "OS に応じたパッケージマネージャーで削除してください。"
+        ;;
     esac
 }

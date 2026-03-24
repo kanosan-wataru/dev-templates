@@ -37,6 +37,6 @@ string_split() {
     local -n _result="$1"
     local delimiter="$2" string="$3"
     local old_ifs="$IFS"
-    IFS="$delimiter" read -ra _result <<< "$string"
+    IFS="$delimiter" read -ra _result <<<"$string"
     IFS="$old_ifs"
 }

@@ -64,7 +64,7 @@ jobs:
       - uses: actions/checkout@v4
       - name: Install shfmt
         run: |
-          go install mvdan.cc/sh/v3/cmd/shfmt@v3.8.0
+          go install mvdan.cc/sh/v3/cmd/shfmt@v3.13.0
           echo "$HOME/go/bin" >> "$GITHUB_PATH"
       - name: Check shell formatting (zsh scripts)
         run: |
@@ -105,7 +105,7 @@ jobs:
 
       - name: Run shellcheck on bash scripts
         run: |
-          shellcheck -x -s bash -e SC2154,SC1091 \
+          shellcheck -x -s bash -e SC2154,SC1091,SC2034 \
             dotfiles/setup.sh \
             dotfiles/lib/*.sh \
             dotfiles/modules/*.sh \

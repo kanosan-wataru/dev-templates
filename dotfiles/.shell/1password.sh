@@ -12,8 +12,8 @@
 # NOTE: Independent of ENABLE_SSH_1PASSWORD -- always load if the file exists
 if [[ -r "${HOME}/.config/op/.env" ]]; then
     # Validate file permissions (warn if not 600)
-    _op_token_perms=$(command stat -c '%a' "${HOME}/.config/op/.env" 2>/dev/null \
-        || command stat -f '%Lp' "${HOME}/.config/op/.env" 2>/dev/null)
+    _op_token_perms=$(command stat -c '%a' "${HOME}/.config/op/.env" 2>/dev/null ||
+        command stat -f '%Lp' "${HOME}/.config/op/.env" 2>/dev/null)
     if [[ "$_op_token_perms" != "600" ]]; then
         printf '%s\n' "Warning: ${HOME}/.config/op/.env permissions are ${_op_token_perms} (recommended: 600)." >&2
     fi

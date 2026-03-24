@@ -43,9 +43,9 @@ PY_MOD_MANAGED_FILES=(
 # --- ヘルパー: OS 判定 ---
 _py_detect_os() {
     case "$OSTYPE" in
-        darwin*) printf '%s' "macos" ;;
-        linux*)  printf '%s' "linux" ;;
-        *)       printf '%s' "unknown" ;;
+    darwin*) printf '%s' "macos" ;;
+    linux*) printf '%s' "linux" ;;
+    *) printf '%s' "unknown" ;;
     esac
 }
 
@@ -68,22 +68,22 @@ setup_python() {
     os=$(_py_detect_os)
 
     case "$os" in
-        macos)
-            _py_setup_macos || return 1
-            ;;
-        linux)
-            _py_setup_linux || return 1
-            ;;
-        *)
-            msg_error "未対応の OS です (OSTYPE=${OSTYPE})。"
-            return 1
-            ;;
+    macos)
+        _py_setup_macos || return 1
+        ;;
+    linux)
+        _py_setup_linux || return 1
+        ;;
+    *)
+        msg_error "未対応の OS です (OSTYPE=${OSTYPE})。"
+        return 1
+        ;;
     esac
 
     # 設定ファイルの配置
     _py_install_config
 
-    if (( DRY_RUN )); then
+    if ((DRY_RUN)); then
         msg_info "Python 開発環境をセットアップ予定です（dry-run）。"
     else
         msg_success "Python 開発環境のセットアップが完了しました。"
@@ -176,7 +176,7 @@ _py_install_config() {
     msg_info "設定ファイルを配置します..."
     run_cmd mkdir -p "$HOME/.shell"
     for entry in "${PY_MOD_MANAGED_FILES[@]}"; do
-        IFS='|' read -r src dst label hint <<< "$entry"
+        IFS='|' read -r src dst label hint <<<"$entry"
         install_config "$src" "$dst" "$label" "$hint"
     done
 }
@@ -186,7 +186,7 @@ uninstall_python() {
     local restored=0
 
     for entry in "${PY_MOD_MANAGED_FILES[@]}"; do
-        IFS='|' read -r _src dst label _hint <<< "$entry"
+        IFS='|' read -r _src dst label _hint <<<"$entry"
 
         local newest
         newest=$(find_newest_backup "${dst}.backup."'*') || true
@@ -198,7 +198,7 @@ uninstall_python() {
                 return 1
             }
             restored=1
-        elif [[ -f "$dst" || -h "$dst" ]]; then
+        elif [[ -f "$dst" || -L "$dst" ]]; then
             printf '%s\n' "削除: ${label} を削除します。"
             run_cmd command rm -f "$dst" || {
                 msg_error "${label} の削除に失敗しました。"
@@ -210,7 +210,7 @@ uninstall_python() {
         fi
     done
 
-    if (( restored )); then
+    if ((restored)); then
         msg_success "Python 開発環境の設定を削除しました。"
     else
         msg_info "Python 開発環境の復元・削除対象はありませんでした。"

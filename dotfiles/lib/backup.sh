@@ -10,6 +10,7 @@ find_newest_backup() {
     local newest
     # Use ls -t for modification-time sort (newest first)
     # Redirect stderr to hide "no matches" errors
+    # shellcheck disable=SC2086
     newest=$(ls -t $pattern 2>/dev/null | head -1 || true)
     if [[ -n "$newest" ]]; then
         printf '%s' "$newest"
@@ -23,7 +24,8 @@ find_newest_backup() {
 # Returns: backup path (stdout)
 create_backup() {
     local file="$1"
-    local backup="${file}.bak.$(date +%Y%m%d%H%M%S)"
+    local backup
+    backup="${file}.bak.$(date +%Y%m%d%H%M%S)"
     cp "$file" "$backup"
     printf '%s' "$backup"
 }

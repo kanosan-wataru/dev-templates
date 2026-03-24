@@ -46,31 +46,31 @@ _cb_draw() {
     local max_width="${COLUMNS:-80}"
 
     # On redraw, move cursor up to start of menu
-    if (( redraw )); then
+    if ((redraw)); then
         printf '\e[%dA' "$_CB_TOTAL_LINES"
     fi
 
     # Header
-    printf '\e[2K'  # Clear line
+    printf '\e[2K' # Clear line
     printf '%s%s %s %s\n' \
         "${C_CYAN}" "${C_BOLD}" "$_CB_PROMPT" "${C_RESET}"
-    printf '\e[2K'  # Clear line
+    printf '\e[2K' # Clear line
     printf '%s (up/down:move  Space:toggle  a:all  n:none  Enter:confirm  q:cancel)%s\n' \
         "${C_GRAY}" "${C_RESET}"
 
     # Menu items
     local i
-    for (( i = 0; i < _CB_COUNT; i++ )); do
-        printf '\e[2K'  # Clear line
+    for ((i = 0; i < _CB_COUNT; i++)); do
+        printf '\e[2K' # Clear line
 
         local prefix="  "
         local check="[ ]"
 
-        if (( _CB_SELECTED[i] )); then
+        if ((_CB_SELECTED[i])); then
             check="[x]"
         fi
 
-        if (( i == _CB_CURSOR )); then
+        if ((i == _CB_CURSOR)); then
             prefix="> "
         fi
 
@@ -86,11 +86,11 @@ _cb_draw() {
         local line="${prefix}${check} ${padded_label} ${desc}"
 
         # Truncate to terminal width
-        if (( ${#line} > max_width - 1 )); then
+        if ((${#line} > max_width - 1)); then
             line="${line:0:$((max_width - 2))}"
         fi
 
-        if (( i == _CB_CURSOR )); then
+        if ((i == _CB_CURSOR)); then
             # Reverse video (highlighted)
             printf '\e[7m%s\e[0m\n' "$line"
         else
@@ -127,12 +127,12 @@ checkbox_menu() {
     _CB_SELECTED=()
     _CB_CURSOR=0
     _CB_HEADER_LINES=2
-    _CB_TOTAL_LINES=$(( _CB_HEADER_LINES + _CB_COUNT ))
+    _CB_TOTAL_LINES=$((_CB_HEADER_LINES + _CB_COUNT))
 
     local item label desc default_val i
     for item in "$@"; do
         # Split by pipe delimiter
-        IFS='|' read -r label desc default_val <<< "$item"
+        IFS='|' read -r label desc default_val <<<"$item"
 
         _CB_LABELS+=("$label")
         _CB_DESCS+=("$desc")
@@ -143,12 +143,12 @@ checkbox_menu() {
     trap '_cb_cleanup' INT TERM QUIT
 
     # Hide cursor
-    printf '\e[?25h'  # Ensure visible first (reset state)
-    printf '\e[?25l'  # Then hide
+    printf '\e[?25h' # Ensure visible first (reset state)
+    printf '\e[?25l' # Then hide
 
     # Reserve vertical space by printing blank lines, then move back up
     local j
-    for (( j = 0; j < _CB_TOTAL_LINES; j++ )); do
+    for ((j = 0; j < _CB_TOTAL_LINES; j++)); do
         printf '\n'
     done
     printf '\e[%dA' "$_CB_TOTAL_LINES"
@@ -160,56 +160,59 @@ checkbox_menu() {
     local key
     while true; do
         # Read single character (silent, raw)
-        IFS= read -rsn1 key || { _cb_cleanup; return 1; }
+        IFS= read -rsn1 key || {
+            _cb_cleanup
+            return 1
+        }
 
         case "$key" in
-            $'\e')
-                # Escape sequence: read remaining bytes for arrow keys
-                local key2="" key3=""
-                IFS= read -rsn1 -t 0.1 key2 2>/dev/null || true
-                if [[ "$key2" == "[" || "$key2" == "O" ]]; then
-                    IFS= read -rsn1 -t 0.1 key3 2>/dev/null || true
-                    case "$key3" in
-                        A)  # Up arrow
-                            if (( _CB_CURSOR > 0 )); then _CB_CURSOR=$(( _CB_CURSOR - 1 )); fi
-                            ;;
-                        B)  # Down arrow
-                            if (( _CB_CURSOR < _CB_COUNT - 1 )); then _CB_CURSOR=$(( _CB_CURSOR + 1 )); fi
-                            ;;
-                    esac
-                fi
-                ;;
-            k)  # vim: up
-                if (( _CB_CURSOR > 0 )); then _CB_CURSOR=$(( _CB_CURSOR - 1 )); fi
-                ;;
-            j)  # vim: down
-                if (( _CB_CURSOR < _CB_COUNT - 1 )); then _CB_CURSOR=$(( _CB_CURSOR + 1 )); fi
-                ;;
-            ' ')  # Space: toggle selection
-                if (( _CB_SELECTED[_CB_CURSOR] )); then
-                    _CB_SELECTED[$_CB_CURSOR]=0
-                else
-                    _CB_SELECTED[$_CB_CURSOR]=1
-                fi
-                ;;
-            a)  # Select all
-                for (( i = 0; i < _CB_COUNT; i++ )); do
-                    _CB_SELECTED[$i]=1
-                done
-                ;;
-            n)  # Deselect all
-                for (( i = 0; i < _CB_COUNT; i++ )); do
-                    _CB_SELECTED[$i]=0
-                done
-                ;;
-            q)  # Cancel
-                printf '\e[?25h'  # Show cursor
-                trap - INT TERM QUIT
-                return 1
-                ;;
-            '')  # Enter key (read -n1 returns empty string for newline)
-                break
-                ;;
+        $'\e')
+            # Escape sequence: read remaining bytes for arrow keys
+            local key2="" key3=""
+            IFS= read -rsn1 -t 0.1 key2 2>/dev/null || true
+            if [[ "$key2" == "[" || "$key2" == "O" ]]; then
+                IFS= read -rsn1 -t 0.1 key3 2>/dev/null || true
+                case "$key3" in
+                A) # Up arrow
+                    if ((_CB_CURSOR > 0)); then _CB_CURSOR=$((_CB_CURSOR - 1)); fi
+                    ;;
+                B) # Down arrow
+                    if ((_CB_CURSOR < _CB_COUNT - 1)); then _CB_CURSOR=$((_CB_CURSOR + 1)); fi
+                    ;;
+                esac
+            fi
+            ;;
+        k) # vim: up
+            if ((_CB_CURSOR > 0)); then _CB_CURSOR=$((_CB_CURSOR - 1)); fi
+            ;;
+        j) # vim: down
+            if ((_CB_CURSOR < _CB_COUNT - 1)); then _CB_CURSOR=$((_CB_CURSOR + 1)); fi
+            ;;
+        ' ') # Space: toggle selection
+            if ((_CB_SELECTED[_CB_CURSOR])); then
+                _CB_SELECTED[$_CB_CURSOR]=0
+            else
+                _CB_SELECTED[$_CB_CURSOR]=1
+            fi
+            ;;
+        a) # Select all
+            for ((i = 0; i < _CB_COUNT; i++)); do
+                _CB_SELECTED[$i]=1
+            done
+            ;;
+        n) # Deselect all
+            for ((i = 0; i < _CB_COUNT; i++)); do
+                _CB_SELECTED[$i]=0
+            done
+            ;;
+        q)                   # Cancel
+            printf '\e[?25h' # Show cursor
+            trap - INT TERM QUIT
+            return 1
+            ;;
+        '') # Enter key (read -n1 returns empty string for newline)
+            break
+            ;;
         esac
 
         # Redraw
@@ -217,13 +220,13 @@ checkbox_menu() {
     done
 
     # Restore terminal state
-    printf '\e[?25h'  # Show cursor
+    printf '\e[?25h' # Show cursor
     trap - INT TERM QUIT
 
     # Build result: space-separated list of selected 0-based indices
     REPLY=""
-    for (( i = 0; i < _CB_COUNT; i++ )); do
-        if (( _CB_SELECTED[i] )); then
+    for ((i = 0; i < _CB_COUNT; i++)); do
+        if ((_CB_SELECTED[i])); then
             if [[ -n "$REPLY" ]]; then
                 REPLY+=" "
             fi
