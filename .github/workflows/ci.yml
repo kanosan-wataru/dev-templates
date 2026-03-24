@@ -54,8 +54,16 @@ jobs:
         run: sudo apt-get update -qq && sudo apt-get install -y -qq zsh
       - name: Verify Zsh is available
         run: zsh --version
+      - name: Install modern Bash (macOS)
+        if: runner.os == 'macOS'
+        run: brew install bash
       - name: Run setup.sh --all --dry-run
-        run: bash dotfiles/setup.sh --all --dry-run
+        run: |
+          if [[ "$(uname)" == "Darwin" ]]; then
+            "$(brew --prefix)/bin/bash" dotfiles/setup.sh --all --dry-run
+          else
+            bash dotfiles/setup.sh --all --dry-run
+          fi
 
   shell-format:
     name: Shell Format Check
@@ -105,7 +113,7 @@ jobs:
 
       - name: Run shellcheck on bash scripts
         run: |
-          shellcheck -x -s bash -e SC2154,SC1091,SC2034 \
+          shellcheck -x -s bash -e SC2154,SC1091,SC2034,SC2317 \
             dotfiles/setup.sh \
             dotfiles/lib/*.sh \
             dotfiles/modules/*.sh \

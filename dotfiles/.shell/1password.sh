@@ -21,6 +21,7 @@ if [[ -r "${HOME}/.config/op/.env" ]]; then
     # Validate file contains only the expected export line before sourcing
     _op_token_file="${HOME}/.config/op/.env"
     if grep -qxE "export OP_SERVICE_ACCOUNT_TOKEN='[A-Za-z0-9_+/=.-]+'" "$_op_token_file"; then
+        # shellcheck disable=SC1090
         source "$_op_token_file"
     else
         printf '%s\n' "[1password] Token file content is invalid: $_op_token_file" >&2

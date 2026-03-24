@@ -10,7 +10,7 @@ find_newest_backup() {
     local newest
     # Use ls -t for modification-time sort (newest first)
     # Redirect stderr to hide "no matches" errors
-    # shellcheck disable=SC2086
+    # shellcheck disable=SC2086,SC2012
     newest=$(ls -t $pattern 2>/dev/null | head -1 || true)
     if [[ -n "$newest" ]]; then
         printf '%s' "$newest"
