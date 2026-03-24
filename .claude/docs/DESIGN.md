@@ -603,9 +603,9 @@ dotfiles/
 - [ ] Test Agent Teams workflow end-to-end with a real project
 - [ ] Update hooks for Agent Teams quality gates
 - [ ] Evaluate optimal team size for /team-implement
-- [ ] Issue #71: Execute Phase 1a-1e (zsh-to-bash migration)
-- [ ] Issue #71: Execute Phase 2 (config file separation)
-- [ ] Issue #71: Execute Phase 3 (CI integration)
+- [x] Issue #71: Execute Phase 1a-1e (zsh-to-bash migration) -- PR #72
+- [x] Issue #71: Execute Phase 2 (config file separation) -- PR #73
+- [x] Issue #71: Execute Phase 3 (CI integration) -- PR #74
 
 ## Open Questions
 
