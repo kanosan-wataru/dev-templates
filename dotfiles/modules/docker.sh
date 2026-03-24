@@ -26,9 +26,9 @@ DOCKER_MOD_APT_PACKAGES=(
 # 戻り値: "macos" / "linux" / "unknown"
 _docker_detect_env() {
     case "$OSTYPE" in
-        darwin*) printf '%s' "macos" ;;
-        linux*)  printf '%s' "linux" ;;
-        *)       printf '%s' "unknown" ;;
+    darwin*) printf '%s' "macos" ;;
+    linux*) printf '%s' "linux" ;;
+    *) printf '%s' "unknown" ;;
     esac
 }
 
@@ -60,21 +60,21 @@ _docker_install_apt() {
     local distro
     distro=$(. /etc/os-release && echo "$ID")
     case "$distro" in
-        ubuntu|debian) ;;
-        *)
-            msg_error "未対応のディストリビューションです (${distro})。Ubuntu または Debian が必要です。"
-            return 1
-            ;;
+    ubuntu | debian) ;;
+    *)
+        msg_error "未対応のディストリビューションです (${distro})。Ubuntu または Debian が必要です。"
+        return 1
+        ;;
     esac
 
     # ステップ 1: 競合する旧パッケージの削除
-    if (( ! DRY_RUN )); then
+    if ((!DRY_RUN)); then
         local -a old_pkgs
-        old_pkgs=($(dpkg --get-selections \
+        mapfile -t old_pkgs < <(dpkg --get-selections \
             docker.io docker-compose docker-compose-v2 \
             docker-doc podman-docker containerd runc \
-            2>/dev/null | cut -f1))
-        if (( ${#old_pkgs[@]} > 0 )); then
+            2>/dev/null | cut -f1)
+        if ((${#old_pkgs[@]} > 0)); then
             msg_step "競合する旧パッケージを削除します: ${old_pkgs[*]}"
             run_cmd sudo apt-get remove -y "${old_pkgs[@]}" 2>/dev/null || true
         fi
@@ -97,7 +97,7 @@ _docker_install_apt() {
         return 1
     }
 
-    if (( ! DRY_RUN )); then
+    if ((!DRY_RUN)); then
         sudo curl -fsSL "https://download.docker.com/linux/${distro}/gpg" \
             -o "$DOCKER_MOD_GPG_KEY" || {
             msg_error "Docker の GPG キー取得に失敗しました。"
@@ -112,7 +112,7 @@ _docker_install_apt() {
     fi
 
     # ステップ 4: Docker APT リポジトリの追加 (DEB822 形式)
-    if (( ! DRY_RUN )); then
+    if ((!DRY_RUN)); then
         local codename
         codename=$(. /etc/os-release && echo "${UBUNTU_CODENAME:-$VERSION_CODENAME}")
         if [[ -z "$codename" ]]; then
@@ -227,9 +227,9 @@ _docker_install_nvidia_toolkit() {
         msg_error "/etc/apt/keyrings の作成に失敗しました。"
         return 1
     }
-    if (( ! DRY_RUN )); then
-        curl -fsSL https://nvidia.github.io/libnvidia-container/gpgkey \
-            | sudo gpg --dearmor -o /etc/apt/keyrings/nvidia-container-toolkit-keyring.gpg || {
+    if ((!DRY_RUN)); then
+        curl -fsSL https://nvidia.github.io/libnvidia-container/gpgkey |
+            sudo gpg --dearmor -o /etc/apt/keyrings/nvidia-container-toolkit-keyring.gpg || {
             msg_error "NVIDIA GPG キーの取得に失敗しました。"
             return 1
         }
@@ -242,10 +242,10 @@ _docker_install_nvidia_toolkit() {
     fi
 
     # ステップ 3: apt リポジトリの追加
-    if (( ! DRY_RUN )); then
-        curl -fsSL https://nvidia.github.io/libnvidia-container/stable/deb/nvidia-container-toolkit.list \
-            | sed 's#deb https://#deb [signed-by=/etc/apt/keyrings/nvidia-container-toolkit-keyring.gpg] https://#g' \
-            | sudo tee /etc/apt/sources.list.d/nvidia-container-toolkit.list >/dev/null || {
+    if ((!DRY_RUN)); then
+        curl -fsSL https://nvidia.github.io/libnvidia-container/stable/deb/nvidia-container-toolkit.list |
+            sed 's#deb https://#deb [signed-by=/etc/apt/keyrings/nvidia-container-toolkit-keyring.gpg] https://#g' |
+            sudo tee /etc/apt/sources.list.d/nvidia-container-toolkit.list >/dev/null || {
             msg_error "NVIDIA apt リポジトリの追加に失敗しました。"
             return 1
         }
@@ -294,12 +294,12 @@ setup_docker() {
     env=$(_docker_detect_env)
 
     case "$env" in
-        linux)  msg_info "環境を検出しました — Linux" ;;
-        macos)  msg_info "環境を検出しました — macOS" ;;
-        *)
-            msg_error "未対応の OS です (OSTYPE=${OSTYPE})。"
-            return 1
-            ;;
+    linux) msg_info "環境を検出しました — Linux" ;;
+    macos) msg_info "環境を検出しました — macOS" ;;
+    *)
+        msg_error "未対応の OS です (OSTYPE=${OSTYPE})。"
+        return 1
+        ;;
     esac
 
     # --- 1. Docker のインストール（べき等） ---
@@ -309,20 +309,20 @@ setup_docker() {
     else
         msg_info "Docker をインストールします..."
         case "$env" in
-            linux)
-                if ! command -v apt-get >/dev/null 2>&1; then
-                    msg_error "apt-get が見つかりません。Debian/Ubuntu 系のみ対応しています。"
-                    return 1
-                fi
-                _docker_install_apt || return 1
-                ;;
-            macos)
-                _docker_install_macos || return 1
-                ;;
+        linux)
+            if ! command -v apt-get >/dev/null 2>&1; then
+                msg_error "apt-get が見つかりません。Debian/Ubuntu 系のみ対応しています。"
+                return 1
+            fi
+            _docker_install_apt || return 1
+            ;;
+        macos)
+            _docker_install_macos || return 1
+            ;;
         esac
 
         # インストールの確認
-        if (( ! DRY_RUN )); then
+        if ((!DRY_RUN)); then
             if command -v docker >/dev/null 2>&1; then
                 msg_step "$(printf '%s%s%s' "${C_GREEN}" "Docker のインストールが完了しました ($(docker --version 2>/dev/null))。" "${C_RESET}")"
             else
@@ -363,7 +363,7 @@ setup_docker() {
 
     # --- 完了メッセージ ---
     printf '\n'
-    if (( DRY_RUN )); then
+    if ((DRY_RUN)); then
         msg_info "Docker セットアップ予定です（dry-run）。"
     else
         msg_success "Docker のセットアップが完了しました。"
@@ -394,56 +394,56 @@ uninstall_docker() {
     env=$(_docker_detect_env)
 
     case "$env" in
-        linux)
-            if ! command -v apt-get >/dev/null 2>&1; then
-                msg_error "apt-get が見つかりません。Debian/Ubuntu 系のみ対応しています。"
-                return 1
-            fi
-            msg_info "Docker Engine を削除します..."
-
-            # Docker パッケージの削除
-            run_cmd sudo apt-get purge -y "${DOCKER_MOD_APT_PACKAGES[@]}" docker-ce-rootless-extras 2>/dev/null || {
-                msg_warn "Docker パッケージの削除に失敗しました（既に削除済みの可能性があります）。"
-            }
-
-            run_cmd sudo apt-get autoremove -y 2>/dev/null || true
-
-            # APT ソースと GPG キーの削除
-            if [[ -f "$DOCKER_MOD_APT_SOURCE" ]]; then
-                run_cmd sudo rm -f "$DOCKER_MOD_APT_SOURCE" || {
-                    msg_warn "${DOCKER_MOD_APT_SOURCE} の削除に失敗しました。"
-                }
-            fi
-
-            if [[ -f "$DOCKER_MOD_GPG_KEY" ]]; then
-                run_cmd sudo rm -f "$DOCKER_MOD_GPG_KEY" || {
-                    msg_warn "${DOCKER_MOD_GPG_KEY} の削除に失敗しました。"
-                }
-            fi
-
-            msg_success "Docker Engine のアンインストールが完了しました。"
-            printf '\n'
-            printf '%s\n' "NOTE: Docker のデータ（イメージ、コンテナ、ボリューム等）は残っています。"
-            msg_step "完全に削除する場合:"
-            msg_step "  sudo rm -rf /var/lib/docker"
-            msg_step "  sudo rm -rf /var/lib/containerd"
-            ;;
-        macos)
-            msg_info "Docker Desktop を削除します..."
-            if ! command -v brew >/dev/null 2>&1; then
-                msg_error "Homebrew が見つかりません。手動で削除してください。"
-                return 1
-            fi
-
-            run_cmd brew uninstall --cask docker || {
-                msg_warn "Docker Desktop の削除に失敗しました（既に削除済みの可能性があります）。"
-            }
-
-            msg_success "Docker Desktop のアンインストールが完了しました。"
-            ;;
-        *)
-            msg_error "未対応の OS です (OSTYPE=${OSTYPE})。"
+    linux)
+        if ! command -v apt-get >/dev/null 2>&1; then
+            msg_error "apt-get が見つかりません。Debian/Ubuntu 系のみ対応しています。"
             return 1
-            ;;
+        fi
+        msg_info "Docker Engine を削除します..."
+
+        # Docker パッケージの削除
+        run_cmd sudo apt-get purge -y "${DOCKER_MOD_APT_PACKAGES[@]}" docker-ce-rootless-extras 2>/dev/null || {
+            msg_warn "Docker パッケージの削除に失敗しました（既に削除済みの可能性があります）。"
+        }
+
+        run_cmd sudo apt-get autoremove -y 2>/dev/null || true
+
+        # APT ソースと GPG キーの削除
+        if [[ -f "$DOCKER_MOD_APT_SOURCE" ]]; then
+            run_cmd sudo rm -f "$DOCKER_MOD_APT_SOURCE" || {
+                msg_warn "${DOCKER_MOD_APT_SOURCE} の削除に失敗しました。"
+            }
+        fi
+
+        if [[ -f "$DOCKER_MOD_GPG_KEY" ]]; then
+            run_cmd sudo rm -f "$DOCKER_MOD_GPG_KEY" || {
+                msg_warn "${DOCKER_MOD_GPG_KEY} の削除に失敗しました。"
+            }
+        fi
+
+        msg_success "Docker Engine のアンインストールが完了しました。"
+        printf '\n'
+        printf '%s\n' "NOTE: Docker のデータ（イメージ、コンテナ、ボリューム等）は残っています。"
+        msg_step "完全に削除する場合:"
+        msg_step "  sudo rm -rf /var/lib/docker"
+        msg_step "  sudo rm -rf /var/lib/containerd"
+        ;;
+    macos)
+        msg_info "Docker Desktop を削除します..."
+        if ! command -v brew >/dev/null 2>&1; then
+            msg_error "Homebrew が見つかりません。手動で削除してください。"
+            return 1
+        fi
+
+        run_cmd brew uninstall --cask docker || {
+            msg_warn "Docker Desktop の削除に失敗しました（既に削除済みの可能性があります）。"
+        }
+
+        msg_success "Docker Desktop のアンインストールが完了しました。"
+        ;;
+    *)
+        msg_error "未対応の OS です (OSTYPE=${OSTYPE})。"
+        return 1
+        ;;
     esac
 }

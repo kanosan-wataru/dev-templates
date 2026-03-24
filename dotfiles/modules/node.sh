@@ -25,19 +25,19 @@ NODE_MOD_MANAGED_FILES=(
 # --- ヘルパー: OS 判定 ---
 _node_detect_os() {
     case "$OSTYPE" in
-        darwin*) printf '%s' "macos" ;;
-        linux*)  printf '%s' "linux" ;;
-        *)       printf '%s' "unknown" ;;
+    darwin*) printf '%s' "macos" ;;
+    linux*) printf '%s' "linux" ;;
+    *) printf '%s' "unknown" ;;
     esac
 }
 
 # --- ヘルパー: アーキテクチャ判定 ---
 _node_detect_arch() {
     case "$(uname -m)" in
-        x86_64)  printf '%s' "x64" ;;
-        aarch64) printf '%s' "arm64" ;;
-        arm64)   printf '%s' "arm64" ;;
-        *)       printf '%s' "unknown" ;;
+    x86_64) printf '%s' "x64" ;;
+    aarch64) printf '%s' "arm64" ;;
+    arm64) printf '%s' "arm64" ;;
+    *) printf '%s' "unknown" ;;
     esac
 }
 
@@ -55,26 +55,26 @@ setup_node() {
         fnm_exists=1
     fi
 
-    if (( ! fnm_exists )); then
+    if ((!fnm_exists)); then
         local os
         os=$(_node_detect_os)
 
         case "$os" in
-            macos)
-                _node_setup_macos || return 1
-                ;;
-            linux)
-                _node_setup_linux || return 1
-                ;;
-            *)
-                msg_error "未対応の OS です (OSTYPE=${OSTYPE})。"
-                return 1
-                ;;
+        macos)
+            _node_setup_macos || return 1
+            ;;
+        linux)
+            _node_setup_linux || return 1
+            ;;
+        *)
+            msg_error "未対応の OS です (OSTYPE=${OSTYPE})。"
+            return 1
+            ;;
         esac
     fi
 
     # 一時的に fnm を PATH に通す（同セッション内の後続モジュール用）
-    if (( ! DRY_RUN )); then
+    if ((!DRY_RUN)); then
         [[ -d "$NODE_MOD_FNM_BIN_DIR" ]] && export PATH="$NODE_MOD_FNM_BIN_DIR:$PATH"
         if command -v fnm >/dev/null 2>&1; then
             eval "$(fnm env)"
@@ -91,9 +91,9 @@ setup_node() {
     _node_install_config
 
     # コマンドハッシュをクリア（後続モジュールの ensure_node 用）
-    (( ! DRY_RUN )) && hash -r
+    ((!DRY_RUN)) && hash -r
 
-    if (( DRY_RUN )); then
+    if ((DRY_RUN)); then
         msg_info "Node.js 開発環境をセットアップ予定です（dry-run）。"
     else
         msg_success "Node.js 開発環境のセットアップが完了しました。"
@@ -134,7 +134,7 @@ _node_setup_linux() {
         fi
     done
 
-    if (( ${#missing_cmds[@]} > 0 )); then
+    if ((${#missing_cmds[@]} > 0)); then
         printf '%s\n' "${missing_cmds[*]} をインストールします..."
         if command -v apt-get >/dev/null 2>&1; then
             run_cmd sudo apt-get update -qq || {
@@ -181,7 +181,7 @@ _node_setup_linux() {
 
     msg_info "fnm を GitHub Releases からダウンロードします (${arch})..."
 
-    if (( DRY_RUN )); then
+    if ((DRY_RUN)); then
         msg_dry_run "curl -fsSL ${download_url} -o /tmp/${zip_name}"
         msg_dry_run "unzip -o /tmp/${zip_name} -d ${NODE_MOD_FNM_BIN_DIR}"
         msg_dry_run "chmod +x ${NODE_MOD_FNM_BIN_DIR}/fnm"
@@ -219,7 +219,7 @@ _node_setup_linux() {
 
 # --- Node.js LTS インストール ---
 _node_install_lts() {
-    if (( DRY_RUN )); then
+    if ((DRY_RUN)); then
         msg_dry_run "fnm install --lts"
         msg_dry_run "fnm default lts-latest"
         return 0
@@ -240,10 +240,10 @@ _node_install_lts() {
             node_major="${node_major%%.*}"
         fi
 
-        if [[ "$node_major" =~ ^[0-9]+$ ]] && (( node_major >= 18 )); then
+        if [[ "$node_major" =~ ^[0-9]+$ ]] && ((node_major >= 18)); then
             msg_info "Node.js は既にインストールされています (${node_ver})。スキップします。"
             return 0
-        elif [[ "$node_major" =~ ^[0-9]+$ ]] && (( node_major < 18 )); then
+        elif [[ "$node_major" =~ ^[0-9]+$ ]] && ((node_major < 18)); then
             msg_warn "既存の Node.js (${node_ver}) は推奨バージョン (v18 以上) 未満です。fnm で LTS をインストールします。"
         else
             msg_warn "Node.js のバージョンを特定できません (${node_ver:-unknown})。fnm で LTS をインストールします。"
@@ -271,7 +271,7 @@ _node_install_config() {
     msg_info "設定ファイルを配置します..."
     run_cmd mkdir -p "$HOME/.shell"
     for entry in "${NODE_MOD_MANAGED_FILES[@]}"; do
-        IFS='|' read -r src dst label hint <<< "$entry"
+        IFS='|' read -r src dst label hint <<<"$entry"
         install_config "$src" "$dst" "$label" "$hint"
     done
 }
@@ -281,7 +281,7 @@ uninstall_node() {
     local restored=0
 
     for entry in "${NODE_MOD_MANAGED_FILES[@]}"; do
-        IFS='|' read -r _src dst label _hint <<< "$entry"
+        IFS='|' read -r _src dst label _hint <<<"$entry"
 
         local newest
         newest=$(find_newest_backup "${dst}.backup."'*') || true
@@ -293,7 +293,7 @@ uninstall_node() {
                 return 1
             }
             restored=1
-        elif [[ -f "$dst" || -h "$dst" ]]; then
+        elif [[ -f "$dst" || -L "$dst" ]]; then
             printf '%s\n' "削除: ${label} を削除します。"
             run_cmd command rm -f "$dst" || {
                 msg_error "${label} の削除に失敗しました。"
@@ -305,7 +305,7 @@ uninstall_node() {
         fi
     done
 
-    if (( restored )); then
+    if ((restored)); then
         msg_success "Node.js 開発環境の設定を削除しました。"
     else
         msg_info "Node.js 開発環境の復元・削除対象はありませんでした。"
@@ -316,12 +316,12 @@ uninstall_node() {
     local os
     os=$(_node_detect_os)
     case "$os" in
-        macos)
-            msg_step "brew uninstall fnm"
-            ;;
-        *)
-            msg_step "rm -f ${NODE_MOD_FNM_BIN_DIR}/fnm"
-            ;;
+    macos)
+        msg_step "brew uninstall fnm"
+        ;;
+    *)
+        msg_step "rm -f ${NODE_MOD_FNM_BIN_DIR}/fnm"
+        ;;
     esac
     msg_step "rm -rf ${XDG_DATA_HOME:-$HOME/.local/share}/fnm"
 }
