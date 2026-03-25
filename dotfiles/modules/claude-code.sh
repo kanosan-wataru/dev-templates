@@ -401,6 +401,17 @@ setup_claude_code() {
     msg_success "Claude Code 設定ファイルの配置が完了しました。"
 }
 
+# --- ステータス表示 ---
+module_status() {
+    local status version
+    if command -v claude &>/dev/null; then
+        version=$(claude --version 2>/dev/null | head -1 || printf '%s' "installed")
+        printf '  %-14s %s%-18s%s %s\n' "$MODULE_ID" "${C_GREEN}" "✓ installed" "${C_RESET}" "$version"
+    else
+        printf '  %-14s %s%-18s%s %s\n' "$MODULE_ID" "${C_RED}" "✗ not found" "${C_RESET}" "-"
+    fi
+}
+
 # --- アンインストール ---
 uninstall_claude_code() {
     local restored=0
