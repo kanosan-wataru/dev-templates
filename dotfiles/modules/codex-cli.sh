@@ -116,6 +116,17 @@ setup_codex_cli() {
     msg_success "Codex CLI 設定ファイルの配置が完了しました。"
 }
 
+# --- ステータス表示 ---
+module_status() {
+    local status version
+    if command -v codex &>/dev/null; then
+        version=$(codex --version 2>/dev/null | head -1 || printf '%s' "installed")
+        printf '  %-14s %s%-18s%s %s\n' "$MODULE_ID" "${C_GREEN}" "✓ installed" "${C_RESET}" "$version"
+    else
+        printf '  %-14s %s%-18s%s %s\n' "$MODULE_ID" "${C_RED}" "✗ not found" "${C_RESET}" "-"
+    fi
+}
+
 # --- アンインストール ---
 uninstall_codex_cli() {
     local restored=0

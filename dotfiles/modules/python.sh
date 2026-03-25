@@ -212,6 +212,28 @@ _py_install_config() {
     done
 }
 
+# --- ステータス表示 ---
+module_status() {
+    local -a found=()
+
+    if command -v pyenv &>/dev/null; then
+        found+=("pyenv $(pyenv --version 2>/dev/null | sed 's/^pyenv //' | head -1)")
+    fi
+
+    if command -v uv &>/dev/null; then
+        found+=("$(uv --version 2>/dev/null | head -1)")
+    fi
+
+    if ((${#found[@]} > 0)); then
+        local versions
+        versions=$(printf '%s, ' "${found[@]}")
+        versions="${versions%, }"
+        printf '  %-14s %s%-18s%s %s\n' "$MODULE_ID" "${C_GREEN}" "✓ installed" "${C_RESET}" "$versions"
+    else
+        printf '  %-14s %s%-18s%s %s\n' "$MODULE_ID" "${C_RED}" "✗ not found" "${C_RESET}" "-"
+    fi
+}
+
 # --- アンインストール ---
 uninstall_python() {
     local restored=0

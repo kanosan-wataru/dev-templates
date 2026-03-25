@@ -213,6 +213,45 @@ setup_modern_cli() {
     fi
 }
 
+# --- ステータス表示 ---
+module_status() {
+    local -a found=()
+
+    # eza
+    if command -v eza &>/dev/null; then
+        # NOTE: eza --version outputs version on line 2 (e.g. "v0.23.4 [+git]")
+        found+=("eza $(eza --version 2>/dev/null | sed -n '2p' | awk '{print $1}')")
+    fi
+
+    # bat / batcat
+    if command -v bat &>/dev/null; then
+        found+=("$(bat --version 2>/dev/null | head -1)")
+    elif command -v batcat &>/dev/null; then
+        found+=("$(batcat --version 2>/dev/null | head -1)")
+    fi
+
+    # fd / fdfind
+    if command -v fd &>/dev/null; then
+        found+=("$(fd --version 2>/dev/null | head -1)")
+    elif command -v fdfind &>/dev/null; then
+        found+=("$(fdfind --version 2>/dev/null | head -1)")
+    fi
+
+    # rg (ripgrep)
+    if command -v rg &>/dev/null; then
+        found+=("$(rg --version 2>/dev/null | head -1)")
+    fi
+
+    if ((${#found[@]} > 0)); then
+        local versions
+        versions=$(printf '%s, ' "${found[@]}")
+        versions="${versions%, }"
+        printf '  %-14s %s%-18s%s %s\n' "$MODULE_ID" "${C_GREEN}" "✓ installed" "${C_RESET}" "$versions"
+    else
+        printf '  %-14s %s%-18s%s %s\n' "$MODULE_ID" "${C_RED}" "✗ not found" "${C_RESET}" "-"
+    fi
+}
+
 # --- アンインストール ---
 # NOTE: システムパッケージの自動削除は意図しない依存破壊のリスクがあるため、手順の表示のみとする
 uninstall_modern_cli() {

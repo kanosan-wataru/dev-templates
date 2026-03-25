@@ -276,6 +276,17 @@ _node_install_config() {
     done
 }
 
+# --- ステータス表示 ---
+module_status() {
+    local status version
+    if command -v node &>/dev/null; then
+        version=$(node --version 2>/dev/null | head -1)
+        printf '  %-14s %s%-18s%s %s\n' "$MODULE_ID" "${C_GREEN}" "✓ installed" "${C_RESET}" "node $version"
+    else
+        printf '  %-14s %s%-18s%s %s\n' "$MODULE_ID" "${C_RED}" "✗ not found" "${C_RESET}" "-"
+    fi
+}
+
 # --- アンインストール ---
 uninstall_node() {
     local restored=0

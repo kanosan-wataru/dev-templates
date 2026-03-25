@@ -457,6 +457,17 @@ setup_1password() {
     msg_step "初回は 'op signin' でサインインしてください。"
 }
 
+# --- ステータス表示 ---
+module_status() {
+    local status version
+    if command -v op &>/dev/null; then
+        version=$(op --version 2>/dev/null | head -1)
+        printf '  %-14s %s%-18s%s %s\n' "$MODULE_ID" "${C_GREEN}" "✓ installed" "${C_RESET}" "op $version"
+    else
+        printf '  %-14s %s%-18s%s %s\n' "$MODULE_ID" "${C_RED}" "✗ not found" "${C_RESET}" "-"
+    fi
+}
+
 # --- アンインストール ---
 uninstall_1password() {
     local restored=0
