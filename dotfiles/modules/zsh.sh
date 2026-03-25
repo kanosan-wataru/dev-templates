@@ -17,11 +17,18 @@ ZSH_MOD_CONFIG_DIR="$ZSH_MOD_BASE_DIR/.zsh"
 ZSH_MOD_ZINIT_HOME="${XDG_DATA_HOME:-$HOME/.local/share}/zinit/zinit.git"
 ZSH_MOD_ZINIT_VERSION="v3.14.0"
 
+# Source separation: deploy templates to subdirectories, add source line to user dotfiles
+# NOTE: Elements are "src|user_file|deploy_dir|deploy_name|label"
+ZSH_MOD_SOURCE_CONFIGS=(
+    "$SCRIPT_DIR/.zshrc|$ZSH_MOD_BASE_DIR/.zshrc|$ZSH_MOD_BASE_DIR/.zshrc.d|dev-templates.zsh|.zshrc"
+    "$SCRIPT_DIR/.bashrc|$HOME/.bashrc|$HOME/.bashrc.d|dev-templates.bash|.bashrc"
+)
+
 # 管理対象ファイルのリスト（配布元パス, 配置先パス, 表示名, 未検出時メッセージ）
 # NOTE: 配列の各要素は "src|dst|label|hint" の形式
 ZSH_MOD_MANAGED_FILES=(
-    "$SCRIPT_DIR/.zshrc|$ZSH_MOD_BASE_DIR/.zshrc|.zshrc|"
-    "$SCRIPT_DIR/.bashrc|$HOME/.bashrc|.bashrc|"
+    "$ZSH_MOD_BASE_DIR/.zshrc.d/dev-templates.zsh|$ZSH_MOD_BASE_DIR/.zshrc.d/dev-templates.zsh|.zshrc (template)|"
+    "$HOME/.bashrc.d/dev-templates.bash|$HOME/.bashrc.d/dev-templates.bash|.bashrc (template)|"
     "$SCRIPT_DIR/.zsh/.p10k.zsh|$ZSH_MOD_CONFIG_DIR/.p10k.zsh|.p10k.zsh|Powerlevel10k のデフォルト設定が使用されます。"
     "$SCRIPT_DIR/.zsh/plugins.zsh|$ZSH_MOD_CONFIG_DIR/plugins.zsh|plugins.zsh|プラグインは手動で設定してください。"
     "$SCRIPT_DIR/.shell/aliases.sh|$HOME/.shell/aliases.sh|aliases.sh|エイリアスは手動で設定してください。"
@@ -80,7 +87,20 @@ setup_zsh() {
 
     # 設定ファイルの配置
     msg_info "設定ファイルを配置します..."
-    for entry in "${ZSH_MOD_MANAGED_FILES[@]}"; do
+
+    # Source separation: .zshrc and .bashrc deploy to subdirectories
+    for entry in "${ZSH_MOD_SOURCE_CONFIGS[@]}"; do
+        IFS='|' read -r src user_file deploy_dir deploy_name label <<<"$entry"
+        install_source_config "$src" "$user_file" "$deploy_dir" "$deploy_name" "$label"
+    done
+
+    # Direct deployment: other config files
+    local _zsh_direct_files=(
+        "$SCRIPT_DIR/.zsh/.p10k.zsh|$ZSH_MOD_CONFIG_DIR/.p10k.zsh|.p10k.zsh|Powerlevel10k のデフォルト設定が使用されます。"
+        "$SCRIPT_DIR/.zsh/plugins.zsh|$ZSH_MOD_CONFIG_DIR/plugins.zsh|plugins.zsh|プラグインは手動で設定してください。"
+        "$SCRIPT_DIR/.shell/aliases.sh|$HOME/.shell/aliases.sh|aliases.sh|エイリアスは手動で設定してください。"
+    )
+    for entry in "${_zsh_direct_files[@]}"; do
         IFS='|' read -r src dst label hint <<<"$entry"
         install_config "$src" "$dst" "$label" "$hint"
     done
