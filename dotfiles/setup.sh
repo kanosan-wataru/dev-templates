@@ -9,6 +9,7 @@ set -euo pipefail
 #   bash setup.sh --all            Install all modules at once
 #   bash setup.sh --select zsh     Specify modules (multiple allowed)
 #   bash setup.sh --dry-run        Preview changes only
+#   bash setup.sh --force          Skip diff confirmation (backup + overwrite)
 #   bash setup.sh --uninstall      Restore from backups
 #   bash setup.sh --help           Show help
 #
@@ -37,6 +38,7 @@ DRY_RUN=0
 UNINSTALL=0
 ALL_FLAG=0
 HELP_FLAG=0
+FORCE=0
 declare -a SELECT_MODULES=()
 declare -A MODULE_DEPS_MAP=()
 declare -A MODULE_ID_SET=()
@@ -48,6 +50,9 @@ while (($# > 0)); do
         ;;
     --uninstall)
         UNINSTALL=1
+        ;;
+    --force | -f)
+        FORCE=1
         ;;
     --all)
         ALL_FLAG=1
@@ -93,6 +98,14 @@ run_cmd() {
 
 # Config file backup and deployment helper (idempotent)
 # Args: $1=source path $2=destination path $3=display name $4=hint when missing
+#
+# Behavior:
+#   - If destination does not exist: deploy without asking (new file)
+#   - If destination exists and is identical: skip (idempotent)
+#   - If destination exists and differs:
+#       --force:   backup + overwrite without confirmation
+#       --dry-run: show preview message only
+#       otherwise: show diff and ask user for confirmation
 install_config() {
     local src="$1" dst="$2" label="$3" missing_hint="${4:-}"
 
@@ -113,17 +126,52 @@ install_config() {
         return 0
     fi
 
-    # Backup existing file or symlink
+    # Interactive diff preview when destination exists and differs
     if [[ -f "$dst" || -L "$dst" ]]; then
+        if ((DRY_RUN)); then
+            # Dry-run: show what would happen, then return
+            msg_dry_run "${label} を更新予定です。"
+            return 0
+        fi
+
+        if ! ((FORCE)); then
+            # Show compact diff preview
+            printf '\n'
+            msg_warn "${label} に差分があります:"
+            diff -u "$dst" "$src" | head -40 || true
+            printf '\n'
+
+            # Ask user for confirmation
+            local answer=""
+            while true; do
+                printf '上書きしますか？ %s [y/N/d] (y=はい, N=いいえ, d=全文表示): ' "$label"
+                read -r answer </dev/tty
+                case "$answer" in
+                [yY])
+                    break
+                    ;;
+                [dD])
+                    # Show full diff
+                    printf '\n'
+                    diff -u "$dst" "$src" || true
+                    printf '\n'
+                    # Ask again after showing full diff
+                    ;;
+                *)
+                    # Empty or 'n' or 'N' -- skip
+                    msg_info "スキップしました: ${label}"
+                    return 0
+                    ;;
+                esac
+            done
+        fi
+
+        # Backup existing file or symlink
         run_cmd command mv "$dst" "${dst}${BACKUP_SUFFIX}" || {
             msg_error "${label} のバックアップに失敗しました。"
             exit 1
         }
-        if ((DRY_RUN)); then
-            msg_info "既存の ${label} を ${dst}${BACKUP_SUFFIX} にバックアップします（予定）。"
-        else
-            msg_info "既存の ${label} を ${dst}${BACKUP_SUFFIX} にバックアップしました。"
-        fi
+        msg_info "既存の ${label} を ${dst}${BACKUP_SUFFIX} にバックアップしました。"
     fi
 
     # Deploy file
@@ -135,11 +183,52 @@ install_config() {
         fi
         exit 1
     }
-    if ((DRY_RUN)); then
-        msg_info "${label} を配置予定です（dry-run）。"
-    else
-        msg_info "${label} を配置しました。"
+    msg_info "${label} を配置しました。"
+}
+
+# Deploy config via source separation
+# Instead of overwriting the user's dotfile, deploy the template to a
+# subdirectory and insert a one-line `source` into the user's file.
+# This preserves user customizations while keeping template updates clean.
+# Args: $1=source path $2=user's dotfile $3=deploy directory
+#       $4=deploy filename $5=display label
+install_source_config() {
+    local src="$1"
+    local user_file="$2"
+    local deploy_dir="$3"
+    local deploy_name="$4"
+    local label="$5"
+
+    # Deploy the template to the separate directory
+    if [[ ! -d "$deploy_dir" ]]; then
+        run_cmd command mkdir -p -m 700 "$deploy_dir" || {
+            msg_error "${deploy_dir} の作成に失敗しました。"
+            return 1
+        }
     fi
+    install_config "$src" "${deploy_dir}/${deploy_name}" "$label"
+
+    # Source line to insert into the user's dotfile
+    local source_line="source \"${deploy_dir}/${deploy_name}\""
+
+    # Check if source line already exists
+    if [[ -f "$user_file" ]] && grep -qF "$source_line" "$user_file" 2>/dev/null; then
+        msg_info "${label}: source 行は $(basename "$user_file") に設定済みです。"
+        return 0
+    fi
+
+    if ((DRY_RUN)); then
+        msg_dry_run "$(basename "$user_file") に source 行を追加予定です。"
+        return 0
+    fi
+
+    # Append source line to user's dotfile (create if needed)
+    {
+        printf '\n'
+        printf '# dev-templates managed - do not remove\n'
+        printf '%s\n' "$source_line"
+    } >>"$user_file"
+    msg_success "$(basename "$user_file") に source 行を追加しました。"
 }
 
 # Verify Node.js and npm availability
@@ -269,6 +358,7 @@ if ((HELP_FLAG)); then
     printf '\n'
     printf 'オプション:\n'
     printf '  --dry-run          変更内容のプレビューのみ（実際には変更しない）\n'
+    printf '  --force, -f        差分確認をスキップ（バックアップ＋上書き）\n'
     printf '  --uninstall        全モジュールをアンインストール（バックアップから復元）\n'
     printf '  --all              全モジュールを一括インストール\n'
     printf '  --select MODULE    特定モジュールを指定（複数指定可）\n'
