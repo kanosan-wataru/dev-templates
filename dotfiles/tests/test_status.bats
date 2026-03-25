@@ -32,11 +32,11 @@ setup() {
     [[ "$output" == *"codex-cli"* ]]
 }
 
-@test "--status shows installed or not found for each module" {
+@test "--status shows installed, partial, or not found for each module" {
     run bash "$PROJECT_ROOT/setup.sh" --status
-    # Each module line should contain either "installed" or "not found"
+    # Each module line should contain "installed", "partial", or "not found"
     local module_lines
-    module_lines=$(echo "$output" | grep -c -E '(installed|not found)')
+    module_lines=$(echo "$output" | grep -c -E '(installed|partial|not found)')
     # At least 10 modules should be listed
     [ "$module_lines" -ge 10 ]
 }

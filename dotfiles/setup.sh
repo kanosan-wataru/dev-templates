@@ -363,30 +363,36 @@ if ((STATUS_FLAG)); then
     printf '  %-14s %-18s %s\n' "Module" "Status" "Version"
     printf '  %-14s %-18s %s\n' "──────────────" "──────────────────" "─────────────────────"
 
+    # Build ID -> file mapping once (O(n) instead of O(n^2) grep per module)
+    declare -A _status_file_map=()
+    for mod_file in "${SCRIPT_DIR}"/modules/*.sh; do
+        [[ -e "$mod_file" ]] || continue
+        _mod_id="$(
+            MODULE_ID=""
+            # shellcheck disable=SC1090
+            source "$mod_file"
+            printf '%s' "${MODULE_ID:-}"
+        )"
+        [[ -n "$_mod_id" ]] || continue
+        _status_file_map["$_mod_id"]="$mod_file"
+    done
+
     for entry in "${MODULES[@]}"; do
         IFS='|' read -r mod_id _rest <<<"$entry"
-
-        # Run module_status in a subshell to avoid variable contamination
-        # Each module file is re-sourced to get its module_status function
+        mod_file="${_status_file_map[$mod_id]-}"
+        if [[ -z "$mod_file" ]]; then
+            printf '  %-14s %-18s %s\n' "$mod_id" "? unknown" "-"
+            continue
+        fi
         (
             MODULE_ID="" MODULE_NAME="" MODULE_DESC="" MODULE_DEFAULT=0 MODULE_ORDER=50 MODULE_DEPS=""
-
-            for mod_file in "${SCRIPT_DIR}"/modules/*.sh; do
-                [[ -e "$mod_file" ]] || continue
-
-                # Peek at MODULE_ID to find the matching file
-                _peek_id=$(grep '^MODULE_ID=' "$mod_file" 2>/dev/null | head -1 | cut -d= -f2 | tr -d '"')
-                [[ "$_peek_id" == "$mod_id" ]] || continue
-
-                # shellcheck disable=SC1090
-                source "$mod_file"
-                if declare -f module_status >/dev/null 2>&1; then
-                    module_status
-                else
-                    printf '  %-14s %-18s %s\n' "$mod_id" "? unknown" "-"
-                fi
-                break
-            done
+            # shellcheck disable=SC1090
+            source "$mod_file"
+            if declare -f module_status >/dev/null 2>&1; then
+                module_status
+            else
+                printf '  %-14s %-18s %s\n' "$mod_id" "? unknown" "-"
+            fi
         )
     done
 

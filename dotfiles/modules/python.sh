@@ -214,22 +214,40 @@ _py_install_config() {
 
 # --- ステータス表示 ---
 module_status() {
-    local -a found=()
+    local -a found=() missing=()
+    local total_tools=2
 
     if command -v pyenv &>/dev/null; then
         found+=("pyenv $(pyenv --version 2>/dev/null | sed 's/^pyenv //' | head -1)")
+    else
+        missing+=("pyenv")
     fi
 
     if command -v uv &>/dev/null; then
         found+=("$(uv --version 2>/dev/null | head -1)")
+    else
+        missing+=("uv")
     fi
 
-    if ((${#found[@]} > 0)); then
+    local found_count=${#found[@]}
+
+    if ((found_count == total_tools)); then
+        # Both tools installed
         local versions
         versions=$(printf '%s, ' "${found[@]}")
         versions="${versions%, }"
         printf '  %-14s %s%-18s%s %s\n' "$MODULE_ID" "${C_GREEN}" "✓ installed" "${C_RESET}" "$versions"
+    elif ((found_count > 0)); then
+        # Partial: one tool installed, one missing
+        local found_names missing_names
+        found_names=$(printf '%s, ' "${found[@]}")
+        found_names="${found_names%, }"
+        missing_names=$(printf '%s, ' "${missing[@]}")
+        missing_names="${missing_names%, }"
+        printf '  %-14s %s%-18s%s found: %s | missing: %s\n' \
+            "$MODULE_ID" "${C_YELLOW}" "△ partial" "${C_RESET}" "$found_names" "$missing_names"
     else
+        # Neither tool installed
         printf '  %-14s %s%-18s%s %s\n' "$MODULE_ID" "${C_RED}" "✗ not found" "${C_RESET}" "-"
     fi
 }
