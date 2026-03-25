@@ -1,12 +1,13 @@
 # ---------------------------------------------
 # モジュール: Python 開発環境
 # pyenv + pyenv-virtualenv (Python バージョン管理)
+# uv (Python package manager)
 # ---------------------------------------------
 
 # --- メタデータ ---
 MODULE_ID="python"
 MODULE_NAME="Python 開発環境"
-MODULE_DESC="pyenv + virtualenv (Python バージョン管理)"
+MODULE_DESC="pyenv + virtualenv (Python バージョン管理) + uv"
 MODULE_DEFAULT=0
 MODULE_ORDER=25
 
@@ -55,30 +56,35 @@ setup_python() {
     print_separator
 
     # べき等性チェック
+    local pyenv_already_installed=0
     if command -v pyenv >/dev/null 2>&1; then
         local current_ver
         current_ver=$(pyenv --version 2>/dev/null || printf '%s' "unknown")
         msg_info "pyenv は既にインストールされています (${current_ver})。スキップします。"
-        # 設定ファイルのみ更新確認
-        _py_install_config
-        return 0
+        pyenv_already_installed=1
     fi
 
-    local os
-    os=$(_py_detect_os)
+    # pyenv installation (skip if already installed)
+    if ((!pyenv_already_installed)); then
+        local os
+        os=$(_py_detect_os)
 
-    case "$os" in
-    macos)
-        _py_setup_macos || return 1
-        ;;
-    linux)
-        _py_setup_linux || return 1
-        ;;
-    *)
-        msg_error "未対応の OS です (OSTYPE=${OSTYPE})。"
-        return 1
-        ;;
-    esac
+        case "$os" in
+        macos)
+            _py_setup_macos || return 1
+            ;;
+        linux)
+            _py_setup_linux || return 1
+            ;;
+        *)
+            msg_error "未対応の OS です (OSTYPE=${OSTYPE})。"
+            return 1
+            ;;
+        esac
+    fi
+
+    # --- uv (Python package manager) ---
+    _py_setup_uv
 
     # 設定ファイルの配置
     _py_install_config
@@ -171,6 +177,31 @@ _py_setup_linux() {
     fi
 }
 
+# --- uv セットアップ ---
+_py_setup_uv() {
+    msg_info "uv のセットアップを開始します..."
+
+    if command -v uv &>/dev/null; then
+        msg_info "uv は既にインストールされています。($(uv --version))"
+    else
+        if ((DRY_RUN)); then
+            msg_dry_run "uv をインストール予定です。"
+        else
+            msg_info "uv をインストールしています..."
+            curl -LsSf https://astral.sh/uv/install.sh | sh || {
+                msg_error "uv のインストールに失敗しました。"
+                return 1
+            }
+            # Source the env to make uv available in current session
+            if [[ -f "$HOME/.local/bin/env" ]]; then
+                # shellcheck disable=SC1091
+                source "$HOME/.local/bin/env"
+            fi
+            msg_success "uv をインストールしました。($(uv --version 2>/dev/null || echo 'version unknown'))"
+        fi
+    fi
+}
+
 # --- 設定ファイル配置ヘルパー ---
 _py_install_config() {
     msg_info "設定ファイルを配置します..."
@@ -223,4 +254,8 @@ uninstall_python() {
         msg_step "# macOS の場合:"
         msg_step "brew uninstall pyenv pyenv-virtualenv"
     fi
+
+    printf '\n'
+    printf '%s\n' "NOTE: uv は削除されていません。不要な場合は以下を実行してください:"
+    msg_step "uv self uninstall"
 }
