@@ -17,7 +17,7 @@ Bash スクリプト（セットアップ）+ Zsh（対話シェル）のモジ�
 | `dotfiles/.shell/aliases.sh` | エイリアス定義（git/docker エイリアス、fzf 連携関数） |
 | `dotfiles/.shell/env.sh` | 環境変数読み込み（`~/.claude/.env` から MCP サーバー用等） |
 | `dotfiles/.shell/node.sh` | fnm (Fast Node Manager) 初期化 |
-| `dotfiles/.shell/python.sh` | pyenv / pyenv-virtualenv 初期化 |
+| `dotfiles/.shell/python.sh` | pyenv / uv 初期化 |
 | `dotfiles/.shell/1password.sh` | 1Password SSH エージェント設定（WSL/Linux/macOS 自動判定） |
 | `dotfiles/.claude/` | Claude Code 設定テンプレート一式（CLAUDE.md, スキル, エージェント等） |
 | `dotfiles/.codex/` | Codex CLI 設定テンプレート（モデル設定、サンドボックスルール） |
@@ -51,7 +51,8 @@ bash dotfiles/setup.sh
   [ ] Node.js 開発環境      fnm + Node.js LTS (バージョン管理)
   [ ] Docker                Docker Engine + Compose + NVIDIA GPU
   [ ] Claude Code           Anthropic CLI (Node.js v18+ 必要)
-  [ ] Python 開発環境       pyenv + virtualenv (Python バージョン管理)
+  [ ] AWS CLI               AWS CLI v2
+  [ ] Python 開発環境       pyenv + uv (Python バージョン管理 + パッケージ管理)
   [ ] Gemini CLI            Google AI CLI (Node.js v20+ 必要)
   [ ] Codex CLI              OpenAI CLI (Node.js v18+ 必要)
 ```
@@ -67,7 +68,8 @@ bash dotfiles/setup.sh
 | **Node.js 開発環境** | fnm + Node.js LTS 自動インストール | Homebrew (macOS) / curl + unzip (Linux) |
 | **Docker** | Docker Engine + Compose + NVIDIA GPU サポート | Homebrew (macOS) / apt + curl (Linux) |
 | **Claude Code** | Anthropic の AI コーディングアシスタント CLI + 設定テンプレート | Node.js v18+ / jq（MCP マージ用、任意） |
-| **Python 開発環境** | pyenv + pyenv-virtualenv | Git + ビルド依存パッケージ |
+| **AWS CLI** | AWS CLI v2 | curl + unzip (Linux) / Homebrew (macOS) |
+| **Python 開発環境** | pyenv + Python + uv (パッケージマネージャー) | Git + ビルド依存パッケージ |
 | **Gemini CLI** | Google の AI CLI | Node.js v20+ |
 | **Codex CLI** | OpenAI の AI コーディングアシスタント CLI + 設定テンプレート | Node.js v18+ |
 
@@ -79,6 +81,8 @@ bash dotfiles/setup.sh
 | `--select MODULE` | 特定モジュールを指定（複数指定可） |
 | `--dry-run` | 実際の変更を行わず、実行内容をプレビュー表示 |
 | `--uninstall` | 全モジュールをアンインストール（バックアップから復元） |
+| `--status` | 各モジュールのインストール状態を一覧表示 |
+| `--force`, `-f` | 差分確認をスキップ（バックアップ＋上書き） |
 | `--help`, `-h` | ヘルプを表示 |
 
 ```bash
@@ -108,6 +112,8 @@ bash dotfiles/setup.sh --uninstall
 2. [Zinit](https://github.com/zdharma-continuum/zinit) プラグインマネージャーのインストール
 3. `~/.zsh` / `~/.shell` ディレクトリの作成（パーミッション 700）
 4. 設定ファイルの配置（`.zshrc`, `.bashrc`, `.zsh/plugins.zsh`, `.zsh/.p10k.zsh`, `.shell/*.sh`）
+   - `.zshrc` / `.bashrc` は **source 分離方式**: 既存ファイルに `source` 行を追加するだけで、ユーザーのカスタマイズを保持
+   - その他のファイルは差分プレビューを表示し、確認後に上書き（`--force` でスキップ可能）
    - 既存ファイルと内容が同一の場合はスキップ（べき等）
    - 内容が異なる場合はタイムスタンプ付きでバックアップ後に配置
 
@@ -142,11 +148,16 @@ bash dotfiles/setup.sh --uninstall
 4. systemd サービスの自動起動設定（Linux のみ、systemctl 利用可能時）
 5. NVIDIA Container Toolkit の自動インストール（NVIDIA GPU ドライバー検出時のみ）
 
+#### AWS CLI
+1. 環境の自動判定（Linux / macOS）
+2. AWS CLI v2 のインストール（Linux: curl + unzip / macOS: Homebrew）
+
 #### Python 開発環境
 1. ビルド依存パッケージのインストール（macOS: Homebrew / Linux: apt）
 2. [pyenv](https://github.com/pyenv/pyenv) のインストール（macOS: Homebrew / Linux: git clone）
 3. [pyenv-virtualenv](https://github.com/pyenv/pyenv-virtualenv) プラグインのインストール
-4. `python.sh` の配置（`.shell/` に pyenv 初期化）
+4. [uv](https://github.com/astral-sh/uv) パッケージマネージャーのインストール
+5. `python.sh` の配置（`.shell/` に pyenv + uv 初期化）
 
 #### Claude Code
 1. Node.js v18+ / npm の存在確認
@@ -222,7 +233,8 @@ VS Code / Cursor から Dev Containers として接続する場合は、コマ�
 - Node.js (fnm + LTS)
 - Docker Engine + Compose
 - Claude Code
-- Python (pyenv)
+- AWS CLI v2
+- Python (pyenv + uv)
 - Gemini CLI
 - Codex CLI
 
@@ -305,6 +317,7 @@ dev-templates/
 │   │   ├── node.sh           # モジュール: Node.js 開発環境
 │   │   ├── docker.sh         # モジュール: Docker + NVIDIA GPU
 │   │   ├── claude-code.sh    # モジュール: Claude Code
+│   │   ├── aws-cli.sh        # モジュール: AWS CLI v2
 │   │   ├── codex-cli.sh      # モジュール: Codex CLI
 │   │   ├── python.sh         # モジュール: Python 開発環境
 │   │   └── gemini-cli.sh     # モジュール: Gemini CLI
