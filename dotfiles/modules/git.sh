@@ -130,6 +130,17 @@ _git_show_user_guide() {
     fi
 }
 
+# --- ステータス表示 ---
+module_status() {
+    local status version
+    if command -v git &>/dev/null; then
+        version=$(git --version 2>/dev/null | head -1)
+        printf '  %-14s %s%-18s%s %s\n' "$MODULE_ID" "${C_GREEN}" "✓ installed" "${C_RESET}" "$version"
+    else
+        printf '  %-14s %s%-18s%s %s\n' "$MODULE_ID" "${C_RED}" "✗ not found" "${C_RESET}" "-"
+    fi
+}
+
 # --- アンインストール ---
 uninstall_git() {
     local restored=0

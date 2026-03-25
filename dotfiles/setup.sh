@@ -11,6 +11,7 @@ set -euo pipefail
 #   bash setup.sh --dry-run        Preview changes only
 #   bash setup.sh --force          Skip diff confirmation (backup + overwrite)
 #   bash setup.sh --uninstall      Restore from backups
+#   bash setup.sh --status         Show installation status of all modules
 #   bash setup.sh --help           Show help
 #
 # Modules are dynamically loaded from the modules/ directory.
@@ -38,6 +39,7 @@ DRY_RUN=0
 UNINSTALL=0
 ALL_FLAG=0
 HELP_FLAG=0
+STATUS_FLAG=0
 FORCE=0
 declare -a SELECT_MODULES=()
 declare -A MODULE_DEPS_MAP=()
@@ -64,6 +66,9 @@ while (($# > 0)); do
         fi
         shift
         SELECT_MODULES+=("$1")
+        ;;
+    --status)
+        STATUS_FLAG=1
         ;;
     --help | -h)
         HELP_FLAG=1
@@ -351,6 +356,51 @@ load_modules() {
 load_modules
 
 # ==============================================
+# Status display (show installation status of all modules)
+# ==============================================
+if ((STATUS_FLAG)); then
+    printf '\n'
+    printf '  %-14s %-18s %s\n' "Module" "Status" "Version"
+    printf '  %-14s %-18s %s\n' "──────────────" "──────────────────" "─────────────────────"
+
+    # Build ID -> file mapping once (O(n) instead of O(n^2) grep per module)
+    declare -A _status_file_map=()
+    for mod_file in "${SCRIPT_DIR}"/modules/*.sh; do
+        [[ -e "$mod_file" ]] || continue
+        _mod_id="$(
+            MODULE_ID=""
+            # shellcheck disable=SC1090
+            source "$mod_file"
+            printf '%s' "${MODULE_ID:-}"
+        )"
+        [[ -n "$_mod_id" ]] || continue
+        _status_file_map["$_mod_id"]="$mod_file"
+    done
+
+    for entry in "${MODULES[@]}"; do
+        IFS='|' read -r mod_id _rest <<<"$entry"
+        mod_file="${_status_file_map[$mod_id]-}"
+        if [[ -z "$mod_file" ]]; then
+            printf '  %-14s %-18s %s\n' "$mod_id" "? unknown" "-"
+            continue
+        fi
+        (
+            MODULE_ID="" MODULE_NAME="" MODULE_DESC="" MODULE_DEFAULT=0 MODULE_ORDER=50 MODULE_DEPS=""
+            # shellcheck disable=SC1090
+            source "$mod_file"
+            if declare -f module_status >/dev/null 2>&1; then
+                module_status
+            else
+                printf '  %-14s %-18s %s\n' "$mod_id" "? unknown" "-"
+            fi
+        )
+    done
+
+    printf '\n'
+    exit 0
+fi
+
+# ==============================================
 # Help display (dynamically generated after module loading)
 # ==============================================
 if ((HELP_FLAG)); then
@@ -362,6 +412,7 @@ if ((HELP_FLAG)); then
     printf '  --uninstall        全モジュールをアンインストール（バックアップから復元）\n'
     printf '  --all              全モジュールを一括インストール\n'
     printf '  --select MODULE    特定モジュールを指定（複数指定可）\n'
+    printf '  --status           各モジュールのインストール状態を表示\n'
     printf '  --help, -h         このヘルプを表示\n'
     printf '\n'
     printf 'モジュール:\n'

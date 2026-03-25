@@ -213,6 +213,67 @@ setup_modern_cli() {
     fi
 }
 
+# --- ステータス表示 ---
+module_status() {
+    local -a found=() missing=()
+    local total_tools=4
+
+    # eza
+    if command -v eza &>/dev/null; then
+        # NOTE: eza --version outputs version on line 2 (e.g. "v0.23.4 [+git]")
+        found+=("eza $(eza --version 2>/dev/null | sed -n '2p' | awk '{print $1}')")
+    else
+        missing+=("eza")
+    fi
+
+    # bat / batcat
+    if command -v bat &>/dev/null; then
+        found+=("$(bat --version 2>/dev/null | head -1)")
+    elif command -v batcat &>/dev/null; then
+        found+=("$(batcat --version 2>/dev/null | head -1)")
+    else
+        missing+=("bat")
+    fi
+
+    # fd / fdfind
+    if command -v fd &>/dev/null; then
+        found+=("$(fd --version 2>/dev/null | head -1)")
+    elif command -v fdfind &>/dev/null; then
+        found+=("$(fdfind --version 2>/dev/null | head -1)")
+    else
+        missing+=("fd")
+    fi
+
+    # rg (ripgrep)
+    if command -v rg &>/dev/null; then
+        found+=("$(rg --version 2>/dev/null | head -1)")
+    else
+        missing+=("rg")
+    fi
+
+    local found_count=${#found[@]}
+
+    if ((found_count == total_tools)); then
+        # All tools installed
+        local versions
+        versions=$(printf '%s, ' "${found[@]}")
+        versions="${versions%, }"
+        printf '  %-14s %s%-18s%s %s\n' "$MODULE_ID" "${C_GREEN}" "✓ installed" "${C_RESET}" "$versions"
+    elif ((found_count > 0)); then
+        # Partial: some tools installed, some missing
+        local found_names missing_names
+        found_names=$(printf '%s, ' "${found[@]}")
+        found_names="${found_names%, }"
+        missing_names=$(printf '%s, ' "${missing[@]}")
+        missing_names="${missing_names%, }"
+        printf '  %-14s %s%-18s%s found: %s | missing: %s\n' \
+            "$MODULE_ID" "${C_YELLOW}" "△ partial" "${C_RESET}" "$found_names" "$missing_names"
+    else
+        # No tools installed
+        printf '  %-14s %s%-18s%s %s\n' "$MODULE_ID" "${C_RED}" "✗ not found" "${C_RESET}" "-"
+    fi
+}
+
 # --- アンインストール ---
 # NOTE: システムパッケージの自動削除は意図しない依存破壊のリスクがあるため、手順の表示のみとする
 uninstall_modern_cli() {
