@@ -1,25 +1,85 @@
 #!/usr/bin/env bats
 
-# Backup restore sort order tests (regression for #59)
+# Tests for find_newest_backup() in lib/backup.sh
 
-MODULES_DIR="$(cd "$(dirname "$BATS_TEST_FILENAME")/../modules" && pwd)"
-
-@test "no modules use om[1] (oldest-first) for backup restore" {
-    for f in "$MODULES_DIR"/*.sh; do
-        run grep -n 'om\[1\]' "$f"
-        if [ "$status" -eq 0 ]; then
-            echo "$(basename "$f") uses om[1] (oldest-first) instead of Om[1] (newest-first): $output" >&2
-            return 1
-        fi
-    done
+setup() {
+    PROJECT_ROOT="$(cd "$BATS_TEST_DIRNAME/.." && pwd)"
+    # shellcheck source=../lib/backup.sh
+    source "$PROJECT_ROOT/lib/backup.sh"
+    TEST_TMPDIR="$(mktemp -d)"
 }
 
-@test "modules using backup restore use Om[1] (newest-first)" {
-    local found=0
-    for f in "$MODULES_DIR"/*.sh; do
-        if grep -q 'Om\[1\]' "$f"; then
-            found=1
-        fi
-    done
-    [ "$found" -eq 1 ] || skip "No modules use backup restore pattern"
+teardown() {
+    rm -rf "$TEST_TMPDIR"
+}
+
+# ============================================================
+# find_newest_backup() tests
+# ============================================================
+
+@test "find_newest_backup returns newest backup by modification time" {
+    # Arrange: create backup files with different modification times
+    touch "$TEST_TMPDIR/config.bak.20260101000000"
+    touch "$TEST_TMPDIR/config.bak.20260301000000"
+    touch "$TEST_TMPDIR/config.bak.20260201000000"
+    # Ensure modification-time order matches name order
+    touch -t 202601010000 "$TEST_TMPDIR/config.bak.20260101000000"
+    touch -t 202603010000 "$TEST_TMPDIR/config.bak.20260301000000"
+    touch -t 202602010000 "$TEST_TMPDIR/config.bak.20260201000000"
+
+    # Act
+    run find_newest_backup "$TEST_TMPDIR/config.bak.*"
+
+    # Assert
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"20260301000000"* ]]
+}
+
+@test "find_newest_backup returns 1 when no backups exist" {
+    # Act
+    run find_newest_backup "$TEST_TMPDIR/nonexistent.bak.*"
+
+    # Assert
+    [ "$status" -eq 1 ]
+    [ -z "$output" ]
+}
+
+@test "find_newest_backup handles single backup file" {
+    # Arrange
+    touch "$TEST_TMPDIR/config.bak.20260115120000"
+
+    # Act
+    run find_newest_backup "$TEST_TMPDIR/config.bak.*"
+
+    # Assert
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"20260115120000"* ]]
+}
+
+@test "find_newest_backup returns full path" {
+    # Arrange
+    touch "$TEST_TMPDIR/myfile.bak.20260501000000"
+
+    # Act
+    run find_newest_backup "$TEST_TMPDIR/myfile.bak.*"
+
+    # Assert
+    [ "$status" -eq 0 ]
+    [ "$output" = "$TEST_TMPDIR/myfile.bak.20260501000000" ]
+}
+
+@test "find_newest_backup picks newest by mtime not by name" {
+    # Arrange: name order differs from modification-time order
+    touch "$TEST_TMPDIR/rc.bak.AAA"
+    touch "$TEST_TMPDIR/rc.bak.ZZZ"
+    # Make AAA newer by mtime even though ZZZ sorts later alphabetically
+    touch -t 202601010000 "$TEST_TMPDIR/rc.bak.ZZZ"
+    touch -t 202612010000 "$TEST_TMPDIR/rc.bak.AAA"
+
+    # Act
+    run find_newest_backup "$TEST_TMPDIR/rc.bak.*"
+
+    # Assert: AAA is picked (newest mtime)
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"rc.bak.AAA" ]]
 }

@@ -27,74 +27,13 @@ setup() {
     FORCE=0
     BACKUP_SUFFIX=".backup.test"
 
-    # Source helper functions from setup.sh by extracting them
-    # NOTE: We cannot source setup.sh directly because it runs load_modules
-    # and other side effects. Instead, define the functions inline from setup.sh.
-    _source_setup_functions
+    # Source shared helper functions (run_cmd, install_config, install_source_config)
+    # shellcheck source=helpers/setup_functions.bash
+    source "$BATS_TEST_DIRNAME/helpers/setup_functions.bash"
 }
 
 teardown() {
     rm -rf "$TEST_TMPDIR"
-}
-
-# Extract install_config from setup.sh without triggering side effects.
-# Mirrors the approach in test_install_config.bats.
-# NOTE: install_config below is a simplified version of setup.sh (lines ~117-213) for testing.
-# The interactive diff prompt ([y/N/d]) and cp failure recovery hints are omitted.
-# If the production install_config changes, review and update this test version accordingly.
-_source_setup_functions() {
-    # run_cmd: dry-run aware command wrapper
-    run_cmd() {
-        if ((DRY_RUN)); then
-            msg_dry_run "$(printf '%q ' "$@")"
-        else
-            "$@"
-        fi
-    }
-
-    # install_config: config file backup and deployment helper
-    install_config() {
-        local src="$1" dst="$2" label="$3" missing_hint="${4:-}"
-
-        if [[ ! -f "$src" ]]; then
-            if [[ -n "$missing_hint" ]]; then
-                msg_warn "${label} が見つかりません。${missing_hint}"
-            else
-                msg_error "配布元の ${label} が見つかりません: ${src}"
-                exit 1
-            fi
-            return 0
-        fi
-
-        if [[ -f "$dst" && ! -L "$dst" ]] && cmp -s "$src" "$dst"; then
-            msg_info "${label} は既に最新の状態です。スキップします。"
-            return 0
-        fi
-
-        if [[ -f "$dst" || -L "$dst" ]]; then
-            if ((DRY_RUN)); then
-                msg_dry_run "${label} を更新予定です。"
-                return 0
-            fi
-
-            if ! ((FORCE)); then
-                msg_info "スキップしました: ${label}"
-                return 0
-            fi
-
-            run_cmd command mv "$dst" "${dst}${BACKUP_SUFFIX}" || {
-                msg_error "${label} のバックアップに失敗しました。"
-                exit 1
-            }
-            msg_info "既存の ${label} を ${dst}${BACKUP_SUFFIX} にバックアップしました。"
-        fi
-
-        run_cmd command cp -p "$src" "$dst" || {
-            msg_error "${label} の配置に失敗しました。"
-            exit 1
-        }
-        msg_info "${label} を配置しました。"
-    }
 }
 
 # ============================================================
