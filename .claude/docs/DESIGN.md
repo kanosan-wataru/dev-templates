@@ -583,7 +583,7 @@ Zsh-only config (`plugins.zsh`) remained in `dotfiles/.zsh/`.
 | TUI: in-place rewrite | Preserve exact UX; read -rsn 1 is direct equivalent of read -k 1 | External tool (dialog/whiptail), simplify to numbered list | 2026-03-18 |
 | Config files: shared .shell/ dir | Unified POSIX-compatible config shared by bash and zsh | Single shared dir (too many conditionals), replace .zsh entirely (breaking) | 2026-03-18 |
 | Target: bash 4+ only | declare -A required; macOS supported via Homebrew (bash 5.x); CI runs on both Ubuntu and macOS | bash 3.2 (no assoc arrays, much harder) | 2026-03-18 |
-| Backup discovery: ls -t helper | Simple, fast, covers all cases | find -printf (GNU-only), stat (macOS incompatible -- moot since Linux-only) | 2026-03-18 |
+| Backup discovery: ls -t helper | Simple, fast, covers all cases | find -printf (GNU-only, not portable to macOS/BSD), stat (flags differ between GNU/BSD; not reliably portable) | 2026-03-18 |
 | Gemini role expanded to codebase analysis + research + multimodal | Gemini CLI has native 1M context; Claude Code is 200K; delegate large-context tasks to Gemini | Keep Claude for codebase analysis (requires 1M Beta) | 2026-02-19 |
 | All subagents default to Opus | 200K context makes quality of reasoning more important than context size; Opus provides better output | Sonnet (cheaper but 200K same as Opus, weaker reasoning) | 2026-02-19 |
 | Agent Teams default model changed to Opus | Consistent with subagent model selection; better reasoning for parallel tasks | Sonnet (cheaper) | 2026-02-19 |
