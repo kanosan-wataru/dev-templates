@@ -154,27 +154,40 @@ setup_modern_cli() {
         [[ "$cmd_name" == "bat" ]] && alt_cmd="batcat"
         [[ "$cmd_name" == "fd" ]] && alt_cmd="fdfind"
 
-        # べき等性チェック
+        # Idempotency check (skip if already installed and not upgrading)
         if command -v "$cmd_name" >/dev/null 2>&1; then
-            msg_info "${cmd_name} は既にインストールされています。スキップします。"
-            ((skipped++))
-            continue
+            if ! ((UPGRADE)); then
+                msg_info "${cmd_name} は既にインストールされています。スキップします。"
+                ((skipped++))
+                continue
+            fi
+            msg_info "${cmd_name} のアップグレードを実行します... (現在: $(${cmd_name} --version 2>/dev/null | head -1 || echo 'unknown'))"
         fi
         if [[ -n "$alt_cmd" ]] && command -v "$alt_cmd" >/dev/null 2>&1; then
-            msg_info "${alt_cmd} (${cmd_name}) は既にインストールされています。スキップします。"
-            ((skipped++))
-            continue
+            if ! ((UPGRADE)); then
+                msg_info "${alt_cmd} (${cmd_name}) は既にインストールされています。スキップします。"
+                ((skipped++))
+                continue
+            fi
+            msg_info "${cmd_name} のアップグレードを実行します... (現在: $(${alt_cmd} --version 2>/dev/null | head -1 || echo 'unknown'))"
         fi
 
         printf '%s\n' "${cmd_name} をインストールします... (${desc})"
 
         case "$os" in
         macos)
-            run_cmd brew install "$brew_pkg" || {
-                msg_error "${cmd_name} のインストールに失敗しました。"
-                ((failed++))
-                continue
-            }
+            if ((UPGRADE)); then
+                run_cmd brew upgrade "$brew_pkg" || {
+                    msg_warn "${cmd_name} のアップグレードに失敗しました（既に最新の可能性があります）。"
+                    continue
+                }
+            else
+                run_cmd brew install "$brew_pkg" || {
+                    msg_error "${cmd_name} のインストールに失敗しました。"
+                    ((failed++))
+                    continue
+                }
+            fi
             ;;
         linux)
             if [[ "$cmd_name" == "eza" ]]; then

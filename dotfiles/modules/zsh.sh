@@ -63,6 +63,22 @@ setup_zsh() {
         else
             msg_success "Zinit ${ZSH_MOD_ZINIT_VERSION} のインストールに成功しました。"
         fi
+    elif ((UPGRADE)); then
+        # Upgrade Zinit in a way that works with detached HEAD / shallow clones
+        msg_info "Zinit のアップグレードを実行します..."
+        run_cmd command git -C "$ZSH_MOD_ZINIT_HOME" fetch --tags --force --depth 1 origin "$ZSH_MOD_ZINIT_VERSION" || {
+            msg_error "Zinit のアップグレードに失敗しました（fetch に失敗しました）。"
+            return 1
+        }
+        run_cmd command git -C "$ZSH_MOD_ZINIT_HOME" checkout --force FETCH_HEAD || {
+            msg_error "Zinit のアップグレードに失敗しました（checkout に失敗しました）。"
+            return 1
+        }
+        if ((DRY_RUN)); then
+            msg_info "Zinit をアップグレード予定です（dry-run）。"
+        else
+            msg_success "Zinit のアップグレードが完了しました。"
+        fi
     else
         msg_info "Zinit は既にインストールされています。"
     fi

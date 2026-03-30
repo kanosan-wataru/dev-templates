@@ -45,10 +45,6 @@ _docker_is_installed() {
         return 1
     fi
 
-    local docker_ver compose_ver
-    docker_ver=$(docker --version 2>/dev/null || printf '%s' "unknown")
-    compose_ver=$(docker compose version 2>/dev/null || printf '%s' "unknown")
-    msg_info "Docker は既にインストールされています (${docker_ver}, ${compose_ver})。スキップします。"
     return 0
 }
 
@@ -152,11 +148,18 @@ _docker_install_macos() {
         return 1
     fi
 
-    msg_step "Docker Desktop を Homebrew でインストールします..."
-    run_cmd brew install --cask docker || {
-        msg_error "Docker Desktop のインストールに失敗しました。"
-        return 1
-    }
+    if ((UPGRADE)); then
+        msg_step "Docker Desktop を Homebrew でアップグレードします..."
+        run_cmd brew upgrade --cask docker || {
+            msg_warn "Docker Desktop のアップグレードに失敗しました（既に最新の可能性があります）。"
+        }
+    else
+        msg_step "Docker Desktop を Homebrew でインストールします..."
+        run_cmd brew install --cask docker || {
+            msg_error "Docker Desktop のインストールに失敗しました。"
+            return 1
+        }
+    fi
 }
 
 # --- ヘルパー: Docker グループ設定 + systemd 自動起動 (Linux のみ) ---
@@ -304,8 +307,27 @@ setup_docker() {
 
     # --- 1. Docker のインストール（べき等） ---
     if _docker_is_installed; then
-        # インストール済み; インストールをスキップ
-        :
+        if ! ((UPGRADE)); then
+            # Already installed and not upgrading; skip installation
+            local docker_ver compose_ver
+            docker_ver=$(docker --version 2>/dev/null || printf '%s' "unknown")
+            compose_ver=$(docker compose version 2>/dev/null || printf '%s' "unknown")
+            msg_info "Docker は既にインストールされています (${docker_ver}, ${compose_ver})。スキップします。"
+        else
+            msg_info "Docker のアップグレードを実行します... (現在: $(docker --version 2>/dev/null || echo 'unknown'))"
+            case "$env" in
+            linux)
+                if ! command -v apt-get >/dev/null 2>&1; then
+                    msg_error "apt-get が見つかりません。Debian/Ubuntu 系のみ対応しています。"
+                    return 1
+                fi
+                _docker_install_apt || return 1
+                ;;
+            macos)
+                _docker_install_macos || return 1
+                ;;
+            esac
+        fi
     else
         msg_info "Docker をインストールします..."
         case "$env" in
