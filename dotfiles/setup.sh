@@ -10,6 +10,7 @@ set -euo pipefail
 #   bash setup.sh --select zsh     Specify modules (multiple allowed)
 #   bash setup.sh --dry-run        Preview changes only
 #   bash setup.sh --force          Skip diff confirmation (backup + overwrite)
+#   bash setup.sh --upgrade         Upgrade installed tools to latest
 #   bash setup.sh --uninstall      Restore from backups
 #   bash setup.sh --status         Show installation status of all modules
 #   bash setup.sh --help           Show help
@@ -41,6 +42,7 @@ ALL_FLAG=0
 HELP_FLAG=0
 STATUS_FLAG=0
 FORCE=0
+UPGRADE=0
 declare -a SELECT_MODULES=()
 declare -A MODULE_DEPS_MAP=()
 declare -A MODULE_ID_SET=()
@@ -67,6 +69,9 @@ while (($# > 0)); do
         shift
         SELECT_MODULES+=("$1")
         ;;
+    --upgrade)
+        UPGRADE=1
+        ;;
     --status)
         STATUS_FLAG=1
         ;;
@@ -81,6 +86,12 @@ while (($# > 0)); do
     esac
     shift
 done
+
+# --- Mutual exclusion checks ---
+if ((UPGRADE)) && ((UNINSTALL)); then
+    msg_error "--upgrade と --uninstall は同時に指定できません"
+    exit 1
+fi
 
 # ==============================================
 # Common variables
@@ -409,6 +420,7 @@ if ((HELP_FLAG)); then
     printf 'オプション:\n'
     printf '  --dry-run          変更内容のプレビューのみ（実際には変更しない）\n'
     printf '  --force, -f        差分確認をスキップ（バックアップ＋上書き）\n'
+    printf '  --upgrade          インストール済みツールを最新バージョンに更新\n'
     printf '  --uninstall        全モジュールをアンインストール（バックアップから復元）\n'
     printf '  --all              全モジュールを一括インストール\n'
     printf '  --select MODULE    特定モジュールを指定（複数指定可）\n'

@@ -49,11 +49,15 @@ setup_codex_cli() {
     # =========================================
 
     # べき等性チェック
-    if command -v codex >/dev/null 2>&1; then
+    if command -v codex >/dev/null 2>&1 && ! ((UPGRADE)); then
         local current_ver
         current_ver=$(codex --version 2>/dev/null || printf '%s' "unknown")
         msg_info "Codex CLI は既にインストールされています (${current_ver})。スキップします。"
     else
+        # Upgrade path: show info message when upgrading an existing installation
+        if command -v codex >/dev/null 2>&1 && ((UPGRADE)); then
+            msg_info "Codex CLI のアップグレードを実行します... (現在: $(codex --version 2>/dev/null || echo 'unknown'))"
+        fi
         # Node.js / npm の確認
         if ! ensure_node; then
             msg_warn "Codex CLI のインストールには Node.js v18+ が必要です。"

@@ -21,6 +21,9 @@ GIT_MOD_MANAGED_FILES=(
     "$SCRIPT_DIR/.gitignore_global|$GIT_MOD_BASE_DIR/.gitignore_global|.gitignore_global|"
 )
 
+# NOTE: No upgrade path needed -- this is a config-only module.
+# Config deployment is handled by install_config which already supports diffs.
+
 # --- セットアップ ---
 setup_git() {
     msg_header "Git グローバル設定"

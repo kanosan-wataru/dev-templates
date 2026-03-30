@@ -27,6 +27,13 @@ _aws_is_installed() {
 
     local aws_ver
     aws_ver=$(aws --version 2>/dev/null || printf '%s' "unknown")
+
+    # When UPGRADE=1, do not skip — proceed to upgrade
+    if ((UPGRADE)); then
+        msg_info "AWS CLI のアップグレードを実行します... (現在: ${aws_ver})"
+        return 1
+    fi
+
     msg_info "AWS CLI は既にインストールされています (${aws_ver})。スキップします。"
     return 0
 }
@@ -66,10 +73,16 @@ _aws_install_linux() {
     local download_url="https://awscli.amazonaws.com/awscli-exe-linux-${arch}.zip"
     msg_step "AWS CLI v2 をダウンロードします..."
 
+    # Determine install flags (--update for upgrade)
+    local install_flags=""
+    if ((UPGRADE)); then
+        install_flags="--update"
+    fi
+
     if ((DRY_RUN)); then
         msg_dry_run "curl -fsSL ${download_url} -o /tmp/awscliv2.zip"
         msg_dry_run "unzip -q -o /tmp/awscliv2.zip -d /tmp"
-        msg_dry_run "sudo /tmp/aws/install"
+        msg_dry_run "sudo /tmp/aws/install ${install_flags}"
         msg_dry_run "rm -rf /tmp/awscliv2.zip /tmp/aws"
         return 0
     fi
@@ -87,7 +100,8 @@ _aws_install_linux() {
         return 1
     }
 
-    sudo /tmp/aws/install || {
+    # shellcheck disable=SC2086
+    sudo /tmp/aws/install ${install_flags} || {
         msg_error "AWS CLI v2 のインストールに失敗しました。"
         rm -rf /tmp/awscliv2.zip /tmp/aws
         return 1
@@ -105,11 +119,18 @@ _aws_install_macos() {
         return 1
     fi
 
-    msg_step "AWS CLI v2 を Homebrew でインストールします..."
-    run_cmd brew install awscli || {
-        msg_error "AWS CLI v2 のインストールに失敗しました。"
-        return 1
-    }
+    if ((UPGRADE)); then
+        msg_step "AWS CLI v2 を Homebrew でアップグレードします..."
+        run_cmd brew upgrade awscli || {
+            msg_warn "AWS CLI v2 のアップグレードに失敗しました（既に最新の可能性があります）。"
+        }
+    else
+        msg_step "AWS CLI v2 を Homebrew でインストールします..."
+        run_cmd brew install awscli || {
+            msg_error "AWS CLI v2 のインストールに失敗しました。"
+            return 1
+        }
+    fi
 }
 
 # --- セットアップ ---
