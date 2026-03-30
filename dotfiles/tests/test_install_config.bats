@@ -38,9 +38,9 @@ teardown() {
 
 # Extract install_config and install_source_config from setup.sh
 # without triggering side effects (module loading, arg parsing, etc.)
-# NOTE: install_config below is an inline copy of setup.sh (lines ~117-213).
-# If the production install_config changes, update this copy accordingly.
-# Direct sourcing of setup.sh is not possible due to side effects (arg parsing, module loading).
+# NOTE: install_config below is a simplified version of setup.sh (lines ~117-213) for testing.
+# The interactive diff prompt ([y/N/d]) and cp failure recovery hints are omitted.
+# If the production install_config changes, review and update this test version accordingly.
 _source_setup_functions() {
     # run_cmd: dry-run aware command wrapper
     run_cmd() {

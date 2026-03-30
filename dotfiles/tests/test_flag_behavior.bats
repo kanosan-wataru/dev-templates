@@ -39,9 +39,9 @@ teardown() {
 
 # Extract install_config from setup.sh without triggering side effects.
 # Mirrors the approach in test_install_config.bats.
-# NOTE: install_config below is an inline copy of setup.sh (lines ~117-213).
-# If the production install_config changes, update this copy accordingly.
-# Direct sourcing of setup.sh is not possible due to side effects (arg parsing, module loading).
+# NOTE: install_config below is a simplified version of setup.sh (lines ~117-213) for testing.
+# The interactive diff prompt ([y/N/d]) and cp failure recovery hints are omitted.
+# If the production install_config changes, review and update this test version accordingly.
 _source_setup_functions() {
     # run_cmd: dry-run aware command wrapper
     run_cmd() {
@@ -157,7 +157,11 @@ _source_setup_functions() {
     [ "$(cat "${DST_DIR}/config${BACKUP_SUFFIX}")" = "old content" ]
 }
 
-@test "no_force_skips_differing_file" {
+@test "no_force_noninteractive_skips_differing_file" {
+    # NOTE: In non-interactive context (no TTY), install_config skips files
+    # that differ when FORCE=0. The production version would show a diff prompt
+    # in an interactive terminal.
+
     # Arrange: source and destination differ, FORCE=0 (default)
     FORCE=0
     printf 'new content\n' >"${SRC_DIR}/config"
@@ -194,7 +198,7 @@ _source_setup_functions() {
     DRY_RUN=1
     printf 'original\n' >"${DST_DIR}/config"
     local original_hash
-    original_hash=$(md5sum "${DST_DIR}/config" | cut -d' ' -f1)
+    original_hash=$(cksum "${DST_DIR}/config")
 
     printf 'modified\n' >"${SRC_DIR}/config"
 
@@ -204,7 +208,7 @@ _source_setup_functions() {
     # Assert: file NOT modified
     [ "$status" -eq 0 ]
     local new_hash
-    new_hash=$(md5sum "${DST_DIR}/config" | cut -d' ' -f1)
+    new_hash=$(cksum "${DST_DIR}/config")
     [ "$original_hash" = "$new_hash" ]
 }
 
