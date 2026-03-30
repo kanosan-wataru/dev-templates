@@ -304,8 +304,24 @@ setup_docker() {
 
     # --- 1. Docker のインストール（べき等） ---
     if _docker_is_installed; then
-        # インストール済み; インストールをスキップ
-        :
+        if ! ((UPGRADE)); then
+            # Already installed and not upgrading; skip installation
+            :
+        else
+            msg_info "Docker のアップグレードを実行します..."
+            case "$env" in
+            linux)
+                if ! command -v apt-get >/dev/null 2>&1; then
+                    msg_error "apt-get が見つかりません。Debian/Ubuntu 系のみ対応しています。"
+                    return 1
+                fi
+                _docker_install_apt || return 1
+                ;;
+            macos)
+                _docker_install_macos || return 1
+                ;;
+            esac
+        fi
     else
         msg_info "Docker をインストールします..."
         case "$env" in

@@ -154,16 +154,22 @@ setup_modern_cli() {
         [[ "$cmd_name" == "bat" ]] && alt_cmd="batcat"
         [[ "$cmd_name" == "fd" ]] && alt_cmd="fdfind"
 
-        # べき等性チェック
+        # Idempotency check (skip if already installed and not upgrading)
         if command -v "$cmd_name" >/dev/null 2>&1; then
-            msg_info "${cmd_name} は既にインストールされています。スキップします。"
-            ((skipped++))
-            continue
+            if ! ((UPGRADE)); then
+                msg_info "${cmd_name} は既にインストールされています。スキップします。"
+                ((skipped++))
+                continue
+            fi
+            msg_info "${cmd_name} のアップグレードを実行します..."
         fi
         if [[ -n "$alt_cmd" ]] && command -v "$alt_cmd" >/dev/null 2>&1; then
-            msg_info "${alt_cmd} (${cmd_name}) は既にインストールされています。スキップします。"
-            ((skipped++))
-            continue
+            if ! ((UPGRADE)); then
+                msg_info "${alt_cmd} (${cmd_name}) は既にインストールされています。スキップします。"
+                ((skipped++))
+                continue
+            fi
+            msg_info "${cmd_name} のアップグレードを実行します..."
         fi
 
         printf '%s\n' "${cmd_name} をインストールします... (${desc})"

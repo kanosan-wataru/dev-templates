@@ -45,11 +45,15 @@ setup_gemini_cli() {
     # =========================================
 
     # べき等性チェック
-    if command -v gemini >/dev/null 2>&1; then
+    if command -v gemini >/dev/null 2>&1 && ! ((UPGRADE)); then
         local current_ver
         current_ver=$(gemini --version 2>/dev/null || printf '%s' "unknown")
         msg_info "Gemini CLI は既にインストールされています (${current_ver})。スキップします。"
     else
+        # Upgrade path: show info message when upgrading an existing installation
+        if command -v gemini >/dev/null 2>&1 && ((UPGRADE)); then
+            msg_info "Gemini CLI のアップグレードを実行します..."
+        fi
         # Node.js / npm の確認
         if ! ensure_node 20; then
             msg_warn "Gemini CLI のインストールには Node.js v20+ が必要です。"

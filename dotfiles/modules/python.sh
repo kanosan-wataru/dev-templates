@@ -60,11 +60,15 @@ setup_python() {
     if command -v pyenv >/dev/null 2>&1; then
         local current_ver
         current_ver=$(pyenv --version 2>/dev/null || printf '%s' "unknown")
-        msg_info "pyenv は既にインストールされています (${current_ver})。スキップします。"
-        pyenv_already_installed=1
+        if ((UPGRADE)); then
+            msg_info "pyenv のアップグレードを実行します... (現在: ${current_ver})"
+        else
+            msg_info "pyenv は既にインストールされています (${current_ver})。スキップします。"
+            pyenv_already_installed=1
+        fi
     fi
 
-    # pyenv installation (skip if already installed)
+    # pyenv installation or upgrade
     if ((!pyenv_already_installed)); then
         local os
         os=$(_py_detect_os)
@@ -109,16 +113,28 @@ _py_setup_macos() {
         return 1
     fi
 
-    msg_info "pyenv を Homebrew でインストールします..."
-    run_cmd brew install pyenv || {
-        msg_error "pyenv のインストールに失敗しました。"
-        return 1
-    }
+    if ((UPGRADE)); then
+        msg_info "pyenv を Homebrew でアップグレードします..."
+        run_cmd brew upgrade pyenv || {
+            msg_warn "pyenv のアップグレードに失敗しました（既に最新の可能性があります）。"
+        }
 
-    msg_info "pyenv-virtualenv を Homebrew でインストールします..."
-    run_cmd brew install pyenv-virtualenv || {
-        msg_warn "pyenv-virtualenv のインストールに失敗しました。pyenv 本体は利用可能です。"
-    }
+        msg_info "pyenv-virtualenv を Homebrew でアップグレードします..."
+        run_cmd brew upgrade pyenv-virtualenv || {
+            msg_warn "pyenv-virtualenv のアップグレードに失敗しました（既に最新の可能性があります）。"
+        }
+    else
+        msg_info "pyenv を Homebrew でインストールします..."
+        run_cmd brew install pyenv || {
+            msg_error "pyenv のインストールに失敗しました。"
+            return 1
+        }
+
+        msg_info "pyenv-virtualenv を Homebrew でインストールします..."
+        run_cmd brew install pyenv-virtualenv || {
+            msg_warn "pyenv-virtualenv のインストールに失敗しました。pyenv 本体は利用可能です。"
+        }
+    fi
 }
 
 # --- Linux セットアップ ---
@@ -153,6 +169,20 @@ _py_setup_linux() {
                 msg_step "手動で削除してください: rm -rf $PY_MOD_PYENV_ROOT" >&2
                 return 1
             }
+        elif ((UPGRADE)); then
+            # Upgrade pyenv via git pull
+            msg_info "pyenv を git pull でアップグレードします..."
+            run_cmd git -C "$PY_MOD_PYENV_ROOT" pull || {
+                msg_warn "pyenv の git pull に失敗しました。"
+            }
+            # Also upgrade pyenv-virtualenv plugin
+            local virtualenv_dir="$PY_MOD_PYENV_ROOT/plugins/pyenv-virtualenv"
+            if [[ -d "$virtualenv_dir" ]]; then
+                msg_info "pyenv-virtualenv を git pull でアップグレードします..."
+                run_cmd git -C "$virtualenv_dir" pull || {
+                    msg_warn "pyenv-virtualenv の git pull に失敗しました。"
+                }
+            fi
         else
             msg_info "$PY_MOD_PYENV_ROOT は既に存在します。スキップします。"
         fi
@@ -182,7 +212,19 @@ _py_setup_uv() {
     msg_info "uv のセットアップを開始します..."
 
     if command -v uv &>/dev/null; then
-        msg_info "uv は既にインストールされています。($(uv --version))"
+        if ((UPGRADE)); then
+            msg_info "uv のアップグレードを実行します... (現在: $(uv --version))"
+            if ((DRY_RUN)); then
+                msg_dry_run "uv self update"
+            else
+                uv self update || {
+                    msg_warn "uv のアップグレードに失敗しました。"
+                }
+                msg_success "uv をアップグレードしました。($(uv --version 2>/dev/null || echo 'version unknown'))"
+            fi
+        else
+            msg_info "uv は既にインストールされています。($(uv --version))"
+        fi
     else
         if ((DRY_RUN)); then
             msg_dry_run "uv をインストール予定です。"

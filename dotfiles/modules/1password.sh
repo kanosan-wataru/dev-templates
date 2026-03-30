@@ -394,9 +394,12 @@ setup_1password() {
     esac
 
     # --- 1. op CLI のインストール ---
-    if command -v op >/dev/null 2>&1; then
+    if command -v op >/dev/null 2>&1 && ! ((UPGRADE)); then
         msg_info "op CLI は既にインストールされています ($(op --version 2>/dev/null || echo '不明'))。スキップします。"
     else
+        if command -v op >/dev/null 2>&1 && ((UPGRADE)); then
+            msg_info "1password-cli のアップグレードを実行します..."
+        fi
         msg_info "1Password CLI (op) をインストールします..."
         case "$env" in
         wsl | linux)

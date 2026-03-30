@@ -63,6 +63,18 @@ setup_zsh() {
         else
             msg_success "Zinit ${ZSH_MOD_ZINIT_VERSION} のインストールに成功しました。"
         fi
+    elif ((UPGRADE)); then
+        # Upgrade Zinit by pulling latest changes
+        msg_info "Zinit のアップグレードを実行します..."
+        run_cmd command git -C "$ZSH_MOD_ZINIT_HOME" pull || {
+            msg_error "Zinit のアップグレードに失敗しました。"
+            return 1
+        }
+        if ((DRY_RUN)); then
+            msg_info "Zinit をアップグレード予定です（dry-run）。"
+        else
+            msg_success "Zinit のアップグレードが完了しました。"
+        fi
     else
         msg_info "Zinit は既にインストールされています。"
     fi

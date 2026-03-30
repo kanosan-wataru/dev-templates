@@ -51,8 +51,12 @@ setup_node() {
     if command -v fnm >/dev/null 2>&1; then
         local current_ver
         current_ver=$(fnm --version 2>/dev/null || printf '%s' "unknown")
-        msg_info "fnm は既にインストールされています (${current_ver})。スキップします。"
-        fnm_exists=1
+        if ((UPGRADE)); then
+            msg_info "fnm のアップグレードを実行します... (現在: ${current_ver})"
+        else
+            msg_info "fnm は既にインストールされています (${current_ver})。スキップします。"
+            fnm_exists=1
+        fi
     fi
 
     if ((!fnm_exists)); then
@@ -117,11 +121,18 @@ _node_setup_macos() {
         return 1
     fi
 
-    msg_info "fnm を Homebrew でインストールします..."
-    run_cmd brew install fnm || {
-        msg_error "fnm のインストールに失敗しました。"
-        return 1
-    }
+    if ((UPGRADE)); then
+        msg_info "fnm を Homebrew でアップグレードします..."
+        run_cmd brew upgrade fnm || {
+            msg_warn "fnm のアップグレードに失敗しました（既に最新の可能性があります）。"
+        }
+    else
+        msg_info "fnm を Homebrew でインストールします..."
+        run_cmd brew install fnm || {
+            msg_error "fnm のインストールに失敗しました。"
+            return 1
+        }
+    fi
 }
 
 # --- Linux セットアップ ---
@@ -240,7 +251,9 @@ _node_install_lts() {
             node_major="${node_major%%.*}"
         fi
 
-        if [[ "$node_major" =~ ^[0-9]+$ ]] && ((node_major >= 18)); then
+        if ((UPGRADE)); then
+            msg_info "Node.js LTS のアップグレードを実行します... (現在: ${node_ver:-unknown})"
+        elif [[ "$node_major" =~ ^[0-9]+$ ]] && ((node_major >= 18)); then
             msg_info "Node.js は既にインストールされています (${node_ver})。スキップします。"
             return 0
         elif [[ "$node_major" =~ ^[0-9]+$ ]] && ((node_major < 18)); then

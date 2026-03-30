@@ -337,11 +337,15 @@ setup_claude_code() {
     # =========================================
 
     # べき等性チェック
-    if command -v claude >/dev/null 2>&1; then
+    if command -v claude >/dev/null 2>&1 && ! ((UPGRADE)); then
         local current_ver
         current_ver=$(claude --version 2>/dev/null || printf '%s' "unknown")
         msg_info "Claude Code は既にインストールされています (${current_ver})。スキップします。"
     else
+        # Upgrade path: show info message when upgrading an existing installation
+        if command -v claude >/dev/null 2>&1 && ((UPGRADE)); then
+            msg_info "Claude Code のアップグレードを実行します..."
+        fi
         # Node.js / npm の確認
         if ! ensure_node; then
             msg_warn "Claude Code のインストールには Node.js v18+ が必要です。"
