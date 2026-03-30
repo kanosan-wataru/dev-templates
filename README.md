@@ -334,6 +334,15 @@ dev-templates/
 │   │   ├── codex-cli.sh      # モジュール: Codex CLI
 │   │   ├── python.sh         # モジュール: Python 開発環境
 │   │   └── gemini-cli.sh     # モジュール: Gemini CLI
+│   ├── tests/
+│   │   ├── test_backup_sort.bats      # テスト: バックアップソート
+│   │   ├── test_detect_env.bats       # テスト: 環境検出
+│   │   ├── test_flag_behavior.bats    # テスト: フラグ動作
+│   │   ├── test_install_config.bats   # テスト: インストール設定
+│   │   ├── test_module_metadata.bats  # テスト: モジュールメタデータ
+│   │   ├── test_positional_args.bats  # テスト: 位置引数
+│   │   ├── test_status.bats           # テスト: ステータス表示
+│   │   └── test_upgrade.bats          # テスト: アップグレード
 │   ├── .gitconfig.shared     # Git 共有設定（include.path 経由）
 │   ├── .gitignore_global     # グローバル gitignore
 │   ├── .bashrc                # Bash エントリーポイント（.shell/ 読み込み）
