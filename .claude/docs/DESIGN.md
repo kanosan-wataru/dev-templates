@@ -341,32 +341,31 @@ fi
 
 ---
 
-### 7. .zsh/.bash Config File Strategy
+### 7. .zsh/.shell Config File Strategy
 
-**Decision: Dual directory structure (keep .zsh, add .bash)**
+**Decision: Shared `.shell/` directory + zsh-only `.zsh/`**
+
+Instead of the originally planned dual `.zsh/` + `.bash/` structure, POSIX-compatible
+files were consolidated into a single `.shell/` directory sourced by both `.bashrc`
+and `.zshrc`. Only the zsh-specific plugin file remains in `.zsh/`.
 
 ```
 dotfiles/
-+-- .zsh/             # UNCHANGED -- for zsh users
-|   +-- plugins.zsh   # Zinit (zsh-only, no bash equivalent)
-|   +-- aliases.zsh   # POSIX-compatible
-|   +-- env.zsh       # POSIX-compatible
-|   +-- node.zsh      # fnm --shell zsh
-|   +-- python.zsh    # POSIX-compatible
-|   +-- 1password.zsh # Minor zsh-isms
-|   +-- .p10k.zsh     # Powerlevel10k (zsh-only)
-+-- .bash/            # NEW -- for bash users
-|   +-- aliases.sh    # Symlink or copy from aliases.zsh (identical)
-|   +-- env.sh        # Symlink or copy from env.zsh (identical)
-|   +-- node.sh       # Adapted: fnm env --shell bash
-|   +-- python.sh     # Symlink or copy from python.zsh (identical)
-|   +-- 1password.sh  # Adapted: printf instead of print -P
-|   +-- plugins.sh    # NEW: bash completions, prompt setup
-+-- .bashrc           # NEW: entry point for bash config
-+-- .zshrc            # EXISTING: entry point for zsh config
++-- .shell/           # Shared POSIX files (sourced by both bash and zsh)
+|   +-- 1password.sh  # 1Password CLI integration
+|   +-- aliases.sh    # Shell aliases
+|   +-- env.sh        # Environment variables
+|   +-- node.sh       # fnm initialization
+|   +-- python.sh     # pyenv / uv initialization
++-- .zsh/             # Zsh-only files
+|   +-- plugins.zsh   # Zinit plugin configuration
++-- .bashrc           # Entry point for bash config
++-- .zshrc            # Entry point for zsh config
 ```
 
-**Note:** Files that are POSIX-compatible (aliases, env, python) can be shared via symlinks or a single source file. The `plugins.sh` is entirely new since Zinit is zsh-only.
+**Note:** This approach eliminates duplication — POSIX-compatible files live in one
+place (`.shell/`) and are sourced by both shells. Zsh-specific configuration (Zinit
+plugins) stays in `.zsh/`.
 
 ---
 
@@ -492,24 +491,21 @@ dotfiles/
 
 ---
 
-#### Phase 2: Config File bash/zsh Separation [Risk: LOW]
+#### Phase 2: Config File Consolidation into `.shell/` [COMPLETED]
 
-**Files to create:**
-- `dotfiles/.bash/aliases.sh`
-- `dotfiles/.bash/env.sh`
-- `dotfiles/.bash/node.sh`
-- `dotfiles/.bash/python.sh`
-- `dotfiles/.bash/1password.sh`
-- `dotfiles/.bash/plugins.sh`
-- `dotfiles/.bashrc`
+**Actual implementation:** Instead of creating a separate `.bash/` directory,
+POSIX-compatible config files were consolidated into `dotfiles/.shell/`:
 
-**Changes:**
-- Copy POSIX-compatible files directly
-- Adapt zsh-specific files (node.zsh -> node.sh with `--shell bash`)
-- Create new bash plugins.sh (completions, prompt)
-- Create .bashrc entry point
+- `dotfiles/.shell/aliases.sh` -- shell aliases
+- `dotfiles/.shell/env.sh` -- environment variables
+- `dotfiles/.shell/node.sh` -- fnm initialization (shell-agnostic)
+- `dotfiles/.shell/python.sh` -- pyenv / uv initialization
+- `dotfiles/.shell/1password.sh` -- 1Password CLI integration
+- `dotfiles/.bashrc` -- bash entry point (sources `.shell/*.sh`)
 
-**Testing:** Source each file in bash, verify no errors.
+Zsh-only config (`plugins.zsh`) remained in `dotfiles/.zsh/`.
+
+**Testing:** `shellcheck` and `shfmt` verify all `.shell/*.sh` files in CI.
 
 ---
 
