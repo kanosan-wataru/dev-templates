@@ -80,7 +80,7 @@ while (($# > 0)); do
         HELP_FLAG=1
         ;;
     *)
-        # Positional args: treat as module names if not prefixed with --
+        # Positional args: treat as module names if not prefixed with -
         if [[ "$1" == -* ]]; then
             msg_error "不明なオプション: $1"
             printf '  ヘルプ: bash %s --help\n' "$0" >&2
@@ -95,6 +95,11 @@ done
 # --- Mutual exclusion checks ---
 if ((UPGRADE)) && ((UNINSTALL)); then
     msg_error "--upgrade と --uninstall は同時に指定できません"
+    exit 1
+fi
+
+if ((UNINSTALL)) && ((${#SELECT_MODULES[@]} > 0)); then
+    msg_error "--uninstall はモジュール指定と併用できません（全モジュールが対象です）"
     exit 1
 fi
 

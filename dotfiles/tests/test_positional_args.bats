@@ -3,7 +3,7 @@
 # Positional argument tests for setup.sh
 
 setup() {
-    PROJECT_ROOT="$(cd "$(dirname "$BATS_TEST_FILENAME")/.." && pwd)"
+    PROJECT_ROOT="$(cd "$BATS_TEST_DIRNAME/.." && pwd)"
     SETUP_SH="$PROJECT_ROOT/setup.sh"
 }
 
@@ -38,6 +38,12 @@ setup() {
     [ "$status" -eq 0 ]
     [[ "$output" == *"Git"* ]]
     [[ "$output" == *"Zsh"* ]]
+}
+
+@test "positional args with --uninstall errors" {
+    run bash "$SETUP_SH" docker --uninstall
+    [ "$status" -ne 0 ]
+    [[ "$output" == *"--uninstall"* ]]
 }
 
 @test "unknown --option still errors" {
