@@ -82,7 +82,8 @@ bash dotfiles/setup.sh
 | `--dry-run` | 実際の変更を行わず、実行内容をプレビュー表示 |
 | `--uninstall` | 全モジュールをアンインストール（バックアップから復元） |
 | `--status` | 各モジュールのインストール状態を一覧表示 |
-| `--force`, `-f` | 差分確認をスキップ（バックアップ＋上書き） |
+| `--force`, `-f` | 差分確認・モジュール内プロンプトをスキップ（完全非対話） |
+| `--upgrade` | インストール済みツールを最新バージョンに更新 |
 | `--help`, `-h` | ヘルプを表示 |
 
 ```bash
@@ -92,11 +93,20 @@ bash dotfiles/setup.sh
 # 全モジュール一括インストール
 bash dotfiles/setup.sh --all
 
-# 特定モジュールのみインストール
+# 特定モジュールのみインストール（位置引数）
+bash dotfiles/setup.sh zsh node docker
+
+# 特定モジュールのみインストール（--select）
 bash dotfiles/setup.sh --select zsh --select node
 
 # 変更内容を事前に確認
 bash dotfiles/setup.sh --all --dry-run
+
+# インストール済みツールを最新版に更新
+bash dotfiles/setup.sh --upgrade --all
+
+# 完全非対話モード（CI 向け）
+bash dotfiles/setup.sh zsh git --force
 
 # 設定ファイルをバックアップから復元・ツールをアンインストール
 bash dotfiles/setup.sh --uninstall
