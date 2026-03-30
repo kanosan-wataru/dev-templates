@@ -152,11 +152,18 @@ _docker_install_macos() {
         return 1
     fi
 
-    msg_step "Docker Desktop を Homebrew でインストールします..."
-    run_cmd brew install --cask docker || {
-        msg_error "Docker Desktop のインストールに失敗しました。"
-        return 1
-    }
+    if ((UPGRADE)); then
+        msg_step "Docker Desktop を Homebrew でアップグレードします..."
+        run_cmd brew upgrade --cask docker || {
+            msg_warn "Docker Desktop のアップグレードに失敗しました（既に最新の可能性があります）。"
+        }
+    else
+        msg_step "Docker Desktop を Homebrew でインストールします..."
+        run_cmd brew install --cask docker || {
+            msg_error "Docker Desktop のインストールに失敗しました。"
+            return 1
+        }
+    fi
 }
 
 # --- ヘルパー: Docker グループ設定 + systemd 自動起動 (Linux のみ) ---
@@ -308,7 +315,7 @@ setup_docker() {
             # Already installed and not upgrading; skip installation
             :
         else
-            msg_info "Docker のアップグレードを実行します..."
+            msg_info "Docker のアップグレードを実行します... (現在: $(docker --version 2>/dev/null || echo 'unknown'))"
             case "$env" in
             linux)
                 if ! command -v apt-get >/dev/null 2>&1; then

@@ -52,7 +52,7 @@ setup_gemini_cli() {
     else
         # Upgrade path: show info message when upgrading an existing installation
         if command -v gemini >/dev/null 2>&1 && ((UPGRADE)); then
-            msg_info "Gemini CLI のアップグレードを実行します..."
+            msg_info "Gemini CLI のアップグレードを実行します... (現在: $(gemini --version 2>/dev/null || echo 'unknown'))"
         fi
         # Node.js / npm の確認
         if ! ensure_node 20; then

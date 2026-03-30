@@ -128,10 +128,16 @@ _1password_install_op_apt() {
 
 # --- ヘルパー: op CLI のインストール (macOS) ---
 _1password_install_op_brew() {
-    run_cmd brew install --cask 1password-cli || {
-        msg_error "1Password CLI のインストールに失敗しました。"
-        return 1
-    }
+    if ((UPGRADE)); then
+        run_cmd brew upgrade --cask 1password-cli || {
+            msg_warn "1Password CLI のアップグレードに失敗しました（既に最新の可能性があります）。"
+        }
+    else
+        run_cmd brew install --cask 1password-cli || {
+            msg_error "1Password CLI のインストールに失敗しました。"
+            return 1
+        }
+    fi
 }
 
 # --- ヘルパー: SSH エージェント設定の案内 ---
@@ -398,7 +404,7 @@ setup_1password() {
         msg_info "op CLI は既にインストールされています ($(op --version 2>/dev/null || echo '不明'))。スキップします。"
     else
         if command -v op >/dev/null 2>&1 && ((UPGRADE)); then
-            msg_info "1password-cli のアップグレードを実行します..."
+            msg_info "1password-cli のアップグレードを実行します... (現在: $(op --version 2>/dev/null || echo 'unknown'))"
         fi
         msg_info "1Password CLI (op) をインストールします..."
         case "$env" in

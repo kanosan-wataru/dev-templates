@@ -217,10 +217,11 @@ _py_setup_uv() {
             if ((DRY_RUN)); then
                 msg_dry_run "uv self update"
             else
-                uv self update || {
+                if uv self update; then
+                    msg_success "uv をアップグレードしました。($(uv --version 2>/dev/null || echo 'version unknown'))"
+                else
                     msg_warn "uv のアップグレードに失敗しました。"
-                }
-                msg_success "uv をアップグレードしました。($(uv --version 2>/dev/null || echo 'version unknown'))"
+                fi
             fi
         else
             msg_info "uv は既にインストールされています。($(uv --version))"

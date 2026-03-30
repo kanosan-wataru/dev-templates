@@ -56,7 +56,7 @@ setup_codex_cli() {
     else
         # Upgrade path: show info message when upgrading an existing installation
         if command -v codex >/dev/null 2>&1 && ((UPGRADE)); then
-            msg_info "Codex CLI のアップグレードを実行します..."
+            msg_info "Codex CLI のアップグレードを実行します... (現在: $(codex --version 2>/dev/null || echo 'unknown'))"
         fi
         # Node.js / npm の確認
         if ! ensure_node; then

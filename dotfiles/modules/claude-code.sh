@@ -344,7 +344,7 @@ setup_claude_code() {
     else
         # Upgrade path: show info message when upgrading an existing installation
         if command -v claude >/dev/null 2>&1 && ((UPGRADE)); then
-            msg_info "Claude Code のアップグレードを実行します..."
+            msg_info "Claude Code のアップグレードを実行します... (現在: $(claude --version 2>/dev/null || echo 'unknown'))"
         fi
         # Node.js / npm の確認
         if ! ensure_node; then

@@ -161,7 +161,7 @@ setup_modern_cli() {
                 ((skipped++))
                 continue
             fi
-            msg_info "${cmd_name} のアップグレードを実行します..."
+            msg_info "${cmd_name} のアップグレードを実行します... (現在: $(${cmd_name} --version 2>/dev/null | head -1 || echo 'unknown'))"
         fi
         if [[ -n "$alt_cmd" ]] && command -v "$alt_cmd" >/dev/null 2>&1; then
             if ! ((UPGRADE)); then
@@ -169,18 +169,25 @@ setup_modern_cli() {
                 ((skipped++))
                 continue
             fi
-            msg_info "${cmd_name} のアップグレードを実行します..."
+            msg_info "${cmd_name} のアップグレードを実行します... (現在: $(${alt_cmd} --version 2>/dev/null | head -1 || echo 'unknown'))"
         fi
 
         printf '%s\n' "${cmd_name} をインストールします... (${desc})"
 
         case "$os" in
         macos)
-            run_cmd brew install "$brew_pkg" || {
-                msg_error "${cmd_name} のインストールに失敗しました。"
-                ((failed++))
-                continue
-            }
+            if ((UPGRADE)); then
+                run_cmd brew upgrade "$brew_pkg" || {
+                    msg_warn "${cmd_name} のアップグレードに失敗しました（既に最新の可能性があります）。"
+                    continue
+                }
+            else
+                run_cmd brew install "$brew_pkg" || {
+                    msg_error "${cmd_name} のインストールに失敗しました。"
+                    ((failed++))
+                    continue
+                }
+            fi
             ;;
         linux)
             if [[ "$cmd_name" == "eza" ]]; then
