@@ -13,6 +13,7 @@ set -euo pipefail
 #   bash setup.sh --upgrade         Upgrade installed tools to latest
 #   bash setup.sh --uninstall      Restore from backups
 #   bash setup.sh --status         Show installation status of all modules
+#   bash setup.sh zsh git docker   Specify modules as positional args
 #   bash setup.sh --help           Show help
 #
 # Modules are dynamically loaded from the modules/ directory.
@@ -79,9 +80,13 @@ while (($# > 0)); do
         HELP_FLAG=1
         ;;
     *)
-        msg_error "不明なオプション: $1"
-        printf '  ヘルプ: bash %s --help\n' "$0" >&2
-        exit 1
+        # Positional args: treat as module names if not prefixed with -
+        if [[ "$1" == -* ]]; then
+            msg_error "不明なオプション: $1"
+            printf '  ヘルプ: bash %s --help\n' "$0" >&2
+            exit 1
+        fi
+        SELECT_MODULES+=("$1")
         ;;
     esac
     shift
@@ -90,6 +95,11 @@ done
 # --- Mutual exclusion checks ---
 if ((UPGRADE)) && ((UNINSTALL)); then
     msg_error "--upgrade と --uninstall は同時に指定できません"
+    exit 1
+fi
+
+if ((UNINSTALL)) && ((${#SELECT_MODULES[@]} > 0)); then
+    msg_error "--uninstall はモジュール指定と併用できません（全モジュールが対象です）"
     exit 1
 fi
 
@@ -415,7 +425,7 @@ fi
 # Help display (dynamically generated after module loading)
 # ==============================================
 if ((HELP_FLAG)); then
-    printf '使用法: bash %s [オプション]\n' "$0"
+    printf '使用法: bash %s [MODULE ...] [オプション]\n' "$0"
     printf '\n'
     printf 'オプション:\n'
     printf '  --dry-run          変更内容のプレビューのみ（実際には変更しない）\n'
@@ -427,6 +437,9 @@ if ((HELP_FLAG)); then
     printf '  --status           各モジュールのインストール状態を表示\n'
     printf '  --help, -h         このヘルプを表示\n'
     printf '\n'
+    printf '位置引数:\n'
+    printf '  MODULE ...         インストールするモジュールを直接指定（--select の短縮形）\n'
+    printf '\n'
     printf 'モジュール:\n'
     for entry in "${MODULES[@]}"; do
         IFS='|' read -r mod_id mod_name mod_desc _mod_default <<<"$entry"
@@ -436,7 +449,8 @@ if ((HELP_FLAG)); then
     printf '例:\n'
     printf '  bash %s                              インタラクティブ選択\n' "$0"
     printf '  bash %s --all                        全モジュール一括\n' "$0"
-    printf '  bash %s --select zsh --select claude-code  複数指定\n' "$0"
+    printf '  bash %s zsh claude-code                  位置引数で複数指定\n' "$0"
+    printf '  bash %s --select zsh --select claude-code  --select で複数指定\n' "$0"
     printf '  bash %s --all --dry-run              全モジュールをプレビュー\n' "$0"
     exit 0
 fi
