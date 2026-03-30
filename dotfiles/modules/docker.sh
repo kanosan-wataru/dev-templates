@@ -45,10 +45,6 @@ _docker_is_installed() {
         return 1
     fi
 
-    local docker_ver compose_ver
-    docker_ver=$(docker --version 2>/dev/null || printf '%s' "unknown")
-    compose_ver=$(docker compose version 2>/dev/null || printf '%s' "unknown")
-    msg_info "Docker は既にインストールされています (${docker_ver}, ${compose_ver})。スキップします。"
     return 0
 }
 
@@ -313,7 +309,10 @@ setup_docker() {
     if _docker_is_installed; then
         if ! ((UPGRADE)); then
             # Already installed and not upgrading; skip installation
-            :
+            local docker_ver compose_ver
+            docker_ver=$(docker --version 2>/dev/null || printf '%s' "unknown")
+            compose_ver=$(docker compose version 2>/dev/null || printf '%s' "unknown")
+            msg_info "Docker は既にインストールされています (${docker_ver}, ${compose_ver})。スキップします。"
         else
             msg_info "Docker のアップグレードを実行します... (現在: $(docker --version 2>/dev/null || echo 'unknown'))"
             case "$env" in
