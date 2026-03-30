@@ -262,12 +262,15 @@ OPENAI_API_KEY=sk-...
 
 `dotfiles/**` または `.github/workflows/**` に変更を含む Pull Request で、GitHub Actions によるチェックが自動実行されます:
 
-- **Shell Format Check** (`shfmt`): bash スクリプト（`.sh`）および zsh スクリプト（`.zsh`）のフォーマットチェック
-- **ShellCheck**: bash スクリプトの静的解析（`shellcheck -s bash`）
-- **BATS テスト**: `dotfiles/tests/*.bats` によるユニットテスト
-- **Setup Dry Run**: `setup.sh --all --dry-run` を実行し、セットアップスクリプトの動作を検証
+| ジョブ | 内容 | 対象 |
+|--------|------|------|
+| **Zsh Syntax Check** | `zsh -n` による構文チェック | `.zsh` ファイル |
+| **Shell Format Check** | `shfmt` によるフォーマットチェック | `.sh` / `.zsh` ファイル |
+| **ShellCheck** | 静的解析（`shellcheck -s bash`、除外: SC1091, SC2034, SC2154, SC2317） | bash スクリプト |
+| **BATS テスト** | `dotfiles/tests/*.bats` によるユニットテスト | テストファイル |
+| **Setup Dry Run** | `setup.sh --all --dry-run` による統合テスト | セットアップ全体 |
 
-構文チェックと dry-run は **Ubuntu** と **macOS** の両環境で実行されます。
+Zsh Syntax Check と Setup Dry Run は **Ubuntu** と **macOS** の両環境で実行されます。
 
 ## ディレクトリ構成
 
