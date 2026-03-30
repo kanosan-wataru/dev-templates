@@ -9,6 +9,7 @@ MODULE_NAME="Claude Code"
 MODULE_DESC="Anthropic CLI + 設定ファイル (Node.js v18+ 必要)"
 MODULE_DEFAULT=0
 MODULE_ORDER=20
+MODULE_DEPS="node"
 
 # --- Claude Code 固有変数 ---
 # NOTE: モジュール固有の変数には衝突回避のため CLAUDE_MOD_ プレフィックスを使用
