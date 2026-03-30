@@ -46,6 +46,12 @@ setup() {
     [[ "$output" == *"不明なオプション"* ]]
 }
 
+@test "single-hyphen unknown option errors" {
+    run bash "$SETUP_SH" -x
+    [ "$status" -ne 0 ]
+    [[ "$output" == *"不明なオプション"* ]]
+}
+
 @test "positional args appear in help text" {
     run bash "$SETUP_SH" --help
     [ "$status" -eq 0 ]

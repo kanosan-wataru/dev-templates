@@ -81,7 +81,7 @@ while (($# > 0)); do
         ;;
     *)
         # Positional args: treat as module names if not prefixed with --
-        if [[ "$1" == --* ]]; then
+        if [[ "$1" == -* ]]; then
             msg_error "不明なオプション: $1"
             printf '  ヘルプ: bash %s --help\n' "$0" >&2
             exit 1

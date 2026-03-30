@@ -282,12 +282,12 @@ _1password_setup_service_account_token() {
     # Check if token file already exists
     if [[ -f "$OP_MOD_TOKEN_FILE" ]]; then
         msg_step "情報: トークンファイルが既に存在します (${OP_MOD_TOKEN_FILE})。"
-        printf '  上書きしますか？ [y/N]: '
         local overwrite
         if ((FORCE)); then
-            overwrite="y"
-            msg_info "--force: トークンファイルを上書きします。"
+            overwrite="n"
+            msg_info "--force: 既存トークンファイルを維持します。"
         else
+            printf '  上書きしますか？ [y/N]: '
             read -r overwrite
         fi
         if [[ "$overwrite" != [yY] ]]; then
@@ -295,12 +295,12 @@ _1password_setup_service_account_token() {
             return 0
         fi
     else
-        printf '  サービスアカウントトークンを設定しますか？ [y/N]: '
         local configure
         if ((FORCE)); then
             configure="n"
             msg_info "--force: トークン設定をスキップします。"
         else
+            printf '  サービスアカウントトークンを設定しますか？ [y/N]: '
             read -r configure
         fi
         if [[ "$configure" != [yY] ]]; then
@@ -518,12 +518,13 @@ uninstall_1password() {
 
     # サービスアカウントトークンの削除
     if [[ -f "$OP_MOD_TOKEN_FILE" ]]; then
-        printf 'サービスアカウントトークンを削除しますか？ (%s) [y/N]: ' "$OP_MOD_TOKEN_FILE"
+        # NOTE: --force auto-accepts token deletion on uninstall (intentional per user request)
         local remove_token
         if ((FORCE)); then
             remove_token="y"
             msg_info "--force: トークンファイルを削除します。"
         else
+            printf 'サービスアカウントトークンを削除しますか？ (%s) [y/N]: ' "$OP_MOD_TOKEN_FILE"
             read -r remove_token
         fi
         if [[ "$remove_token" == [yY] ]]; then
