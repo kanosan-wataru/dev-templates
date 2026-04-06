@@ -132,7 +132,8 @@ _claude_mod_uninstall_rules_dir() {
     for file in "${dst_dir}"/*.md; do
         [[ -f "$file" ]] || continue
 
-        local label="rules/${lang}/$(basename "$file")"
+        local label
+        label="rules/${lang}/$(basename "$file")"
         local newest
         newest=$(find_newest_backup "${file}.backup."'*') || true
 
