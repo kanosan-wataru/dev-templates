@@ -20,7 +20,9 @@ if [[ "${DISABLE_DOTENV:-0}" != "1" ]]; then
     fi
 
     # ~/.config/*/.env (skip files already handled by dedicated modules)
-    for _dotenv_file in "$HOME"/.config/*/.env(N); do
+    for _dotenv_file in "$HOME"/.config/*/.env; do
+        # No matches — skip
+        [[ -e "$_dotenv_file" ]] || continue
         # Skip 1password token (handled by 1password.sh with validation)
         [[ "$_dotenv_file" == */op/.env ]] && continue
         if [[ -r "$_dotenv_file" ]]; then
