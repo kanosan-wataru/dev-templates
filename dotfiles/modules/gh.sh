@@ -69,7 +69,7 @@ _gh_install_linux() {
         msg_dry_run "sudo mkdir -p -m 755 ${keyring_dir}"
         msg_dry_run "wget -nv -O <tmpfile> ${keyring_url}"
         msg_dry_run "sudo tee ${keyring_file} < <tmpfile>"
-        msg_dry_run "sudo chmod go+r ${keyring_file}"
+        msg_dry_run "sudo chmod a+r ${keyring_file}"
         msg_dry_run "echo 'deb [arch=... signed-by=${keyring_file}] https://cli.github.com/packages stable main' | sudo tee ${sources_file}"
         msg_dry_run "sudo apt-get update -qq"
         msg_dry_run "sudo apt-get install -y gh"
@@ -103,7 +103,7 @@ _gh_install_linux() {
     }
     rm -f "$tmp_key"
 
-    sudo chmod go+r "$keyring_file" || {
+    sudo chmod a+r "$keyring_file" || {
         msg_error "GPG 鍵のパーミッション設定に失敗しました。"
         return 1
     }
@@ -158,10 +158,11 @@ _gh_show_auth_guide() {
         return 0
     fi
 
-    # 認証済みチェック
-    if gh auth status >/dev/null 2>&1; then
+    # 認証済みチェック (output stored once to avoid duplicate calls)
+    local gh_auth_output
+    if gh_auth_output=$(gh auth status 2>&1); then
         local gh_user
-        gh_user=$(gh auth status 2>&1 | grep -oP 'Logged in to .+ as \K\S+' || true)
+        gh_user=$(printf '%s\n' "$gh_auth_output" | sed -n 's/.*Logged in to .* as \([^ ]*\).*/\1/p' | head -1)
         msg_info "GitHub CLI は既に認証済みです。"
         if [[ -n "$gh_user" ]]; then
             msg_step "ユーザー: ${gh_user}"
