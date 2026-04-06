@@ -96,7 +96,7 @@ _gh_install_linux() {
         return 1
     }
 
-    cat "$tmp_key" | sudo tee "$keyring_file" >/dev/null || {
+    sudo cp "$tmp_key" "$keyring_file" || {
         msg_error "GPG 鍵の配置に失敗しました。"
         rm -f "$tmp_key"
         return 1
