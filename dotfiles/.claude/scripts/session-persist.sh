@@ -14,7 +14,7 @@ WORKING_DIR=$(pwd)
 TIMESTAMP=$(date -u +"%Y-%m-%dT%H:%M:%SZ")
 
 # セッションサマリーを保存
-cat > "$PERSIST_FILE" << EOF
+cat >"$PERSIST_FILE" <<EOF
 {
   "timestamp": "${TIMESTAMP}",
   "branch": "${BRANCH}",
@@ -25,6 +25,6 @@ cat > "$PERSIST_FILE" << EOF
 EOF
 
 # ツールコールカウンターをリセット
-echo "0" > "${HOME}/.claude/cache/.tool-call-count"
+echo "0" >"${HOME}/.claude/cache/.tool-call-count"
 
 exit 0

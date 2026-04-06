@@ -27,6 +27,7 @@ if [[ "${DISABLE_DOTENV:-0}" != "1" ]]; then
         [[ "$_dotenv_file" == */op/.env ]] && continue
         if [[ -r "$_dotenv_file" ]]; then
             set -a
+            # shellcheck disable=SC1090
             source "$_dotenv_file"
             set +a
         fi
