@@ -67,12 +67,15 @@ _zsh_ensure_installed() {
             return 1
         fi
         msg_info "zsh をインストールします..."
+        run_cmd sudo apt-get update -qq || {
+            msg_warn "apt-get update に失敗しました。古いパッケージインデックスのまま zsh のインストールを試行します。"
+        }
         run_cmd sudo apt-get install -y zsh || {
             msg_error "zsh のインストールに失敗しました。"
             return 1
         }
         if ((!DRY_RUN)); then
-            msg_success "zsh $(zsh --version 2>/dev/null | head -1) をインストールしました。"
+            msg_success "$(zsh --version 2>/dev/null | head -1) をインストールしました。"
         fi
         ;;
     *)
@@ -87,11 +90,14 @@ _zsh_set_default_shell() {
     local zsh_path
     zsh_path=$(command -v zsh)
 
+    local real_user
+    real_user="${SUDO_USER:-$(id -un)}"
+
     local current_shell
     if command -v getent >/dev/null 2>&1; then
-        current_shell=$(getent passwd "$USER" | cut -d: -f7)
+        current_shell=$(getent passwd "$real_user" | cut -d: -f7)
     elif command -v dscl >/dev/null 2>&1; then
-        current_shell=$(dscl . -read "/Users/$USER" UserShell | awk '{print $2}')
+        current_shell=$(dscl . -read "/Users/$real_user" UserShell | awk '{print $2}')
     else
         msg_warn "現在のデフォルトシェルを確認できません。"
         current_shell=""
@@ -103,7 +109,7 @@ _zsh_set_default_shell() {
     fi
 
     msg_info "デフォルトシェルを zsh ($zsh_path) に変更します..."
-    run_cmd sudo chsh -s "$zsh_path" "$USER" || {
+    run_cmd sudo chsh -s "$zsh_path" "$real_user" || {
         msg_error "デフォルトシェルの変更に失敗しました。"
         msg_step "手動で実行してください: chsh -s $zsh_path" >&2
         return 1
@@ -205,7 +211,9 @@ setup_zsh() {
     done
 
     # デフォルトシェルを zsh に変更
-    _zsh_set_default_shell || true
+    if ! _zsh_set_default_shell; then
+        msg_warn "デフォルトシェルの変更に失敗しましたが、zsh 設定のセットアップは続行します。"
+    fi
 
     msg_success "Zsh 設定一式のセットアップが完了しました。"
 }
