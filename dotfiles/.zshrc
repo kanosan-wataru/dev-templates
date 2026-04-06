@@ -1,5 +1,8 @@
 # ~/.zshrc
 
+# Guard: skip when sourced by a non-zsh shell (e.g., bash in Claude Code)
+[[ -n "$ZSH_VERSION" ]] || return 0
+
 # Powerlevel10k の instant prompt を有効化
 if [[ -r "${XDG_CACHE_HOME:-$HOME/.cache}/p10k-instant-prompt-${(%):-%n}.zsh" ]]; then
     source "${XDG_CACHE_HOME:-$HOME/.cache}/p10k-instant-prompt-${(%):-%n}.zsh"
