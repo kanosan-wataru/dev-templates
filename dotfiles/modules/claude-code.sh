@@ -50,6 +50,14 @@ CLAUDE_MOD_MANAGED_FILES=(
     "$SCRIPT_DIR/.claude/agents/codex-debugger.md|$CLAUDE_MOD_CONFIG_DIR/agents/codex-debugger.md|agents/codex-debugger.md|"
     # Shared shell module: .env loading (environment variables for MCP servers)
     "$SCRIPT_DIR/.shell/env.sh|${HOME}/.shell/env.sh|.shell/env.sh|"
+    # スキル定義
+    "$SCRIPT_DIR/.claude/skills/benchmark/SKILL.md|$CLAUDE_MOD_CONFIG_DIR/skills/benchmark/SKILL.md|skills/benchmark/SKILL.md|"
+    "$SCRIPT_DIR/.claude/skills/security-review/SKILL.md|$CLAUDE_MOD_CONFIG_DIR/skills/security-review/SKILL.md|skills/security-review/SKILL.md|"
+    "$SCRIPT_DIR/.claude/skills/coding-standards/SKILL.md|$CLAUDE_MOD_CONFIG_DIR/skills/coding-standards/SKILL.md|skills/coding-standards/SKILL.md|"
+    "$SCRIPT_DIR/.claude/skills/continuous-learning/SKILL.md|$CLAUDE_MOD_CONFIG_DIR/skills/continuous-learning/SKILL.md|skills/continuous-learning/SKILL.md|"
+    "$SCRIPT_DIR/.claude/skills/safety-guard/SKILL.md|$CLAUDE_MOD_CONFIG_DIR/skills/safety-guard/SKILL.md|skills/safety-guard/SKILL.md|"
+    "$SCRIPT_DIR/.claude/skills/strategic-compact/SKILL.md|$CLAUDE_MOD_CONFIG_DIR/skills/strategic-compact/SKILL.md|skills/strategic-compact/SKILL.md|"
+    "$SCRIPT_DIR/.claude/skills/verification-loop/SKILL.md|$CLAUDE_MOD_CONFIG_DIR/skills/verification-loop/SKILL.md|skills/verification-loop/SKILL.md|"
 )
 
 # 配置先ディレクトリのリスト（サブディレクトリを事前作成するため）
@@ -60,6 +68,14 @@ CLAUDE_MOD_REQUIRED_DIRS=(
     "$CLAUDE_MOD_CONFIG_DIR/scripts"
     "$CLAUDE_MOD_CONFIG_DIR/contexts"
     "$CLAUDE_MOD_CONFIG_DIR/rules"
+    "$CLAUDE_MOD_CONFIG_DIR/skills"
+    "$CLAUDE_MOD_CONFIG_DIR/skills/benchmark"
+    "$CLAUDE_MOD_CONFIG_DIR/skills/security-review"
+    "$CLAUDE_MOD_CONFIG_DIR/skills/coding-standards"
+    "$CLAUDE_MOD_CONFIG_DIR/skills/continuous-learning"
+    "$CLAUDE_MOD_CONFIG_DIR/skills/safety-guard"
+    "$CLAUDE_MOD_CONFIG_DIR/skills/strategic-compact"
+    "$CLAUDE_MOD_CONFIG_DIR/skills/verification-loop"
     "${HOME}/.shell"
 )
 
@@ -572,5 +588,5 @@ uninstall_claude_code() {
     }
     msg_success "Claude Code をアンインストールしました。"
     printf '%s\n' "NOTE: ~/.claude/ ディレクトリの空ディレクトリは削除されていません。不要な場合は手動で削除してください:"
-    msg_step "rm -rf ~/.claude/rules/ ~/.claude/scripts/ ~/.claude/contexts/"
+    msg_step "rm -rf ~/.claude/rules/ ~/.claude/scripts/ ~/.claude/contexts/ ~/.claude/skills/"
 }
