@@ -7,7 +7,7 @@
 MODULE_ID="node"
 MODULE_NAME="Node.js 開発環境"
 MODULE_DESC="fnm + Node.js LTS (バージョン管理)"
-MODULE_DEFAULT=0
+MODULE_DEFAULT=1
 MODULE_ORDER=18
 
 # NOTE: モジュール固有の変数には衝突回避のため NODE_MOD_ プレフィックスを使用
