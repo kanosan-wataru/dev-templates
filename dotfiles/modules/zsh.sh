@@ -34,10 +34,99 @@ ZSH_MOD_MANAGED_FILES=(
     "$SCRIPT_DIR/.shell/aliases.sh|$HOME/.shell/aliases.sh|aliases.sh|エイリアスは手動で設定してください。"
 )
 
+# --- ヘルパー: OS 判定 ---
+# Returns: "macos" / "linux" / "unknown"
+_zsh_detect_os() {
+    case "$OSTYPE" in
+    darwin*) printf '%s' "macos" ;;
+    linux*) printf '%s' "linux" ;;
+    *) printf '%s' "unknown" ;;
+    esac
+}
+
+# --- ヘルパー: zsh のインストール確認・実行 ---
+# Returns: 0=available, 1=failed
+_zsh_ensure_installed() {
+    if command -v zsh >/dev/null 2>&1; then
+        msg_info "zsh は既にインストールされています ($(zsh --version 2>/dev/null | head -1))。"
+        return 0
+    fi
+
+    local os
+    os=$(_zsh_detect_os)
+
+    case "$os" in
+    macos)
+        msg_error "zsh が見つかりません。macOS では通常プリインストールされています。"
+        msg_step "Homebrew でインストールしてください: brew install zsh" >&2
+        return 1
+        ;;
+    linux)
+        if ! command -v apt-get >/dev/null 2>&1; then
+            msg_error "apt-get が見つかりません。zsh を手動でインストールしてください。"
+            return 1
+        fi
+        msg_info "zsh をインストールします..."
+        run_cmd sudo apt-get update -qq || {
+            msg_warn "apt-get update に失敗しました。古いパッケージインデックスのまま zsh のインストールを試行します。"
+        }
+        run_cmd sudo apt-get install -y zsh || {
+            msg_error "zsh のインストールに失敗しました。"
+            return 1
+        }
+        if ((!DRY_RUN)); then
+            msg_success "$(zsh --version 2>/dev/null | head -1) をインストールしました。"
+        fi
+        ;;
+    *)
+        msg_error "未対応の OS です (OSTYPE=${OSTYPE})。zsh を手動でインストールしてください。"
+        return 1
+        ;;
+    esac
+}
+
+# --- ヘルパー: デフォルトシェルを zsh に変更 ---
+_zsh_set_default_shell() {
+    local zsh_path
+    zsh_path=$(command -v zsh)
+
+    local real_user
+    real_user="${SUDO_USER:-$(id -un)}"
+
+    local current_shell
+    if command -v getent >/dev/null 2>&1; then
+        current_shell=$(getent passwd "$real_user" | cut -d: -f7)
+    elif command -v dscl >/dev/null 2>&1; then
+        current_shell=$(dscl . -read "/Users/$real_user" UserShell | awk '{print $2}')
+    else
+        msg_warn "現在のデフォルトシェルを確認できません。"
+        current_shell=""
+    fi
+
+    if [[ "$current_shell" == "$zsh_path" ]]; then
+        msg_info "デフォルトシェルは既に zsh ($zsh_path) です。"
+        return 0
+    fi
+
+    msg_info "デフォルトシェルを zsh ($zsh_path) に変更します..."
+    run_cmd sudo chsh -s "$zsh_path" "$real_user" || {
+        msg_error "デフォルトシェルの変更に失敗しました。"
+        msg_step "手動で実行してください: chsh -s $zsh_path" >&2
+        return 1
+    }
+
+    if ((!DRY_RUN)); then
+        msg_success "デフォルトシェルを $zsh_path に変更しました。"
+    fi
+}
+
 # --- セットアップ ---
 setup_zsh() {
     msg_header "Zsh 設定一式"
     print_separator
+
+    # zsh のインストール確認・実行
+    _zsh_ensure_installed || return 1
 
     # 依存コマンドの確認
     if ! command -v git >/dev/null 2>&1; then
@@ -120,6 +209,11 @@ setup_zsh() {
         IFS='|' read -r src dst label hint <<<"$entry"
         install_config "$src" "$dst" "$label" "$hint"
     done
+
+    # デフォルトシェルを zsh に変更
+    if ! _zsh_set_default_shell; then
+        msg_warn "デフォルトシェルの変更に失敗しましたが、zsh 設定のセットアップは続行します。"
+    fi
 
     msg_success "Zsh 設定一式のセットアップが完了しました。"
 }
