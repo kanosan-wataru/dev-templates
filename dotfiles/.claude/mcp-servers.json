@@ -1,41 +1,20 @@
 {
   "mcpServers": {
-    "github": {
-      "type": "http",
-      "url": "https://api.githubcopilot.com/mcp",
-      "headers": {
-        "Authorization": "Bearer ${GITHUB_COPILOT_TOKEN}"
-      }
-    },
-    "playwright": {
-      "type": "stdio",
-      "command": "npx",
-      "args": ["@playwright/mcp@latest", "--headless", "--isolated", "--browser", "chromium", "--no-sandbox"]
-    },
-    "context7": {
-      "type": "stdio",
-      "command": "npx",
-      "args": ["-y", "@upstash/context7-mcp"],
-      "env": {}
-    },
-    "brave-search": {
-      "type": "stdio",
-      "command": "npx",
-      "args": ["-y", "@modelcontextprotocol/server-brave-search"],
-      "env": {
-        "BRAVE_API_KEY": "${BRAVE_API_KEY}"
-      }
-    },
     "codex": {
       "type": "stdio",
       "command": "codex",
-      "args": ["mcp-server"],
+      "args": [
+        "mcp-server"
+      ],
       "env": {}
     },
     "gemini": {
       "type": "stdio",
       "command": "npx",
-      "args": ["-y", "gemini-mcp-tool"],
+      "args": [
+        "-y",
+        "gemini-mcp-tool"
+      ],
       "env": {
         "GOOGLE_CLOUD_PROJECT": "${GOOGLE_CLOUD_PROJECT}"
       }

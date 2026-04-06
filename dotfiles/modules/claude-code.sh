@@ -14,12 +14,17 @@ MODULE_DEPS="node"
 # --- Claude Code 固有変数 ---
 # NOTE: モジュール固有の変数には衝突回避のため CLAUDE_MOD_ プレフィックスを使用
 CLAUDE_MOD_CONFIG_DIR="$HOME/.claude"
-CLAUDE_MOD_SKILLS_DIR="$CLAUDE_MOD_CONFIG_DIR/skills"
 CLAUDE_MOD_MCP_TEMPLATE="$SCRIPT_DIR/.claude/mcp-servers.json"
 CLAUDE_MOD_CLAUDE_JSON="$HOME/.claude.json"
 
+# ルールの言語サブディレクトリ一覧
+CLAUDE_MOD_RULE_LANGS=(
+    common cpp csharp golang java kotlin perl php python rust swift typescript
+)
+
 # 管理対象ファイルのリスト（配布元パス, 配置先パス, 表示名, 未検出時メッセージ）
 # NOTE: 配列の各要素は "src|dst|label|hint" の形式
+# NOTE: rules/ ディレクトリ内のファイルは _claude_mod_install_rules_dir() で一括配置するため、ここには含めない
 CLAUDE_MOD_MANAGED_FILES=(
     # CLAUDE.md（グローバル設定）
     "$SCRIPT_DIR/.claude/CLAUDE.md|$CLAUDE_MOD_CONFIG_DIR/CLAUDE.md|CLAUDE.md|"
@@ -29,43 +34,104 @@ CLAUDE_MOD_MANAGED_FILES=(
     "$SCRIPT_DIR/.claude/hookify.block-force-push.local.md|$CLAUDE_MOD_CONFIG_DIR/hookify.block-force-push.local.md|hookify.block-force-push.local.md|hookify ルールは手動で設定してください。"
     "$SCRIPT_DIR/.claude/hookify.block-sensitive-files.local.md|$CLAUDE_MOD_CONFIG_DIR/hookify.block-sensitive-files.local.md|hookify.block-sensitive-files.local.md|hookify ルールは手動で設定してください。"
     "$SCRIPT_DIR/.claude/hookify.warn-git-add.local.md|$CLAUDE_MOD_CONFIG_DIR/hookify.warn-git-add.local.md|hookify.warn-git-add.local.md|hookify ルールは手動で設定してください。"
-    # スキル: ci
-    "$SCRIPT_DIR/.claude/skills/ci/SKILL.md|$CLAUDE_MOD_SKILLS_DIR/ci/SKILL.md|skills/ci/SKILL.md|"
-    # スキル: commit
-    "$SCRIPT_DIR/.claude/skills/commit/SKILL.md|$CLAUDE_MOD_SKILLS_DIR/commit/SKILL.md|skills/commit/SKILL.md|"
-    "$SCRIPT_DIR/.claude/skills/commit/references/format-guide.md|$CLAUDE_MOD_SKILLS_DIR/commit/references/format-guide.md|skills/commit/references/format-guide.md|"
-    # スキル: create-issue
-    "$SCRIPT_DIR/.claude/skills/create-issue/SKILL.md|$CLAUDE_MOD_SKILLS_DIR/create-issue/SKILL.md|skills/create-issue/SKILL.md|"
-    # スキル: create-pr
-    "$SCRIPT_DIR/.claude/skills/create-pr/SKILL.md|$CLAUDE_MOD_SKILLS_DIR/create-pr/SKILL.md|skills/create-pr/SKILL.md|"
-    # スキル: git-cleanup
-    "$SCRIPT_DIR/.claude/skills/git-cleanup/SKILL.md|$CLAUDE_MOD_SKILLS_DIR/git-cleanup/SKILL.md|skills/git-cleanup/SKILL.md|"
-    # スキル: start-work
-    "$SCRIPT_DIR/.claude/skills/start-work/SKILL.md|$CLAUDE_MOD_SKILLS_DIR/start-work/SKILL.md|skills/start-work/SKILL.md|"
-    # スキル: test
-    "$SCRIPT_DIR/.claude/skills/test/SKILL.md|$CLAUDE_MOD_SKILLS_DIR/test/SKILL.md|skills/test/SKILL.md|"
-    # Shared shell module: .env loading (environment variables for MCP servers)
-    "$SCRIPT_DIR/.shell/env.sh|${HOME}/.shell/env.sh|.shell/env.sh|"
+    "$SCRIPT_DIR/.claude/hookify.block-commit-credits.local.md|$CLAUDE_MOD_CONFIG_DIR/hookify.block-commit-credits.local.md|hookify.block-commit-credits.local.md|hookify ルールは手動で設定してください。"
+    # フックスクリプト
+    "$SCRIPT_DIR/.claude/scripts/session-start.sh|$CLAUDE_MOD_CONFIG_DIR/scripts/session-start.sh|scripts/session-start.sh|"
+    "$SCRIPT_DIR/.claude/scripts/suggest-compact.sh|$CLAUDE_MOD_CONFIG_DIR/scripts/suggest-compact.sh|scripts/suggest-compact.sh|"
+    "$SCRIPT_DIR/.claude/scripts/quality-gate.sh|$CLAUDE_MOD_CONFIG_DIR/scripts/quality-gate.sh|scripts/quality-gate.sh|"
+    "$SCRIPT_DIR/.claude/scripts/session-persist.sh|$CLAUDE_MOD_CONFIG_DIR/scripts/session-persist.sh|scripts/session-persist.sh|"
+    # コンテキスト定義
+    "$SCRIPT_DIR/.claude/contexts/dev.md|$CLAUDE_MOD_CONFIG_DIR/contexts/dev.md|contexts/dev.md|"
+    "$SCRIPT_DIR/.claude/contexts/research.md|$CLAUDE_MOD_CONFIG_DIR/contexts/research.md|contexts/research.md|"
+    "$SCRIPT_DIR/.claude/contexts/review.md|$CLAUDE_MOD_CONFIG_DIR/contexts/review.md|contexts/review.md|"
     # エージェント定義
     "$SCRIPT_DIR/.claude/agents/general-purpose.md|$CLAUDE_MOD_CONFIG_DIR/agents/general-purpose.md|agents/general-purpose.md|"
     "$SCRIPT_DIR/.claude/agents/gemini-explore.md|$CLAUDE_MOD_CONFIG_DIR/agents/gemini-explore.md|agents/gemini-explore.md|"
     "$SCRIPT_DIR/.claude/agents/codex-debugger.md|$CLAUDE_MOD_CONFIG_DIR/agents/codex-debugger.md|agents/codex-debugger.md|"
+    # Shared shell module: .env loading (environment variables for MCP servers)
+    "$SCRIPT_DIR/.shell/env.sh|${HOME}/.shell/env.sh|.shell/env.sh|"
 )
 
-# 配置先ディレクトリのリスト（スキルのサブディレクトリを事前作成するため）
+# 配置先ディレクトリのリスト（サブディレクトリを事前作成するため）
 # NOTE: install_config は親ディレクトリの自動作成を行わないため、ここで明示的に列挙する
 CLAUDE_MOD_REQUIRED_DIRS=(
     "$CLAUDE_MOD_CONFIG_DIR"
-    "$CLAUDE_MOD_SKILLS_DIR/ci"
-    "$CLAUDE_MOD_SKILLS_DIR/commit/references"
-    "$CLAUDE_MOD_SKILLS_DIR/create-issue"
-    "$CLAUDE_MOD_SKILLS_DIR/create-pr"
-    "$CLAUDE_MOD_SKILLS_DIR/git-cleanup"
-    "$CLAUDE_MOD_SKILLS_DIR/start-work"
-    "$CLAUDE_MOD_SKILLS_DIR/test"
     "$CLAUDE_MOD_CONFIG_DIR/agents"
+    "$CLAUDE_MOD_CONFIG_DIR/scripts"
+    "$CLAUDE_MOD_CONFIG_DIR/contexts"
+    "$CLAUDE_MOD_CONFIG_DIR/rules"
     "${HOME}/.shell"
 )
+
+# --- ルールファイルの一括配置 ---
+# 指定した言語サブディレクトリ内の全 .md ファイルを install_config で配置する
+# 引数: $1=言語名 (例: common, python, rust)
+_claude_mod_install_rules_dir() {
+    local lang="$1"
+    local src_dir="$SCRIPT_DIR/.claude/rules/${lang}"
+    local dst_dir="$CLAUDE_MOD_CONFIG_DIR/rules/${lang}"
+
+    # 配布元ディレクトリの存在確認
+    if [[ ! -d "$src_dir" ]]; then
+        msg_warn "ルールディレクトリが見つかりません: ${src_dir}"
+        return 0
+    fi
+
+    # 配置先ディレクトリの作成
+    if [[ ! -d "$dst_dir" ]]; then
+        run_cmd command mkdir -p "$dst_dir" || {
+            msg_error "${dst_dir} の作成に失敗しました。"
+            return 1
+        }
+        if ((DRY_RUN)); then
+            msg_info "${dst_dir} を作成予定です（dry-run）。"
+        else
+            msg_info "${dst_dir} を作成しました。"
+        fi
+    fi
+
+    # 配布元ディレクトリ内の全 .md ファイルを配置
+    local src_file
+    for src_file in "${src_dir}"/*.md; do
+        # glob がマッチしない場合のガード
+        [[ -f "$src_file" ]] || continue
+
+        local filename
+        filename=$(basename "$src_file")
+        install_config "$src_file" "${dst_dir}/${filename}" "rules/${lang}/${filename}" ""
+    done
+}
+
+# --- ルールファイルの一括削除・復元 ---
+# 指定した言語サブディレクトリ内の全 .md ファイルをバックアップから復元または削除する
+# 引数: $1=言語名 (例: common, python, rust)
+# 戻り値: 復元が発生した場合は stdout に "restored" を出力
+_claude_mod_uninstall_rules_dir() {
+    local lang="$1"
+    local dst_dir="$CLAUDE_MOD_CONFIG_DIR/rules/${lang}"
+
+    [[ -d "$dst_dir" ]] || return 0
+
+    local file
+    for file in "${dst_dir}"/*.md; do
+        [[ -f "$file" ]] || continue
+
+        local label="rules/${lang}/$(basename "$file")"
+        local newest
+        newest=$(find_newest_backup "${file}.backup."'*') || true
+
+        if [[ -n "$newest" ]]; then
+            printf '%s\n' "復元: ${label} をバックアップ ($(basename "$newest")) から戻します。"
+            run_cmd command mv "$newest" "$file" || {
+                msg_error "${label} の復元に失敗しました。"
+                return 1
+            }
+            printf '%s' "restored"
+        elif [[ -f "$file" || -L "$file" ]]; then
+            msg_warn "${label} のバックアップが見つかりません。手動で確認してください: ${file}"
+        fi
+    done
+}
 
 # --- MCP サーバー設定のマージ ---
 # テンプレートの mcpServers を ~/.claude.json にマージする（既存設定を保持）
@@ -394,11 +460,26 @@ setup_claude_code() {
         fi
     done
 
-    # 設定ファイルの配置
+    # 設定ファイルの配置（ルール以外）
     for entry in "${CLAUDE_MOD_MANAGED_FILES[@]}"; do
         IFS='|' read -r src dst label hint <<<"$entry"
         install_config "$src" "$dst" "$label" "$hint"
     done
+
+    # ルールファイルの一括配置（言語別サブディレクトリ）
+    for lang in "${CLAUDE_MOD_RULE_LANGS[@]}"; do
+        _claude_mod_install_rules_dir "$lang"
+    done
+
+    # フックスクリプトに実行権限を付与
+    if ! ((DRY_RUN)); then
+        for script in "${CLAUDE_MOD_CONFIG_DIR}/scripts"/*.sh; do
+            [[ -f "$script" ]] || continue
+            if [[ ! -x "$script" ]]; then
+                chmod +x "$script" || msg_warn "実行権限の付与に失敗しました: ${script}"
+            fi
+        done
+    fi
 
     # MCP サーバー設定のマージ（~/.claude.json に追加）
     _claude_mod_merge_mcp_servers || return 1
@@ -427,7 +508,7 @@ uninstall_claude_code() {
     _claude_mod_remove_mcp_servers || return 1
 
     # =========================================
-    # 設定ファイルの復元・削除
+    # 設定ファイルの復元・削除（ルール以外）
     # =========================================
     for entry in "${CLAUDE_MOD_MANAGED_FILES[@]}"; do
         IFS='|' read -r _src dst label _hint <<<"$entry"
@@ -447,6 +528,17 @@ uninstall_claude_code() {
             msg_warn "${label} のバックアップが見つかりません。手動で確認してください: ${dst}"
         else
             msg_info "${label} は配置されていません。スキップします。"
+        fi
+    done
+
+    # =========================================
+    # ルールファイルの復元・削除（言語別サブディレクトリ）
+    # =========================================
+    for lang in "${CLAUDE_MOD_RULE_LANGS[@]}"; do
+        local result
+        result=$(_claude_mod_uninstall_rules_dir "$lang") || return 1
+        if [[ "$result" == *"restored"* ]]; then
+            restored=1
         fi
     done
 
@@ -480,5 +572,5 @@ uninstall_claude_code() {
     }
     msg_success "Claude Code をアンインストールしました。"
     printf '%s\n' "NOTE: ~/.claude/ ディレクトリの空ディレクトリは削除されていません。不要な場合は手動で削除してください:"
-    msg_step "rm -rf ~/.claude/skills/"
+    msg_step "rm -rf ~/.claude/rules/ ~/.claude/scripts/ ~/.claude/contexts/"
 }
