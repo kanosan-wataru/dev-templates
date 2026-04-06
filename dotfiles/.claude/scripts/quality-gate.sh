@@ -16,7 +16,7 @@ except:
 " 2>/dev/null)
 
 if [ -z "$FILE_PATH" ] || [ ! -f "$FILE_PATH" ]; then
-  exit 0
+    exit 0
 fi
 
 # 拡張子を取得
@@ -26,28 +26,28 @@ ISSUES=""
 
 # console.log チェック（JS/TS ファイル）
 if [[ "$EXT" =~ ^(js|ts|jsx|tsx)$ ]]; then
-  CONSOLE_COUNT=$(grep -c "console\.log" "$FILE_PATH" 2>/dev/null || echo "0")
-  if [ "$CONSOLE_COUNT" -gt 0 ]; then
-    ISSUES="${ISSUES}\n  ${CONSOLE_COUNT} console.log found in ${FILE_PATH}"
-  fi
+    CONSOLE_COUNT=$(grep -c "console\.log" "$FILE_PATH" 2>/dev/null || echo "0")
+    if [ "$CONSOLE_COUNT" -gt 0 ]; then
+        ISSUES="${ISSUES}\n  ${CONSOLE_COUNT} console.log found in ${FILE_PATH}"
+    fi
 fi
 
 # print() チェック（Python ファイル、テスト以外）
 if [[ "$EXT" == "py" ]] && [[ "$FILE_PATH" != *"test_"* ]] && [[ "$FILE_PATH" != *"_test.py" ]]; then
-  PRINT_COUNT=$(grep -cE "^\s*print\(" "$FILE_PATH" 2>/dev/null || echo "0")
-  if [ "$PRINT_COUNT" -gt 3 ]; then
-    ISSUES="${ISSUES}\n  ${PRINT_COUNT} print() calls in ${FILE_PATH} (use logging instead?)"
-  fi
+    PRINT_COUNT=$(grep -cE "^\s*print\(" "$FILE_PATH" 2>/dev/null || echo "0")
+    if [ "$PRINT_COUNT" -gt 3 ]; then
+        ISSUES="${ISSUES}\n  ${PRINT_COUNT} print() calls in ${FILE_PATH} (use logging instead?)"
+    fi
 fi
 
 # TODO/FIXME チェック（新規追加のみ -- git diffで確認）
 TODO_COUNT=$(git diff HEAD -- "$FILE_PATH" 2>/dev/null | grep "^+" | grep -ciE "(TODO|FIXME|HACK|XXX)" || echo "0")
 if [ "$TODO_COUNT" -gt 0 ]; then
-  ISSUES="${ISSUES}\n  ${TODO_COUNT} new TODO/FIXME added in ${FILE_PATH}"
+    ISSUES="${ISSUES}\n  ${TODO_COUNT} new TODO/FIXME added in ${FILE_PATH}"
 fi
 
 if [ -n "$ISSUES" ]; then
-  echo -e "$ISSUES" >&2
+    echo -e "$ISSUES" >&2
 fi
 
 exit 0
