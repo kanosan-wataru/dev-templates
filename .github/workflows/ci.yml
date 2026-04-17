@@ -57,6 +57,10 @@ jobs:
       - name: Install modern Bash (macOS)
         if: runner.os == 'macOS'
         run: brew install bash
+      - name: Setup Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
       - name: Run setup.sh --all --dry-run
         run: |
           if [[ "$(uname)" == "Darwin" ]]; then
@@ -124,6 +128,11 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+
+      - name: Setup Node.js 22
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
 
       - name: Install BATS
         run: |
