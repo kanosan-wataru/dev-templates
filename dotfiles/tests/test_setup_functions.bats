@@ -350,3 +350,20 @@ _setup_module_registry() {
     # modD should come first (lowest in MODULES order)
     [ "${selected_module_ids[0]}" = "modD" ]
 }
+
+@test "resolve_module_deps: copilot-cli dependency on node is resolved" {
+    # Arrange: copilot-cli depends on node
+    declare -A MODULE_DEPS_MAP=([copilot-cli]="node")
+    declare -A MODULE_ID_SET=([node]=1 [copilot-cli]=1)
+    _setup_module_registry "node|Node.js|desc|1" "copilot-cli|GitHub Copilot CLI|desc|0"
+    selected_module_ids=(copilot-cli)
+
+    # Act
+    resolve_module_deps
+
+    # Assert: node was auto-added and comes before copilot-cli
+    array_contains "node" "${selected_module_ids[@]}"
+    [ "${#selected_module_ids[@]}" -eq 2 ]
+    [ "${selected_module_ids[0]}" = "node" ]
+    [ "${selected_module_ids[1]}" = "copilot-cli" ]
+}

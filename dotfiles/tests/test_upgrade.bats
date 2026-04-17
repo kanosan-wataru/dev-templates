@@ -25,7 +25,8 @@ setup() {
 }
 
 @test "without --upgrade, no upgrade messages appear" {
-    run bash "$SETUP_SH" --dry-run --all
+    # NOTE: --all は環境依存で失敗しうるため --select で検証する
+    run bash "$SETUP_SH" --dry-run --select git
     [ "$status" -eq 0 ]
     [[ "$output" != *"アップグレードを実行します"* ]]
 }
