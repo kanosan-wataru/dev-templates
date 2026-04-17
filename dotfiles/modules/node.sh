@@ -13,9 +13,8 @@ MODULE_ORDER=18
 # NOTE: モジュール固有の変数には衝突回避のため NODE_MOD_ プレフィックスを使用
 
 NODE_MOD_FNM_BIN_DIR="$HOME/.local/bin"
-# NOTE: バージョンを固定して予期せぬ変更を防止。更新時はこの値を変更する
-NODE_MOD_FNM_VERSION="v1.38.1"
-NODE_MOD_FNM_REPO="https://github.com/Schniz/fnm/releases/download/${NODE_MOD_FNM_VERSION}"
+# NOTE: 常に最新リリースをインストールする（GitHub の /latest リダイレクトを利用）
+NODE_MOD_FNM_REPO="https://github.com/Schniz/fnm/releases/latest/download"
 
 # 管理対象ファイル（配布元パス, 配置先パス, 表示名, 未検出時メッセージ）
 NODE_MOD_MANAGED_FILES=(
@@ -31,13 +30,16 @@ _node_detect_os() {
     esac
 }
 
-# --- ヘルパー: アーキテクチャ判定 ---
-_node_detect_arch() {
+# --- ヘルパー: fnm アセット名判定 ---
+# NOTE: fnm のアセット名は「OS-arch」ではなく独自規則
+#   x86_64  -> fnm-linux.zip
+#   aarch64 -> fnm-arm64.zip
+_node_fnm_asset_name() {
     case "$(uname -m)" in
-    x86_64) printf '%s' "x64" ;;
-    aarch64) printf '%s' "arm64" ;;
-    arm64) printf '%s' "arm64" ;;
-    *) printf '%s' "unknown" ;;
+    x86_64) printf '%s' "fnm-linux.zip" ;;
+    aarch64 | arm64) printf '%s' "fnm-arm64.zip" ;;
+    arm | armv7*) printf '%s' "fnm-arm32.zip" ;;
+    *) printf '%s' "" ;;
     esac
 }
 
@@ -161,15 +163,14 @@ _node_setup_linux() {
         fi
     fi
 
-    # アーキテクチャ判定
-    local arch
-    arch=$(_node_detect_arch)
-    if [[ "$arch" == "unknown" ]]; then
+    # アセット名判定
+    local zip_name
+    zip_name=$(_node_fnm_asset_name)
+    if [[ -z "$zip_name" ]]; then
         msg_error "未対応のアーキテクチャです ($(uname -m))。"
         return 1
     fi
 
-    local zip_name="fnm-linux-${arch}.zip"
     local download_url="${NODE_MOD_FNM_REPO}/${zip_name}"
 
     # バイナリ配置先の作成
@@ -190,7 +191,7 @@ _node_setup_linux() {
         }
     fi
 
-    msg_info "fnm を GitHub Releases からダウンロードします (${arch})..."
+    msg_info "fnm を GitHub Releases からダウンロードします (${zip_name})..."
 
     if ((DRY_RUN)); then
         msg_dry_run "curl -fsSL ${download_url} -o /tmp/${zip_name}"
