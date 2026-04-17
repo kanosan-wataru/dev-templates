@@ -10,12 +10,14 @@ setup() {
 # -- Behavior-based tests (replaces grep-based tests) --
 
 @test "--upgrade flag is accepted without error" {
-    run bash "$SETUP_SH" --upgrade --dry-run --all
+    # NOTE: --all はバージョン要件を満たさないモジュール（copilot-cli: Node 22+ 等）で
+    # 失敗しうるため、環境非依存の git モジュールで検証する
+    run bash "$SETUP_SH" --upgrade --dry-run --select git
     [ "$status" -eq 0 ]
 }
 
-@test "--upgrade --dry-run --all completes successfully" {
-    run bash "$SETUP_SH" --upgrade --dry-run --all
+@test "--upgrade --dry-run completes successfully with upgrade message" {
+    run bash "$SETUP_SH" --upgrade --dry-run --select zsh
     [ "$status" -eq 0 ]
     [[ "$output" == *"アップグレード"* ]]
 }
