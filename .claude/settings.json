@@ -400,6 +400,5 @@
   "language": "日本語",
   "effortLevel": "xhigh",
   "autoMemoryEnabled": true,
-  "skipDangerousModePermissionPrompt": true,
   "voiceEnabled": true
 }

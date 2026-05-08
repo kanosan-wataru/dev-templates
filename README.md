@@ -30,10 +30,6 @@ Bash スクリプト（セットアップ）+ Zsh（対話シェル）のモジ�
 - **Bash** (v4.0 以上)
 - **Git**
 
-## セキュリティ上の注意
-
-このリポジトリ直下の `.claude/settings.json` には `skipDangerousModePermissionPrompt: true` が設定されています。これは Claude Code の危険操作前の確認プロンプトをスキップする上級者向けの設定です。利用者は内容を理解した上で使用してください。リスクを避ける場合は、`.claude/settings.json` の該当キーを `false` に変更するか、設定ごと削除してください。
-
 ## セットアップ
 
 ```bash
