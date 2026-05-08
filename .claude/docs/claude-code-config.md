@@ -458,7 +458,7 @@ MCP サーバー設定は `~/.claude.json` の `mcpServers` キーにマージ�
 
 ## 13. 既知の課題と改善候補
 
-CLAUDE.md の三者クロスチェック分析（Claude × Codex × Gemini、2026-03-12 実施）で発見された課題。詳細は `~/.claude/projects/-home-wataru--claude/memory/technical-notes.md` を参照。
+CLAUDE.md の三者クロスチェック分析（Claude × Codex × Gemini、2026-03-12 実施）で発見された課題。
 
 ### 優先度: 高
 

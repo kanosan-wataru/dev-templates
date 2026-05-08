@@ -108,5 +108,5 @@
   "language": "日本語",
   "effortLevel": "max",
   "voiceEnabled": true,
-  "skipDangerousModePermissionPrompt": true
+  "skipDangerousModePermissionPrompt": false
 }
