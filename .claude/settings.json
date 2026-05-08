@@ -1,84 +1,63 @@
 {
-  "$schema": "https://json.schemastore.org/claude-code-settings.json",
-  "language": "japanese",
-  "effortLevel": "high",
-  "fastMode": false,
-  "alwaysThinkingEnabled": true,
+  "env": {},
+  "permissions": {
+    "allow": [
+      "mcp__gemini",
+      "Bash(git *)",
+      "Bash(gh *)",
+      "Bash(make *)",
+      "Bash(make)",
+      "Bash(pytest*)",
+      "Bash(python *)",
+      "Bash(python3 *)"
+    ],
+    "deny": [
+      "Read(**/.env)",
+      "Edit(**/.env)",
+      "Write(**/.env)",
+      "Read(**/dev.env)",
+      "Edit(**/dev.env)",
+      "Write(**/dev.env)"
+    ]
+  },
+  "disabledMcpjsonServers": [],
   "hooks": {
-    "UserPromptSubmit": [
+    "SessionStart": [
       {
-        "matcher": "",
+        "matcher": "*",
         "hooks": [
           {
             "type": "command",
-            "command": "python3 \"$CLAUDE_PROJECT_DIR/.claude/hooks/agent-router.py\"",
-            "timeout": 5
+            "command": "node \"$CLAUDE_PROJECT_DIR/.claude/scripts/hooks/session-start-bootstrap.js\""
+          }
+        ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash $CLAUDE_PROJECT_DIR/.claude/lsps-runtime/pyright/hooks/check-pyright.sh",
+            "timeout": 30
+          }
+        ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash $CLAUDE_PROJECT_DIR/.claude/lsps-runtime/vtsls/hooks/check-vtsls.sh",
+            "timeout": 30
           }
         ]
       }
     ],
     "PreToolUse": [
       {
-        "matcher": "Edit|Write",
+        "matcher": "Bash",
         "hooks": [
           {
             "type": "command",
-            "command": "python3 \"$CLAUDE_PROJECT_DIR/.claude/hooks/check-codex-before-write.py\"",
-            "timeout": 10
-          }
-        ]
-      },
-      {
-        "matcher": "WebSearch|WebFetch",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "python3 \"$CLAUDE_PROJECT_DIR/.claude/hooks/suggest-gemini-research.py\"",
-            "timeout": 5
-          }
-        ]
-      }
-    ],
-    "TeammateIdle": [
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "echo '{\"hookSpecificOutput\": {\"feedback\": \"Before going idle: (1) Check the shared task list for pending tasks. If all tasks are complete, verify results. (2) IMPORTANT: Write your work log to .claude/logs/agent-teams/{team-name}/{your-teammate-name}.md if you have not done so yet. The work log must include: Summary, Tasks Completed, Files Modified, Key Decisions, Communication with Teammates, and Issues Encountered. (3) Report to the team lead.\"}}'"
-          }
-        ]
-      }
-    ],
-    "TaskCompleted": [
-      {
-        "hooks": [
-          {
-            "type": "command",
-            "command": "python3 \"$CLAUDE_PROJECT_DIR/.claude/hooks/log-cli-tools.py\"",
-            "timeout": 5
-          }
-        ]
-      }
-    ],
-    "PreCompact": [
-      {
-        "matcher": "auto",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "echo '{\"hookSpecificOutput\": {\"additionalContext\": \"Context compaction triggered. Key context: Check CLAUDE.md for project rules, .claude/docs/DESIGN.md for design decisions, .claude/rules/ for coding standards.\"}}'"
-          }
-        ]
-      }
-    ],
-    "PostToolUse": [
-      {
-        "matcher": "Task",
-        "hooks": [
-          {
-            "type": "command",
-            "command": "python3 \"$CLAUDE_PROJECT_DIR/.claude/hooks/check-codex-after-plan.py\"",
-            "timeout": 10
+            "command": "npx block-no-verify@1.1.2"
           }
         ]
       },
@@ -87,18 +66,43 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python3 \"$CLAUDE_PROJECT_DIR/.claude/hooks/error-to-codex.py\"",
-            "timeout": 10
-          },
+            "command": "node \"$CLAUDE_PROJECT_DIR/.claude/scripts/hooks/auto-tmux-dev.js\""
+          }
+        ]
+      },
+      {
+        "matcher": "Bash",
+        "hooks": [
           {
             "type": "command",
-            "command": "python3 \"$CLAUDE_PROJECT_DIR/.claude/hooks/post-test-analysis.py\"",
-            "timeout": 10
-          },
+            "command": "node \"$CLAUDE_PROJECT_DIR/.claude/scripts/hooks/run-with-flags.js\" \"pre:bash:tmux-reminder\" \"scripts/hooks/pre-bash-tmux-reminder.js\" \"strict\""
+          }
+        ]
+      },
+      {
+        "matcher": "Bash",
+        "hooks": [
           {
             "type": "command",
-            "command": "python3 \"$CLAUDE_PROJECT_DIR/.claude/hooks/log-cli-tools.py\"",
-            "timeout": 5
+            "command": "node \"$CLAUDE_PROJECT_DIR/.claude/scripts/hooks/run-with-flags.js\" \"pre:bash:git-push-reminder\" \"scripts/hooks/pre-bash-git-push-reminder.js\" \"strict\""
+          }
+        ]
+      },
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"$CLAUDE_PROJECT_DIR/.claude/scripts/hooks/run-with-flags.js\" \"pre:bash:commit-quality\" \"scripts/hooks/pre-bash-commit-quality.js\" \"strict\""
+          }
+        ]
+      },
+      {
+        "matcher": "Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"$CLAUDE_PROJECT_DIR/.claude/scripts/hooks/run-with-flags.js\" \"pre:write:doc-file-warning\" \"scripts/hooks/doc-file-warning.js\" \"standard,strict\""
           }
         ]
       },
@@ -107,118 +111,295 @@
         "hooks": [
           {
             "type": "command",
-            "command": "python3 \"$CLAUDE_PROJECT_DIR/.claude/hooks/lint-on-save.py\"",
-            "timeout": 30
-          },
+            "command": "node \"$CLAUDE_PROJECT_DIR/.claude/scripts/hooks/run-with-flags.js\" \"pre:edit-write:suggest-compact\" \"scripts/hooks/suggest-compact.js\" \"standard,strict\""
+          }
+        ]
+      },
+      {
+        "matcher": "*",
+        "hooks": [
           {
             "type": "command",
-            "command": "python3 \"$CLAUDE_PROJECT_DIR/.claude/hooks/post-implementation-review.py\"",
+            "command": "bash \"$CLAUDE_PROJECT_DIR/.claude/scripts/hooks/run-with-flags-shell.sh\" \"pre:observe\" \"skills/continuous-learning-v2/hooks/observe.sh\" \"standard,strict\"",
+            "timeout": 10,
+            "async": true
+          }
+        ]
+      },
+      {
+        "matcher": "Bash|Write|Edit|MultiEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"$CLAUDE_PROJECT_DIR/.claude/scripts/hooks/run-with-flags.js\" \"pre:governance-capture\" \"scripts/hooks/governance-capture.js\" \"standard,strict\"",
+            "timeout": 10
+          }
+        ]
+      },
+      {
+        "matcher": "Write|Edit|MultiEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"$CLAUDE_PROJECT_DIR/.claude/scripts/hooks/run-with-flags.js\" \"pre:config-protection\" \"scripts/hooks/config-protection.js\" \"standard,strict\"",
+            "timeout": 5
+          }
+        ]
+      },
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"$CLAUDE_PROJECT_DIR/.claude/scripts/hooks/run-with-flags.js\" \"pre:mcp-health-check\" \"scripts/hooks/mcp-health-check.js\" \"standard,strict\""
+          }
+        ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "CLAUDE_PLUGIN_ROOT=$CLAUDE_PROJECT_DIR/.claude/hookify-runtime python3 $CLAUDE_PROJECT_DIR/.claude/hookify-runtime/hooks/pretooluse.py",
+            "timeout": 10
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"$CLAUDE_PROJECT_DIR/.claude/scripts/hooks/post-bash-command-log.js\" audit"
+          }
+        ]
+      },
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"$CLAUDE_PROJECT_DIR/.claude/scripts/hooks/post-bash-command-log.js\" cost"
+          }
+        ]
+      },
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"$CLAUDE_PROJECT_DIR/.claude/scripts/hooks/run-with-flags.js\" \"post:bash:pr-created\" \"scripts/hooks/post-bash-pr-created.js\" \"standard,strict\""
+          }
+        ]
+      },
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"$CLAUDE_PROJECT_DIR/.claude/scripts/hooks/run-with-flags.js\" \"post:bash:build-complete\" \"scripts/hooks/post-bash-build-complete.js\" \"standard,strict\"",
+            "timeout": 30,
+            "async": true
+          }
+        ]
+      },
+      {
+        "matcher": "Edit|Write|MultiEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"$CLAUDE_PROJECT_DIR/.claude/scripts/hooks/run-with-flags.js\" \"post:quality-gate\" \"scripts/hooks/quality-gate.js\" \"standard,strict\"",
+            "timeout": 30,
+            "async": true
+          }
+        ]
+      },
+      {
+        "matcher": "Edit|Write|MultiEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"$CLAUDE_PROJECT_DIR/.claude/scripts/hooks/run-with-flags.js\" \"post:edit:design-quality-check\" \"scripts/hooks/design-quality-check.js\" \"standard,strict\"",
+            "timeout": 10
+          }
+        ]
+      },
+      {
+        "matcher": "Edit|Write|MultiEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"$CLAUDE_PROJECT_DIR/.claude/scripts/hooks/run-with-flags.js\" \"post:edit:accumulate\" \"scripts/hooks/post-edit-accumulator.js\" \"standard,strict\""
+          }
+        ]
+      },
+      {
+        "matcher": "Edit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"$CLAUDE_PROJECT_DIR/.claude/scripts/hooks/run-with-flags.js\" \"post:edit:console-warn\" \"scripts/hooks/post-edit-console-warn.js\" \"standard,strict\""
+          }
+        ]
+      },
+      {
+        "matcher": "Bash|Write|Edit|MultiEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"$CLAUDE_PROJECT_DIR/.claude/scripts/hooks/run-with-flags.js\" \"post:governance-capture\" \"scripts/hooks/governance-capture.js\" \"standard,strict\"",
+            "timeout": 10
+          }
+        ]
+      },
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bash \"$CLAUDE_PROJECT_DIR/.claude/scripts/hooks/run-with-flags-shell.sh\" \"post:observe\" \"skills/continuous-learning-v2/hooks/observe.sh\" \"standard,strict\"",
+            "timeout": 10,
+            "async": true
+          }
+        ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "CLAUDE_PLUGIN_ROOT=$CLAUDE_PROJECT_DIR/.claude/hookify-runtime python3 $CLAUDE_PROJECT_DIR/.claude/hookify-runtime/hooks/posttooluse.py",
+            "timeout": 10
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node -e \"const fs=require('fs');const path=require('path');const {spawnSync}=require('child_process');const raw=fs.readFileSync(0,'utf8');const rel=path.join('scripts','hooks','run-with-flags.js');const hasRunnerRoot=candidate=>{const value=typeof candidate==='string'?candidate.trim():'';return value.length>0&&fs.existsSync(path.join(path.resolve(value),rel));};const root=(()=>{const envRoot=process.env.CLAUDE_PLUGIN_ROOT||'';if(hasRunnerRoot(envRoot))return path.resolve(envRoot.trim());const home=require('os').homedir();const claudeDir=path.join(home,'.claude');if(hasRunnerRoot(claudeDir))return claudeDir;for(const candidate of [path.join(claudeDir,'plugins','ecc'),path.join(claudeDir,'plugins','ecc@ecc'),path.join(claudeDir,'plugins','marketplace','ecc'),path.join(claudeDir,'plugins','everything-claude-code'),path.join(claudeDir,'plugins','everything-claude-code@everything-claude-code'),path.join(claudeDir,'plugins','marketplace','everything-claude-code')]){if(hasRunnerRoot(candidate))return candidate;}try{for(const slug of ['ecc','everything-claude-code']){const cacheBase=path.join(claudeDir,'plugins','cache',slug);for(const org of fs.readdirSync(cacheBase,{withFileTypes:true})){if(!org.isDirectory())continue;for(const version of fs.readdirSync(path.join(cacheBase,org.name),{withFileTypes:true})){if(!version.isDirectory())continue;const candidate=path.join(cacheBase,org.name,version.name);if(hasRunnerRoot(candidate))return candidate;}}}}catch{}return claudeDir;})();const script=path.join(root,rel);if(fs.existsSync(script)){const result=spawnSync(process.execPath,[script,'stop:format-typecheck','scripts/hooks/stop-format-typecheck.js','standard,strict'],{input:raw,encoding:'utf8',env:process.env,cwd:process.cwd(),timeout:300000});const stdout=typeof result.stdout==='string'?result.stdout:'';if(stdout)process.stdout.write(stdout);else process.stdout.write(raw);if(result.stderr)process.stderr.write(result.stderr);if(result.error||result.status===null||result.signal){const reason=result.error?result.error.message:(result.signal?'signal '+result.signal:'missing exit status');process.stderr.write('[Stop] ERROR: hook runner failed: '+reason+String.fromCharCode(10));process.exit(1);}process.exit(Number.isInteger(result.status)?result.status:0);}process.stderr.write('[Stop] WARNING: could not resolve ECC plugin root; skipping hook'+String.fromCharCode(10));process.stdout.write(raw);\"",
+            "timeout": 300
+          }
+        ]
+      },
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node -e \"const fs=require('fs');const path=require('path');const {spawnSync}=require('child_process');const raw=fs.readFileSync(0,'utf8');const rel=path.join('scripts','hooks','run-with-flags.js');const hasRunnerRoot=candidate=>{const value=typeof candidate==='string'?candidate.trim():'';return value.length>0&&fs.existsSync(path.join(path.resolve(value),rel));};const root=(()=>{const envRoot=process.env.CLAUDE_PLUGIN_ROOT||'';if(hasRunnerRoot(envRoot))return path.resolve(envRoot.trim());const home=require('os').homedir();const claudeDir=path.join(home,'.claude');if(hasRunnerRoot(claudeDir))return claudeDir;for(const candidate of [path.join(claudeDir,'plugins','ecc'),path.join(claudeDir,'plugins','ecc@ecc'),path.join(claudeDir,'plugins','marketplace','ecc'),path.join(claudeDir,'plugins','everything-claude-code'),path.join(claudeDir,'plugins','everything-claude-code@everything-claude-code'),path.join(claudeDir,'plugins','marketplace','everything-claude-code')]){if(hasRunnerRoot(candidate))return candidate;}try{for(const slug of ['ecc','everything-claude-code']){const cacheBase=path.join(claudeDir,'plugins','cache',slug);for(const org of fs.readdirSync(cacheBase,{withFileTypes:true})){if(!org.isDirectory())continue;for(const version of fs.readdirSync(path.join(cacheBase,org.name),{withFileTypes:true})){if(!version.isDirectory())continue;const candidate=path.join(cacheBase,org.name,version.name);if(hasRunnerRoot(candidate))return candidate;}}}}catch{}return claudeDir;})();const script=path.join(root,rel);if(fs.existsSync(script)){const result=spawnSync(process.execPath,[script,'stop:check-console-log','scripts/hooks/check-console-log.js','standard,strict'],{input:raw,encoding:'utf8',env:process.env,cwd:process.cwd(),timeout:30000});const stdout=typeof result.stdout==='string'?result.stdout:'';if(stdout)process.stdout.write(stdout);else process.stdout.write(raw);if(result.stderr)process.stderr.write(result.stderr);if(result.error||result.status===null||result.signal){const reason=result.error?result.error.message:(result.signal?'signal '+result.signal:'missing exit status');process.stderr.write('[Stop] ERROR: hook runner failed: '+reason+String.fromCharCode(10));process.exit(1);}process.exit(Number.isInteger(result.status)?result.status:0);}process.stderr.write('[Stop] WARNING: could not resolve ECC plugin root; skipping hook'+String.fromCharCode(10));process.stdout.write(raw);\""
+          }
+        ]
+      },
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node -e \"const fs=require('fs');const path=require('path');const {spawnSync}=require('child_process');const raw=fs.readFileSync(0,'utf8');const rel=path.join('scripts','hooks','run-with-flags.js');const hasRunnerRoot=candidate=>{const value=typeof candidate==='string'?candidate.trim():'';return value.length>0&&fs.existsSync(path.join(path.resolve(value),rel));};const root=(()=>{const envRoot=process.env.CLAUDE_PLUGIN_ROOT||'';if(hasRunnerRoot(envRoot))return path.resolve(envRoot.trim());const home=require('os').homedir();const claudeDir=path.join(home,'.claude');if(hasRunnerRoot(claudeDir))return claudeDir;for(const candidate of [path.join(claudeDir,'plugins','ecc'),path.join(claudeDir,'plugins','ecc@ecc'),path.join(claudeDir,'plugins','marketplace','ecc'),path.join(claudeDir,'plugins','everything-claude-code'),path.join(claudeDir,'plugins','everything-claude-code@everything-claude-code'),path.join(claudeDir,'plugins','marketplace','everything-claude-code')]){if(hasRunnerRoot(candidate))return candidate;}try{for(const slug of ['ecc','everything-claude-code']){const cacheBase=path.join(claudeDir,'plugins','cache',slug);for(const org of fs.readdirSync(cacheBase,{withFileTypes:true})){if(!org.isDirectory())continue;for(const version of fs.readdirSync(path.join(cacheBase,org.name),{withFileTypes:true})){if(!version.isDirectory())continue;const candidate=path.join(cacheBase,org.name,version.name);if(hasRunnerRoot(candidate))return candidate;}}}}catch{}return claudeDir;})();const script=path.join(root,rel);if(fs.existsSync(script)){const result=spawnSync(process.execPath,[script,'stop:session-end','scripts/hooks/session-end.js','minimal,standard,strict'],{input:raw,encoding:'utf8',env:process.env,cwd:process.cwd(),timeout:30000});const stdout=typeof result.stdout==='string'?result.stdout:'';if(stdout)process.stdout.write(stdout);else process.stdout.write(raw);if(result.stderr)process.stderr.write(result.stderr);if(result.error||result.status===null||result.signal){const reason=result.error?result.error.message:(result.signal?'signal '+result.signal:'missing exit status');process.stderr.write('[Stop] ERROR: hook runner failed: '+reason+String.fromCharCode(10));process.exit(1);}process.exit(Number.isInteger(result.status)?result.status:0);}process.stderr.write('[Stop] WARNING: could not resolve ECC plugin root; skipping hook'+String.fromCharCode(10));process.stdout.write(raw);\"",
+            "timeout": 10,
+            "async": true
+          }
+        ]
+      },
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node -e \"const fs=require('fs');const path=require('path');const {spawnSync}=require('child_process');const raw=fs.readFileSync(0,'utf8');const rel=path.join('scripts','hooks','run-with-flags.js');const hasRunnerRoot=candidate=>{const value=typeof candidate==='string'?candidate.trim():'';return value.length>0&&fs.existsSync(path.join(path.resolve(value),rel));};const root=(()=>{const envRoot=process.env.CLAUDE_PLUGIN_ROOT||'';if(hasRunnerRoot(envRoot))return path.resolve(envRoot.trim());const home=require('os').homedir();const claudeDir=path.join(home,'.claude');if(hasRunnerRoot(claudeDir))return claudeDir;for(const candidate of [path.join(claudeDir,'plugins','ecc'),path.join(claudeDir,'plugins','ecc@ecc'),path.join(claudeDir,'plugins','marketplace','ecc'),path.join(claudeDir,'plugins','everything-claude-code'),path.join(claudeDir,'plugins','everything-claude-code@everything-claude-code'),path.join(claudeDir,'plugins','marketplace','everything-claude-code')]){if(hasRunnerRoot(candidate))return candidate;}try{for(const slug of ['ecc','everything-claude-code']){const cacheBase=path.join(claudeDir,'plugins','cache',slug);for(const org of fs.readdirSync(cacheBase,{withFileTypes:true})){if(!org.isDirectory())continue;for(const version of fs.readdirSync(path.join(cacheBase,org.name),{withFileTypes:true})){if(!version.isDirectory())continue;const candidate=path.join(cacheBase,org.name,version.name);if(hasRunnerRoot(candidate))return candidate;}}}}catch{}return claudeDir;})();const script=path.join(root,rel);if(fs.existsSync(script)){const result=spawnSync(process.execPath,[script,'stop:evaluate-session','scripts/hooks/evaluate-session.js','minimal,standard,strict'],{input:raw,encoding:'utf8',env:process.env,cwd:process.cwd(),timeout:30000});const stdout=typeof result.stdout==='string'?result.stdout:'';if(stdout)process.stdout.write(stdout);else process.stdout.write(raw);if(result.stderr)process.stderr.write(result.stderr);if(result.error||result.status===null||result.signal){const reason=result.error?result.error.message:(result.signal?'signal '+result.signal:'missing exit status');process.stderr.write('[Stop] ERROR: hook runner failed: '+reason+String.fromCharCode(10));process.exit(1);}process.exit(Number.isInteger(result.status)?result.status:0);}process.stderr.write('[Stop] WARNING: could not resolve ECC plugin root; skipping hook'+String.fromCharCode(10));process.stdout.write(raw);\"",
+            "timeout": 10,
+            "async": true
+          }
+        ]
+      },
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node -e \"const fs=require('fs');const path=require('path');const {spawnSync}=require('child_process');const raw=fs.readFileSync(0,'utf8');const rel=path.join('scripts','hooks','run-with-flags.js');const hasRunnerRoot=candidate=>{const value=typeof candidate==='string'?candidate.trim():'';return value.length>0&&fs.existsSync(path.join(path.resolve(value),rel));};const root=(()=>{const envRoot=process.env.CLAUDE_PLUGIN_ROOT||'';if(hasRunnerRoot(envRoot))return path.resolve(envRoot.trim());const home=require('os').homedir();const claudeDir=path.join(home,'.claude');if(hasRunnerRoot(claudeDir))return claudeDir;for(const candidate of [path.join(claudeDir,'plugins','ecc'),path.join(claudeDir,'plugins','ecc@ecc'),path.join(claudeDir,'plugins','marketplace','ecc'),path.join(claudeDir,'plugins','everything-claude-code'),path.join(claudeDir,'plugins','everything-claude-code@everything-claude-code'),path.join(claudeDir,'plugins','marketplace','everything-claude-code')]){if(hasRunnerRoot(candidate))return candidate;}try{for(const slug of ['ecc','everything-claude-code']){const cacheBase=path.join(claudeDir,'plugins','cache',slug);for(const org of fs.readdirSync(cacheBase,{withFileTypes:true})){if(!org.isDirectory())continue;for(const version of fs.readdirSync(path.join(cacheBase,org.name),{withFileTypes:true})){if(!version.isDirectory())continue;const candidate=path.join(cacheBase,org.name,version.name);if(hasRunnerRoot(candidate))return candidate;}}}}catch{}return claudeDir;})();const script=path.join(root,rel);if(fs.existsSync(script)){const result=spawnSync(process.execPath,[script,'stop:cost-tracker','scripts/hooks/cost-tracker.js','minimal,standard,strict'],{input:raw,encoding:'utf8',env:process.env,cwd:process.cwd(),timeout:30000});const stdout=typeof result.stdout==='string'?result.stdout:'';if(stdout)process.stdout.write(stdout);else process.stdout.write(raw);if(result.stderr)process.stderr.write(result.stderr);if(result.error||result.status===null||result.signal){const reason=result.error?result.error.message:(result.signal?'signal '+result.signal:'missing exit status');process.stderr.write('[Stop] ERROR: hook runner failed: '+reason+String.fromCharCode(10));process.exit(1);}process.exit(Number.isInteger(result.status)?result.status:0);}process.stderr.write('[Stop] WARNING: could not resolve ECC plugin root; skipping hook'+String.fromCharCode(10));process.stdout.write(raw);\"",
+            "timeout": 10,
+            "async": true
+          }
+        ]
+      },
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node -e \"const fs=require('fs');const path=require('path');const {spawnSync}=require('child_process');const raw=fs.readFileSync(0,'utf8');const rel=path.join('scripts','hooks','run-with-flags.js');const hasRunnerRoot=candidate=>{const value=typeof candidate==='string'?candidate.trim():'';return value.length>0&&fs.existsSync(path.join(path.resolve(value),rel));};const root=(()=>{const envRoot=process.env.CLAUDE_PLUGIN_ROOT||'';if(hasRunnerRoot(envRoot))return path.resolve(envRoot.trim());const home=require('os').homedir();const claudeDir=path.join(home,'.claude');if(hasRunnerRoot(claudeDir))return claudeDir;for(const candidate of [path.join(claudeDir,'plugins','ecc'),path.join(claudeDir,'plugins','ecc@ecc'),path.join(claudeDir,'plugins','marketplace','ecc'),path.join(claudeDir,'plugins','everything-claude-code'),path.join(claudeDir,'plugins','everything-claude-code@everything-claude-code'),path.join(claudeDir,'plugins','marketplace','everything-claude-code')]){if(hasRunnerRoot(candidate))return candidate;}try{for(const slug of ['ecc','everything-claude-code']){const cacheBase=path.join(claudeDir,'plugins','cache',slug);for(const org of fs.readdirSync(cacheBase,{withFileTypes:true})){if(!org.isDirectory())continue;for(const version of fs.readdirSync(path.join(cacheBase,org.name),{withFileTypes:true})){if(!version.isDirectory())continue;const candidate=path.join(cacheBase,org.name,version.name);if(hasRunnerRoot(candidate))return candidate;}}}}catch{}return claudeDir;})();const script=path.join(root,rel);if(fs.existsSync(script)){const result=spawnSync(process.execPath,[script,'stop:desktop-notify','scripts/hooks/desktop-notify.js','standard,strict'],{input:raw,encoding:'utf8',env:process.env,cwd:process.cwd(),timeout:30000});const stdout=typeof result.stdout==='string'?result.stdout:'';if(stdout)process.stdout.write(stdout);else process.stdout.write(raw);if(result.stderr)process.stderr.write(result.stderr);if(result.error||result.status===null||result.signal){const reason=result.error?result.error.message:(result.signal?'signal '+result.signal:'missing exit status');process.stderr.write('[Stop] ERROR: hook runner failed: '+reason+String.fromCharCode(10));process.exit(1);}process.exit(Number.isInteger(result.status)?result.status:0);}process.stderr.write('[Stop] WARNING: could not resolve ECC plugin root; skipping hook'+String.fromCharCode(10));process.stdout.write(raw);\"",
+            "timeout": 10,
+            "async": true
+          }
+        ]
+      },
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "CLAUDE_PLUGIN_ROOT=$CLAUDE_PROJECT_DIR/.claude/hookify-runtime python3 $CLAUDE_PROJECT_DIR/.claude/hookify-runtime/hooks/stop.py",
+            "timeout": 10
+          }
+        ]
+      }
+    ],
+    "PreCompact": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"$CLAUDE_PROJECT_DIR/.claude/scripts/hooks/run-with-flags.js\" \"pre:compact\" \"scripts/hooks/pre-compact.js\" \"standard,strict\""
+          }
+        ]
+      }
+    ],
+    "PostToolUseFailure": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node \"$CLAUDE_PROJECT_DIR/.claude/scripts/hooks/run-with-flags.js\" \"post:mcp-health-check\" \"scripts/hooks/mcp-health-check.js\" \"standard,strict\""
+          }
+        ]
+      }
+    ],
+    "SessionEnd": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node -e \"const fs=require('fs');const path=require('path');const {spawnSync}=require('child_process');const raw=fs.readFileSync(0,'utf8');const rel=path.join('scripts','hooks','run-with-flags.js');const hasRunnerRoot=candidate=>{const value=typeof candidate==='string'?candidate.trim():'';return value.length>0&&fs.existsSync(path.join(path.resolve(value),rel));};const root=(()=>{const envRoot=process.env.CLAUDE_PLUGIN_ROOT||'';if(hasRunnerRoot(envRoot))return path.resolve(envRoot.trim());const home=require('os').homedir();const claudeDir=path.join(home,'.claude');if(hasRunnerRoot(claudeDir))return claudeDir;for(const candidate of [path.join(claudeDir,'plugins','ecc'),path.join(claudeDir,'plugins','ecc@ecc'),path.join(claudeDir,'plugins','marketplace','ecc'),path.join(claudeDir,'plugins','everything-claude-code'),path.join(claudeDir,'plugins','everything-claude-code@everything-claude-code'),path.join(claudeDir,'plugins','marketplace','everything-claude-code')]){if(hasRunnerRoot(candidate))return candidate;}try{for(const slug of ['ecc','everything-claude-code']){const cacheBase=path.join(claudeDir,'plugins','cache',slug);for(const org of fs.readdirSync(cacheBase,{withFileTypes:true})){if(!org.isDirectory())continue;for(const version of fs.readdirSync(path.join(cacheBase,org.name),{withFileTypes:true})){if(!version.isDirectory())continue;const candidate=path.join(cacheBase,org.name,version.name);if(hasRunnerRoot(candidate))return candidate;}}}}catch{}return claudeDir;})();const script=path.join(root,rel);if(fs.existsSync(script)){const result=spawnSync(process.execPath,[script,'session:end:marker','scripts/hooks/session-end-marker.js','minimal,standard,strict'],{input:raw,encoding:'utf8',env:process.env,cwd:process.cwd(),timeout:30000});const stdout=typeof result.stdout==='string'?result.stdout:'';if(stdout)process.stdout.write(stdout);else process.stdout.write(raw);if(result.stderr)process.stderr.write(result.stderr);if(result.error||result.status===null||result.signal){const reason=result.error?result.error.message:(result.signal?'signal '+result.signal:'missing exit status');process.stderr.write('[SessionEnd] ERROR: hook runner failed: '+reason+String.fromCharCode(10));process.exit(1);}process.exit(Number.isInteger(result.status)?result.status:0);}process.stderr.write('[SessionEnd] WARNING: could not resolve ECC plugin root; skipping hook'+String.fromCharCode(10));process.stdout.write(raw);\"",
+            "timeout": 10,
+            "async": true
+          }
+        ]
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "CLAUDE_PLUGIN_ROOT=$CLAUDE_PROJECT_DIR/.claude/hookify-runtime python3 $CLAUDE_PROJECT_DIR/.claude/hookify-runtime/hooks/userpromptsubmit.py",
             "timeout": 10
           }
         ]
       }
     ]
   },
-  "permissions": {
-    "allow": [
-      "Read(*)",
-      "Edit(*)",
-      "Write(*)",
-      "Glob(*)",
-      "Grep(*)",
-      "WebFetch(*)",
-      "WebSearch(*)",
-      "Task(*)",
-      "Skill(*)",
-      "TodoWrite(*)",
-      "Bash(cat:*)",
-      "Bash(ls:*)",
-      "Bash(find:*)",
-      "Bash(grep:*)",
-      "Bash(head:*)",
-      "Bash(tail:*)",
-      "Bash(wc:*)",
-      "Bash(sort:*)",
-      "Bash(uniq:*)",
-      "Bash(diff:*)",
-      "Bash(echo:*)",
-      "Bash(pwd:*)",
-      "Bash(cd:*)",
-      "Bash(mkdir:*)",
-      "Bash(touch:*)",
-      "Bash(cp:*)",
-      "Bash(mv:*)",
-      "Bash(chmod:*)",
-      "Bash(git:*)",
-      "Bash(python:*)",
-      "Bash(python3:*)",
-      "Bash(uv:*)",
-      "Bash(ruff:*)",
-      "Bash(ty:*)",
-      "Bash(poe:*)",
-      "Bash(pytest:*)",
-      "Bash(node:*)",
-      "Bash(npm:*)",
-      "Bash(npm install:*)",
-      "Bash(npm run dev:*)",
-      "Bash(npm run build:*)",
-      "Bash(npm run tsc:*)",
-      "Bash(npm run test:*)",
-      "Bash(npm run lint:*)",
-      "Bash(npm run format:*)",
-      "Bash(npm exec:*)",
-      "Bash(npm ls:*)",
-      "Bash(npx:*)",
-      "Bash(yarn:*)",
-      "Bash(pnpm:*)",
-      "Bash(bun:*)",
-      "Bash(curl:*)",
-      "Bash(wget:*)",
-      "Bash(jq:*)",
-      "Bash(sed:*)",
-      "Bash(awk:*)",
-      "Bash(xargs:*)",
-      "Bash(tree:*)",
-      "Bash(which:*)",
-      "Bash(type:*)",
-      "Bash(env:*)",
-      "Bash(export:*)",
-      "Bash(source:*)",
-      "Bash(docker:*)",
-      "Bash(docker-compose:*)",
-      "Bash(gemini:*)",
-      "Bash(codex:*)",
-      "Bash(pkill:*)",
-      "Bash(for:*)",
-      "Bash(do)",
-      "Bash(then)",
-      "Bash(else)",
-      "Bash(fi)",
-      "Bash(done)",
-      "Bash(true)"
-    ],
-    "deny": [
-      "Read(./.env)",
-      "Read(./.env.local)",
-      "Read(./.env.production)",
-      "Read(./.env.staging)",
-      "Read(./.env.development)",
-      "Read(./**/*.pem)",
-      "Read(./**/*.key)",
-      "Read(./**/credentials*)",
-      "Read(./**/*secret*)",
-      "Read(./**/*.token)",
-      "Read(./**/*_token)",
-      "Read(~/.ssh/**)",
-      "Read(~/.aws/**)",
-      "Read(~/.config/gcloud/**)",
-      "Bash(rm -rf /)",
-      "Bash(rm -rf ~)"
-    ]
-  },
-  "env": {
-    "EDITOR": "code --wait",
-    "CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS": "1",
-    "CLAUDE_CODE_SUBAGENT_MODEL": "claude-opus-4-6"
-  }
+  "enabledPlugins": {},
+  "extraKnownMarketplaces": {},
+  "language": "日本語",
+  "effortLevel": "xhigh",
+  "autoMemoryEnabled": true,
+  "skipDangerousModePermissionPrompt": true,
+  "voiceEnabled": true
 }
