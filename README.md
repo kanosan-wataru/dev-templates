@@ -1,11 +1,17 @@
 # dev-templates
 
-開発環境の設定ファイル（dotfiles）と開発ツールを管理するリポジトリです。
+開発環境の設定ファイル（dotfiles）と AI コーディング CLI の設定テンプレートを管理するリポジトリです。
 Bash スクリプト（セットアップ）+ Zsh（対話シェル）のモジュラー構成で、macOS / Linux に対応しています。
+
+このリポジトリは 2 つの役割を兼ねます:
+
+- **dotfiles / モジュラーセットアップ** (`dotfiles/`) — `setup.sh` でローカルマシンに開発環境一式を配布
+- **AI CLI 設定テンプレート** (`dotfiles/.claude`, `dotfiles/.codex`, `dotfiles/.gemini`) — Claude Code / Codex CLI / Gemini CLI の最小構成テンプレート
+- **このリポジトリ自身の Claude Code / Copilot 設定** (`.claude/`, `.copilot/`) — リポジトリ作業で使う完全版の設定 (50 agents / 49 commands / 150 skills + hooks/scripts/runtime)
 
 ## 含まれる設定
 
-| ファイル | 説明 |
+| ファイル / ディレクトリ | 説明 |
 |---------|------|
 | `dotfiles/setup.sh` | セットアップスクリプト（bash、インタラクティブ選択・自動インストール） |
 | `dotfiles/lib/*.sh` | 共通ライブラリ（colors.sh, array.sh, backup.sh, tui.sh） |
@@ -15,15 +21,17 @@ Bash スクリプト（セットアップ）+ Zsh（対話シェル）のモジ�
 | `dotfiles/.zsh/plugins.zsh` | Zinit プラグイン設定 |
 | `dotfiles/.zsh/.p10k.zsh` | Powerlevel10k テーマ設定 |
 | `dotfiles/.shell/aliases.sh` | エイリアス定義（git/docker エイリアス、fzf 連携関数） |
-| `dotfiles/.shell/env.sh` | 環境変数読み込み（`~/.claude/.env` から MCP サーバー用等） |
+| `dotfiles/.shell/env.sh` | 環境変数読み込み（`~/.claude/.env` および `~/.config/*/.env` 一括読み込み） |
 | `dotfiles/.shell/node.sh` | fnm (Fast Node Manager) 初期化 |
 | `dotfiles/.shell/python.sh` | pyenv / uv 初期化 |
 | `dotfiles/.shell/1password.sh` | 1Password SSH エージェント設定（WSL/Linux/macOS 自動判定） |
-| `dotfiles/.claude/` | Claude Code 設定テンプレート一式（CLAUDE.md, スキル, エージェント等） |
-| `dotfiles/.codex/` | Codex CLI 設定テンプレート（モデル設定、サンドボックスルール） |
-| `dotfiles/.gemini/` | Gemini CLI 設定テンプレート（セッション設定、カスタム指示） |
+| `dotfiles/.claude/` | Claude Code 設定テンプレート（CLAUDE.md, hookify ルール, スキル, エージェント等） |
+| `dotfiles/.codex/` | Codex CLI 設定テンプレート（config.toml, AGENTS.md, ルール, スキル） |
+| `dotfiles/.gemini/` | Gemini CLI 設定テンプレート（settings.json, GEMINI.md, スキル） |
 | `dotfiles/.gitconfig.shared` | Git 共有設定（include.path 経由で読み込み） |
 | `dotfiles/.gitignore_global` | グローバル gitignore |
+| `.claude/` | このリポジトリ自身の Claude Code 設定（agents/commands/skills/hooks/scripts/runtime 一式） |
+| `.copilot/skills/` | GitHub Copilot CLI 用スキル（pptx, slidekit-create, slidekit-templ） |
 
 ## 動作要件
 
@@ -54,7 +62,9 @@ bash dotfiles/setup.sh
   [ ] AWS CLI               AWS CLI v2
   [ ] Python 開発環境       pyenv + uv (Python バージョン管理 + パッケージ管理)
   [ ] Gemini CLI            Google AI CLI (Node.js v20+ 必要)
-  [ ] Codex CLI              OpenAI CLI (Node.js v18+ 必要)
+  [ ] Codex CLI             OpenAI CLI (Node.js v18+ 必要)
+  [ ] GitHub CLI            gh (GitHub CLI)
+  [ ] GitHub Copilot CLI    Copilot CLI (Node.js v22+ 必要)
 ```
 
 ### モジュール
@@ -70,8 +80,10 @@ bash dotfiles/setup.sh
 | **Claude Code** | Anthropic の AI コーディングアシスタント CLI + 設定テンプレート | Node.js v18+ / jq（MCP マージ用、任意） |
 | **AWS CLI** | AWS CLI v2 | curl + unzip (Linux) / Homebrew (macOS) |
 | **Python 開発環境** | pyenv + Python + uv (パッケージマネージャー) | Git + ビルド依存パッケージ |
-| **Gemini CLI** | Google の AI CLI | Node.js v20+ |
+| **Gemini CLI** | Google の AI CLI + 設定テンプレート | Node.js v20+ |
 | **Codex CLI** | OpenAI の AI コーディングアシスタント CLI + 設定テンプレート | Node.js v18+ |
+| **GitHub CLI** | `gh` コマンド | Homebrew (macOS) / apt (Linux) |
+| **GitHub Copilot CLI** | `copilot` コマンド | Node.js v22+ |
 
 ### オプション
 
@@ -173,19 +185,29 @@ bash dotfiles/setup.sh --uninstall
 1. Node.js v18+ / npm の存在確認
 2. `npm install -g @anthropic-ai/claude-code`（既にインストール済みならスキップ）
 3. 設定ファイルの配置（CLAUDE.md, settings.json, hookify ルール, スキル, エージェント）
-4. `env.sh` の配置（`.shell/` に `~/.claude/.env` からの環境変数読み込み）
+4. `env.sh` の配置（`.shell/` に `~/.claude/.env` および `~/.config/*/.env` 一括読み込み）
 5. MCP サーバー設定の `~/.claude.json` へのマージ（jq 使用、べき等。jq 未インストール時はスキップ）
 6. `~/.claude/.env` に環境変数を設定するよう案内表示
 
 #### Gemini CLI
 1. Node.js v20+ / npm の存在確認
 2. `npm install -g @google/gemini-cli`（既にインストール済みならスキップ）
-3. 設定ファイルの配置（settings.json, GEMINI.md, skills/）
+3. 設定ファイルの配置（settings.json, GEMINI.md, skills/context-loader）
 
 #### Codex CLI
 1. Node.js v18+ / npm の存在確認
 2. `npm install -g @openai/codex`（既にインストール済みならスキップ）
-3. 設定ファイルの配置（config.toml, rules/default.rules, AGENTS.md, skills/）
+3. 設定ファイルの配置（config.toml, rules/default.rules, AGENTS.md, skills/context-loader）
+
+#### GitHub CLI
+1. 環境の自動判定（macOS: Homebrew / Linux: apt + 公式 GPG キー）
+2. `gh` のインストール（既にインストール済みならスキップ）
+3. `gh auth login` の案内表示
+
+#### GitHub Copilot CLI
+1. Node.js v22+ / npm の存在確認
+2. `npm install -g @github/copilot`（既にインストール済みならスキップ）
+3. 認証ガイドの表示（`copilot` 起動時に GitHub アカウントでログイン）
 
 完了後、`exec zsh` でシェルを再起動してください。
 
@@ -247,6 +269,8 @@ VS Code / Cursor から Dev Containers として接続する場合は、コマ�
 - Python (pyenv + uv)
 - Gemini CLI
 - Codex CLI
+- GitHub CLI
+- GitHub Copilot CLI
 
 ### API キーの設定
 
@@ -256,7 +280,37 @@ VS Code / Cursor から Dev Containers として接続する場合は、コマ�
 ANTHROPIC_API_KEY=sk-ant-...
 GEMINI_API_KEY=...
 OPENAI_API_KEY=sk-...
+GH_TOKEN=ghp_...
 ```
+
+## このリポジトリ自身の AI CLI 設定
+
+`dotfiles/` 配下とは別に、リポジトリのルートにこのリポジトリ自身で使う完全版の Claude Code / Copilot CLI 設定が格納されています。
+`$CLAUDE_PROJECT_DIR/.claude/...` のように **プロジェクトローカル参照**で動作し、ホスト依存パスを含みません。
+
+### `.claude/` (プロジェクトローカル Claude Code 設定)
+
+| エントリ | 内容 |
+|---------|------|
+| `CLAUDE.md` / `CLAUDE.jp.md` | プロジェクト向けの Claude Code 指示書（英語 / 日本語） |
+| `settings.json` | 言語・hooks・パーミッション設定 |
+| `agents/` | 50 個のスペシャリストエージェント（reviewer / build-resolver / planner / explore 系） |
+| `commands/` | 49 個のスラッシュコマンド（`/plan`, `/tdd`, `/verify`, `/code-review` 等） |
+| `skills/` | 150 個のスキル（continuous-learning, verification-loop, security-review 等） |
+| `hooks/` | hooks 補助ファイル |
+| `scripts/hooks/` | settings.json から呼ばれる hooks 本体（Node.js） |
+| `rules/` | 言語別ルール（common/typescript/python/golang/rust/web 他） |
+| `lsps-runtime/` | LSP ランタイム（pyright, vtsls）と起動 hooks |
+| `hookify-runtime/` | hookify ランタイム（Python） |
+| `docs/` | 設定リファレンス・設計ドキュメント |
+
+### `.copilot/skills/` (GitHub Copilot CLI 用スキル)
+
+| スキル | 内容 |
+|-------|------|
+| `pptx/` | PowerPoint (OOXML) を pptxgenjs / unpack-pack 系スクリプトで編集するスキル |
+| `slidekit-create/` | スライドキット作成補助 |
+| `slidekit-templ/` | スライドテンプレート補助 |
 
 ## CI
 
@@ -270,88 +324,100 @@ OPENAI_API_KEY=sk-...
 | **BATS テスト** | `dotfiles/tests/*.bats` によるユニットテスト | テストファイル |
 | **Setup Dry Run** | `setup.sh --all --dry-run` による統合テスト | セットアップ全体 |
 
-Zsh Syntax Check と Setup Dry Run は **Ubuntu** と **macOS** の両環境で実行されます。
+Zsh Syntax Check と Setup Dry Run は **Ubuntu** と **macOS** の両環境で実行されます。Setup Dry Run と BATS テストは **Node.js 22** で実行されます。
 
 ## ディレクトリ構成
 
 ```
 dev-templates/
-├── .claude/
-│   ├── docs/
-│   │   └── claude-code-config.md  # Claude Code 設定リファレンス
-│   └── rules/                     # コーディング・開発ルール
+├── .claude/                          # このリポジトリ自身の Claude Code 設定 (プロジェクトローカル)
+│   ├── CLAUDE.md / CLAUDE.jp.md      # プロジェクト指示書 (英語 / 日本語)
+│   ├── settings.json                 # 言語・hooks・パーミッション
+│   ├── agents/                       # スペシャリストエージェント (50)
+│   ├── commands/                     # スラッシュコマンド (49)
+│   ├── skills/                       # スキル定義 (150)
+│   ├── hooks/                        # hooks 補助ファイル
+│   ├── scripts/hooks/                # settings.json から呼ばれる hooks 本体
+│   ├── rules/                        # 言語別ルール (common/typescript/python/golang/rust/web/...)
+│   ├── lsps-runtime/                 # pyright / vtsls 起動 hooks
+│   ├── hookify-runtime/              # hookify ランタイム
+│   └── docs/                         # 設定リファレンス・設計ドキュメント
+├── .copilot/
+│   └── skills/                       # GitHub Copilot CLI 用スキル (pptx / slidekit-*)
 ├── .devcontainer/
-│   └── devcontainer.json     # VS Code Dev Containers 設定
+│   └── devcontainer.json             # VS Code Dev Containers 設定
 ├── .github/workflows/
-│   └── ci.yml                # CI: shfmt + shellcheck + BATS + dry-run（Ubuntu/macOS）
-├── Dockerfile                 # 開発環境コンテナ定義
-├── docker-compose.yml         # Docker Compose 設定
-├── .dockerignore               # Docker ビルドコンテキスト除外設定
-├── .env.example               # 環境変数テンプレート（API キー等）
+│   └── ci.yml                        # CI: shfmt + shellcheck + BATS + dry-run (Ubuntu/macOS, Node 22)
+├── Dockerfile                        # 開発環境コンテナ定義
+├── docker-compose.yml                # Docker Compose 設定
+├── .dockerignore                     # Docker ビルドコンテキスト除外設定
+├── .env.example                      # 環境変数テンプレート (API キー等)
 ├── dotfiles/
-│   ├── .claude/
-│   │   ├── CLAUDE.md            # グローバル Claude 設定
-│   │   ├── settings.json        # 許可ツール・プラグイン設定
-│   │   ├── mcp-servers.json     # MCP サーバー設定テンプレート
-│   │   ├── hookify.*.local.md   # hookify ガードレール（3 ファイル）
-│   │   ├── skills/              # スキル定義（7 スキル）
-│   │   └── agents/              # エージェント定義（3 エージェント）
-│   ├── .codex/
-│   │   ├── AGENTS.md            # Codex CLI エージェント設定
-│   │   ├── config.toml          # Codex CLI モデル設定テンプレート
-│   │   ├── rules/
-│   │   │   └── default.rules    # サンドボックス許可ルール
-│   │   └── skills/
-│   │       └── context-loader/  # コンテキストローダースキル
-│   ├── .gemini/
-│   │   ├── GEMINI.md            # グローバルカスタム指示テンプレート
-│   │   ├── settings.json        # Gemini CLI セッション設定
-│   │   └── skills/
-│   │       └── context-loader/  # コンテキストローダースキル
+│   ├── .claude/                      # Claude Code 設定テンプレート (~/.claude/ に配布)
+│   │   ├── CLAUDE.md                 # グローバル指示書
+│   │   ├── settings.json             # 許可ツール・プラグイン設定
+│   │   ├── mcp-servers.json          # MCP サーバー設定テンプレート
+│   │   ├── hookify.*.local.md        # hookify ガードレール (4 ファイル)
+│   │   ├── skills/                   # スキル定義 (7 スキル)
+│   │   ├── agents/                   # エージェント定義 (3 エージェント)
+│   │   ├── rules/                    # 言語別ルール
+│   │   ├── contexts/                 # コンテキスト定義
+│   │   └── scripts/                  # 補助スクリプト
+│   ├── .codex/                       # Codex CLI 設定テンプレート (~/.codex/ に配布)
+│   │   ├── AGENTS.md                 # Codex CLI エージェント設定
+│   │   ├── config.toml               # モデル設定テンプレート
+│   │   ├── rules/default.rules       # サンドボックス許可ルール
+│   │   └── skills/context-loader/    # コンテキストローダースキル
+│   ├── .gemini/                      # Gemini CLI 設定テンプレート (~/.gemini/ に配布)
+│   │   ├── GEMINI.md                 # グローバルカスタム指示
+│   │   ├── settings.json             # セッション設定
+│   │   └── skills/context-loader/    # コンテキストローダースキル
 │   ├── .zsh/
-│   │   ├── .p10k.zsh        # Powerlevel10k テーマ設定
-│   │   └── plugins.zsh      # Zinit プラグイン設定
-│   ├── .shell/                  # 共有設定（bash / zsh 両対応）
-│   │   ├── aliases.sh       # エイリアス定義
-│   │   ├── env.sh           # 環境変数読み込み（~/.claude/.env）
-│   │   ├── node.sh          # fnm 初期化
-│   │   ├── python.sh        # pyenv 初期化
-│   │   └── 1password.sh     # 1Password SSH エージェント（WSL/Linux/macOS）
-│   ├── lib/                     # セットアップ共通ライブラリ
-│   │   ├── colors.sh        # カラー出力ヘルパー
-│   │   ├── array.sh         # 配列操作ユーティリティ
-│   │   ├── backup.sh        # ファイルバックアップ・リストア
-│   │   └── tui.sh           # TUI（チェックボックス UI 等）
-│   ├── modules/
-│   │   ├── zsh.sh            # モジュール: Zsh 設定一式
-│   │   ├── git.sh            # モジュール: Git グローバル設定
-│   │   ├── 1password.sh      # モジュール: 1Password CLI + SSH + Git 署名
-│   │   ├── modern-cli.sh     # モジュール: モダン CLI ツール
-│   │   ├── node.sh           # モジュール: Node.js 開発環境
-│   │   ├── docker.sh         # モジュール: Docker + NVIDIA GPU
-│   │   ├── claude-code.sh    # モジュール: Claude Code
-│   │   ├── aws-cli.sh        # モジュール: AWS CLI v2
-│   │   ├── codex-cli.sh      # モジュール: Codex CLI
-│   │   ├── python.sh         # モジュール: Python 開発環境
-│   │   └── gemini-cli.sh     # モジュール: Gemini CLI
-│   ├── tests/
-│   │   ├── helpers/
-│   │   │   └── setup_functions.bash   # テストヘルパー: 共通セットアップ関数
-│   │   ├── test_backup_sort.bats      # テスト: バックアップソート
-│   │   ├── test_detect_env.bats       # テスト: 環境検出
-│   │   ├── test_flag_behavior.bats    # テスト: フラグ動作
-│   │   ├── test_install_config.bats   # テスト: インストール設定
-│   │   ├── test_module_metadata.bats  # テスト: モジュールメタデータ
-│   │   ├── test_positional_args.bats  # テスト: 位置引数
-│   │   ├── test_setup_functions.bats  # テスト: セットアップ関数
-│   │   ├── test_status.bats           # テスト: ステータス表示
-│   │   └── test_upgrade.bats          # テスト: アップグレード
-│   ├── .gitconfig.shared     # Git 共有設定（include.path 経由）
-│   ├── .gitignore_global     # グローバル gitignore
-│   ├── .bashrc                # Bash エントリーポイント（.shell/ 読み込み）
-│   ├── .zshrc                # Zsh エントリーポイント（履歴設定 + モジュール読み込み）
-│   └── setup.sh              # セットアップスクリプト（bash、モジュール動的読み込み）
-├── .editorconfig              # エディタ設定（インデント・改行コード統一）
+│   │   ├── .p10k.zsh                 # Powerlevel10k テーマ設定
+│   │   └── plugins.zsh               # Zinit プラグイン設定
+│   ├── .shell/                       # 共有設定 (bash / zsh 両対応)
+│   │   ├── aliases.sh                # エイリアス定義
+│   │   ├── env.sh                    # 環境変数読み込み (~/.claude/.env + ~/.config/*/.env)
+│   │   ├── node.sh                   # fnm 初期化
+│   │   ├── python.sh                 # pyenv 初期化
+│   │   └── 1password.sh              # 1Password SSH エージェント (WSL/Linux/macOS)
+│   ├── lib/                          # セットアップ共通ライブラリ
+│   │   ├── colors.sh                 # カラー出力ヘルパー
+│   │   ├── array.sh                  # 配列操作ユーティリティ
+│   │   ├── backup.sh                 # ファイルバックアップ・リストア
+│   │   └── tui.sh                    # TUI (チェックボックス UI 等)
+│   ├── modules/                      # モジュール定義 (13 モジュール)
+│   │   ├── zsh.sh                    # Zsh 設定一式
+│   │   ├── git.sh                    # Git グローバル設定
+│   │   ├── 1password.sh              # 1Password CLI + SSH + Git 署名
+│   │   ├── modern-cli.sh             # モダン CLI ツール
+│   │   ├── node.sh                   # Node.js 開発環境
+│   │   ├── docker.sh                 # Docker + NVIDIA GPU
+│   │   ├── claude-code.sh            # Claude Code
+│   │   ├── aws-cli.sh                # AWS CLI v2
+│   │   ├── codex-cli.sh              # Codex CLI
+│   │   ├── python.sh                 # Python 開発環境
+│   │   ├── gemini-cli.sh             # Gemini CLI
+│   │   ├── gh.sh                     # GitHub CLI
+│   │   └── copilot-cli.sh            # GitHub Copilot CLI
+│   ├── tests/                        # BATS ユニットテスト
+│   │   ├── helpers/setup_functions.bash
+│   │   ├── test_backup_sort.bats
+│   │   ├── test_copilot_cli.bats
+│   │   ├── test_detect_env.bats
+│   │   ├── test_flag_behavior.bats
+│   │   ├── test_install_config.bats
+│   │   ├── test_module_metadata.bats
+│   │   ├── test_positional_args.bats
+│   │   ├── test_setup_functions.bats
+│   │   ├── test_status.bats
+│   │   └── test_upgrade.bats
+│   ├── .gitconfig.shared             # Git 共有設定 (include.path 経由)
+│   ├── .gitignore_global             # グローバル gitignore
+│   ├── .bashrc                       # Bash エントリーポイント (.shell/ 読み込み)
+│   ├── .zshrc                        # Zsh エントリーポイント (履歴設定 + モジュール読み込み)
+│   └── setup.sh                      # セットアップスクリプト (bash、モジュール動的読み込み)
+├── .editorconfig                     # エディタ設定 (インデント・改行コード統一)
 ├── .gitignore
 └── README.md
 ```
