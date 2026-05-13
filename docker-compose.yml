@@ -3,6 +3,18 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
+      args:
+        # コンテナ内で動かないモジュール (Docker / AWS / 1Password) は既定で除外
+        # 全モジュール入りにする場合は SETUP_MODULES に "--all" を指定する
+        SETUP_MODULES: ${SETUP_MODULES:-zsh git modern-cli node python claude-code codex-cli gemini-cli gh copilot-cli}
+        # fnm / Node.js を固定したい場合は環境変数で指定 (例: FNM_VERSION=v1.38.1 NODE_VERSION=22)
+        # 空の場合は latest / --lts
+        FNM_VERSION: ${FNM_VERSION:-}
+        NODE_VERSION: ${NODE_VERSION:-}
+    init: true
+    # コンテナ内プロセスが setuid バイナリ等で追加権限を獲得できないようにする
+    security_opt:
+      - "no-new-privileges:true"
     volumes:
       - .:/workspaces/dev-templates
       - ~/.ssh:/home/dev/.ssh:ro

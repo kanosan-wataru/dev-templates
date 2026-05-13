@@ -1,50 +1,37 @@
+# syntax=docker/dockerfile:1.7
 # ==============================================
 # 開発環境コンテナ
-# setup.sh --all で全モジュールをプリインストールした Zsh 環境
+# setup.sh で選択したモジュールをインストールした Zsh 環境
 # ==============================================
 
 FROM ubuntu:24.04
 
-# 対話的プロンプトを抑制
+# Ubuntu の既定 /bin/sh は dash で bash 拡張 (${var//pattern} 等) が使えないため
+# 全 RUN ステップを bash で実行する。pipefail でパイプ途中失敗も拾う。
+SHELL ["/bin/bash", "-o", "pipefail", "-c"]
+
 ARG DEBIAN_FRONTEND=noninteractive
-ENV TZ=Asia/Tokyo
+ENV TZ=Asia/Tokyo \
+    LANG=en_US.UTF-8 \
+    LANGUAGE=en_US:en \
+    LC_ALL=en_US.UTF-8
 
-# 全モジュールの前提パッケージを一括インストール
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    # 基本ツール
-    zsh \
-    git \
-    curl \
-    wget \
-    unzip \
-    sudo \
-    ca-certificates \
-    locales \
-    # modern-cli (eza) 用
-    gpg \
-    # Python ビルド依存パッケージ
-    build-essential \
-    libssl-dev \
-    zlib1g-dev \
-    libbz2-dev \
-    libreadline-dev \
-    libsqlite3-dev \
-    libncursesw5-dev \
-    xz-utils \
-    tk-dev \
-    libxml2-dev \
-    libxmlsec1-dev \
-    libffi-dev \
-    liblzma-dev \
-    && rm -rf /var/lib/apt/lists/*
+# BuildKit cache mount を使って apt 取得を高速化
+# NOTE: docker-clean が cache を毎回消すためビルド中だけ退避し、最終イメージには元の挙動を復元する
+#       (runtime で apt-get を使うユーザーが cache 蓄積に悩まないため)
+RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
+    --mount=type=cache,target=/var/lib/apt,sharing=locked \
+    mv /etc/apt/apt.conf.d/docker-clean /tmp/docker-clean.bak \
+    && apt-get update \
+    && apt-get install -y --no-install-recommends \
+        zsh git curl wget unzip sudo ca-certificates locales gpg jq \
+        build-essential libssl-dev zlib1g-dev libbz2-dev libreadline-dev \
+        libsqlite3-dev libncursesw5-dev xz-utils tk-dev libxml2-dev \
+        libxmlsec1-dev libffi-dev liblzma-dev \
+    && locale-gen en_US.UTF-8 \
+    && mv /tmp/docker-clean.bak /etc/apt/apt.conf.d/docker-clean
 
-# ロケール設定
-RUN locale-gen en_US.UTF-8
-ENV LANG=en_US.UTF-8
-ENV LANGUAGE=en_US:en
-ENV LC_ALL=en_US.UTF-8
-
-# 非 root ユーザーの作成（パスワードなし sudo）
+# 非 root ユーザー（パスワードなし sudo）
 ARG USERNAME=dev
 ARG USER_UID=1000
 ARG USER_GID=$USER_UID
@@ -54,28 +41,41 @@ RUN userdel -r ubuntu 2>/dev/null || true \
     && echo "$USERNAME ALL=(ALL) NOPASSWD:ALL" >> /etc/sudoers.d/$USERNAME \
     && chmod 0440 /etc/sudoers.d/$USERNAME
 
-# fnm + Node.js LTS を事前インストール
-# NOTE: ピン留めされたバージョンの公式バイナリを GitHub Releases から直接取得する
-ARG FNM_VERSION=v1.38.1
 USER $USERNAME
-ENV FNM_DIR="/home/${USERNAME}/.local/share/fnm"
-RUN mkdir -p /home/${USERNAME}/.local/bin \
-    && curl -fsSL "https://github.com/Schniz/fnm/releases/download/${FNM_VERSION}/fnm-linux.zip" \
-       -o /tmp/fnm.zip \
-    && unzip -o /tmp/fnm.zip -d /home/${USERNAME}/.local/bin \
-    && chmod +x /home/${USERNAME}/.local/bin/fnm \
-    && rm /tmp/fnm.zip \
-    && export PATH="/home/${USERNAME}/.local/bin:$PATH" \
-    && eval "$(fnm env)" \
-    && fnm install --lts \
-    && fnm default lts-latest
-ENV PATH="/home/${USERNAME}/.local/bin:$PATH"
-
-# dotfiles をコピーして setup.sh を実行
 WORKDIR /home/$USERNAME
+
+# setup.sh で導入するモジュール
+# Docker / AWS CLI / 1Password はコンテナ内で動作しないため既定で除外
+# node モジュールが fnm + Node.js を multi-arch でインストールする
+# 上書き方法:
+#   1) Compose 経由 (推奨): SETUP_MODULES="..." docker compose build
+#   2) 直接 build-arg:      docker compose build --build-arg SETUP_MODULES="..."
+# 再現性のため FNM_VERSION / NODE_VERSION も同じ手順で固定可能
+ARG SETUP_MODULES="zsh git modern-cli node python claude-code codex-cli gemini-cli gh copilot-cli"
+ARG FNM_VERSION=""
+ARG NODE_VERSION=""
+ENV FNM_VERSION=${FNM_VERSION} \
+    NODE_VERSION=${NODE_VERSION}
 COPY --chown=$USERNAME:$USERNAME dotfiles/ /tmp/dotfiles/
-RUN cd /tmp/dotfiles && zsh setup.sh --all \
+# SETUP_MODULES の検証:
+# - 空文字 → 非 TTY フォールバックで --all 相当となり除外モジュールも入るため弾く
+# - 不正文字 (シェルメタ文字) → unquoted 展開でインジェクションになるため弾く
+#   許容: 英数字 / - / _ / 空白 のみ (例: "zsh node", "--all")
+RUN if [[ -z "${SETUP_MODULES// /}" ]]; then \
+        echo "ERROR: SETUP_MODULES is empty. Specify modules explicitly or pass '--all'." >&2; \
+        exit 1; \
+    fi \
+    && if [[ ! "$SETUP_MODULES" =~ ^[A-Za-z0-9_[:space:]-]+$ ]]; then \
+        echo "ERROR: SETUP_MODULES contains invalid characters. Allowed: [A-Za-z0-9_-] and spaces." >&2; \
+        exit 1; \
+    fi \
+    && cd /tmp/dotfiles \
+    && bash setup.sh $SETUP_MODULES --force \
     && rm -rf /tmp/dotfiles
 
 WORKDIR /workspaces
+
+HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
+    CMD command -v zsh >/dev/null && command -v git >/dev/null || exit 1
+
 CMD ["zsh"]

@@ -256,21 +256,40 @@ VS Code / Cursor から Dev Containers として接続する場合は、コマ�
 
 ### 含まれるツール
 
-コンテナイメージには `setup.sh --all` で全モジュールがプリインストールされています:
+コンテナイメージには、コンテナ内で動作するモジュールが既定でプリインストールされます:
 
 - Zsh + Zinit + Powerlevel10k
 - Git グローバル設定
-- 1Password CLI + SSH エージェント + Git 署名
 - モダン CLI ツール (eza, bat, fd, ripgrep)
 - Node.js (fnm + LTS)
-- Docker Engine + Compose
-- Claude Code
-- AWS CLI v2
 - Python (pyenv + uv)
-- Gemini CLI
+- Claude Code
 - Codex CLI
+- Gemini CLI
 - GitHub CLI
 - GitHub Copilot CLI
+
+**既定で除外**されるモジュール (コンテナ内で動作しない / 不要なため):
+
+- Docker Engine (Docker-in-Docker 用途は別途 socket マウントが必要)
+- AWS CLI v2 (必要に応じて手動インストール)
+- 1Password (ホストでの SSH エージェントが前提)
+
+#### モジュール選択のカスタマイズ
+
+`SETUP_MODULES` 環境変数を指定するとビルド時のモジュールを上書きできます:
+
+```bash
+# 全モジュール入り (Docker は build 時にエラーになる可能性あり)
+SETUP_MODULES="--all" docker compose build
+
+# 最小構成 (Zsh + Node + Claude Code のみ)
+SETUP_MODULES="zsh node claude-code" docker compose build
+```
+
+#### Multi-arch ビルド
+
+`linux/amd64` と `linux/arm64` (Apple Silicon) に対応しています。`node` モジュールが `uname -m` を判定して fnm の適切なアセットを取得します (ubuntu:24.04 は `linux/arm/v7` 公式イメージが未提供のため arm32 は非対応)。
 
 ### API キーの設定
 
