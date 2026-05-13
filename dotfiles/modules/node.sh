@@ -13,8 +13,16 @@ MODULE_ORDER=18
 # NOTE: モジュール固有の変数には衝突回避のため NODE_MOD_ プレフィックスを使用
 
 NODE_MOD_FNM_BIN_DIR="$HOME/.local/bin"
-# NOTE: 常に最新リリースをインストールする（GitHub の /latest リダイレクトを利用）
-NODE_MOD_FNM_REPO="https://github.com/Schniz/fnm/releases/latest/download"
+# NOTE: 既定では latest リリースを取得する。再現性が必要な場合は環境変数で固定する
+#   FNM_VERSION=v1.38.1 ... fnm 自体のバージョン (Linux のみ。macOS は brew 任せ)
+#   NODE_VERSION=22      ... fnm install で取得する Node のバージョン (空なら --lts)
+NODE_MOD_FNM_VERSION="${FNM_VERSION:-}"
+NODE_MOD_NODE_VERSION="${NODE_VERSION:-}"
+if [[ -n "$NODE_MOD_FNM_VERSION" ]]; then
+    NODE_MOD_FNM_REPO="https://github.com/Schniz/fnm/releases/download/${NODE_MOD_FNM_VERSION}"
+else
+    NODE_MOD_FNM_REPO="https://github.com/Schniz/fnm/releases/latest/download"
+fi
 
 # 管理対象ファイル（配布元パス, 配置先パス, 表示名, 未検出時メッセージ）
 NODE_MOD_MANAGED_FILES=(
@@ -229,16 +237,28 @@ _node_setup_linux() {
     fi
 }
 
-# --- Node.js LTS インストール ---
+# --- Node.js インストール ---
+# NODE_VERSION 環境変数が設定されていればそのバージョン、未設定なら LTS をインストール
 _node_install_lts() {
+    local install_arg default_arg label
+    if [[ -n "$NODE_MOD_NODE_VERSION" ]]; then
+        install_arg="$NODE_MOD_NODE_VERSION"
+        default_arg="$NODE_MOD_NODE_VERSION"
+        label="Node.js ${NODE_MOD_NODE_VERSION}"
+    else
+        install_arg="--lts"
+        default_arg="lts-latest"
+        label="Node.js LTS"
+    fi
+
     if ((DRY_RUN)); then
-        msg_dry_run "fnm install --lts"
-        msg_dry_run "fnm default lts-latest"
+        msg_dry_run "fnm install ${install_arg}"
+        msg_dry_run "fnm default ${default_arg}"
         return 0
     fi
 
     if ! command -v fnm >/dev/null 2>&1; then
-        msg_warn "fnm が PATH に見つかりません。Node.js LTS のインストールをスキップします。"
+        msg_warn "fnm が PATH に見つかりません。${label} のインストールをスキップします。"
         return 0
     fi
 
@@ -253,26 +273,26 @@ _node_install_lts() {
         fi
 
         if ((UPGRADE)); then
-            msg_info "Node.js LTS のアップグレードを実行します... (現在: ${node_ver:-unknown})"
+            msg_info "${label} のアップグレードを実行します... (現在: ${node_ver:-unknown})"
         elif [[ "$node_major" =~ ^[0-9]+$ ]] && ((node_major >= 18)); then
             msg_info "Node.js は既にインストールされています (${node_ver})。スキップします。"
             return 0
         elif [[ "$node_major" =~ ^[0-9]+$ ]] && ((node_major < 18)); then
-            msg_warn "既存の Node.js (${node_ver}) は推奨バージョン (v18 以上) 未満です。fnm で LTS をインストールします。"
+            msg_warn "既存の Node.js (${node_ver}) は推奨バージョン (v18 以上) 未満です。fnm で ${label} をインストールします。"
         else
-            msg_warn "Node.js のバージョンを特定できません (${node_ver:-unknown})。fnm で LTS をインストールします。"
+            msg_warn "Node.js のバージョンを特定できません (${node_ver:-unknown})。fnm で ${label} をインストールします。"
         fi
     fi
 
-    msg_info "Node.js LTS をインストールします..."
-    fnm install --lts || {
-        msg_error "Node.js LTS のインストールに失敗しました。"
-        msg_step "手動でインストールしてください: fnm install --lts" >&2
+    msg_info "${label} をインストールします..."
+    fnm install "$install_arg" || {
+        msg_error "${label} のインストールに失敗しました。"
+        msg_step "手動でインストールしてください: fnm install ${install_arg}" >&2
         return 1
     }
 
     # デフォルトバージョンに設定
-    fnm default lts-latest 2>/dev/null || {
+    fnm default "$default_arg" 2>/dev/null || {
         msg_warn "デフォルトバージョンの設定に失敗しました。"
     }
 

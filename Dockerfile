@@ -40,12 +40,17 @@ WORKDIR /home/$USERNAME
 
 # setup.sh で導入するモジュール
 # Docker / AWS CLI / 1Password はコンテナ内で動作しないため既定で除外
-# node モジュールが fnm + Node.js LTS を multi-arch でインストールする
+# node モジュールが fnm + Node.js を multi-arch でインストールする
 # 上書きするには docker compose build --build-arg SETUP_MODULES="..." を使う
+# 再現性のため FNM_VERSION / NODE_VERSION も build-arg で固定可能
 ARG SETUP_MODULES="zsh git modern-cli node python claude-code codex-cli gemini-cli gh copilot-cli"
+ARG FNM_VERSION=""
+ARG NODE_VERSION=""
+ENV FNM_VERSION=${FNM_VERSION} \
+    NODE_VERSION=${NODE_VERSION}
 COPY --chown=$USERNAME:$USERNAME dotfiles/ /tmp/dotfiles/
 RUN cd /tmp/dotfiles \
-    && zsh setup.sh $SETUP_MODULES --force \
+    && bash setup.sh $SETUP_MODULES --force \
     && rm -rf /tmp/dotfiles
 
 WORKDIR /workspaces
