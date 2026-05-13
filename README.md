@@ -289,7 +289,7 @@ SETUP_MODULES="zsh node claude-code" docker compose build
 
 #### Multi-arch ビルド
 
-`linux/amd64` / `linux/arm64` (Apple Silicon) / `linux/arm` に対応しています。`node` モジュールがホストアーキテクチャを判定して fnm の適切なアセットを取得します。
+`linux/amd64` と `linux/arm64` (Apple Silicon) に対応しています。`node` モジュールが `uname -m` を判定して fnm の適切なアセットを取得します (ubuntu:24.04 は `linux/arm/v7` 公式イメージが未提供のため arm32 は非対応)。
 
 ### API キーの設定
 

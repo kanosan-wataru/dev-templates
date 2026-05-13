@@ -16,8 +16,24 @@ NODE_MOD_FNM_BIN_DIR="$HOME/.local/bin"
 # NOTE: 既定では latest リリースを取得する。再現性が必要な場合は環境変数で固定する
 #   FNM_VERSION=v1.38.1 ... fnm 自体のバージョン (Linux のみ。macOS は brew 任せ)
 #   NODE_VERSION=22      ... fnm install で取得する Node のバージョン (空なら --lts)
+# 前後空白をトリムしてから検証する
 NODE_MOD_FNM_VERSION="${FNM_VERSION:-}"
+NODE_MOD_FNM_VERSION="${NODE_MOD_FNM_VERSION#"${NODE_MOD_FNM_VERSION%%[![:space:]]*}"}"
+NODE_MOD_FNM_VERSION="${NODE_MOD_FNM_VERSION%"${NODE_MOD_FNM_VERSION##*[![:space:]]}"}"
 NODE_MOD_NODE_VERSION="${NODE_VERSION:-}"
+NODE_MOD_NODE_VERSION="${NODE_MOD_NODE_VERSION#"${NODE_MOD_NODE_VERSION%%[![:space:]]*}"}"
+NODE_MOD_NODE_VERSION="${NODE_MOD_NODE_VERSION%"${NODE_MOD_NODE_VERSION##*[![:space:]]}"}"
+
+# 値検証: シェルインジェクション防止と早期エラー
+if [[ -n "$NODE_MOD_FNM_VERSION" && ! "$NODE_MOD_FNM_VERSION" =~ ^v?[0-9]+(\.[0-9]+)*$ ]]; then
+    printf 'ERROR: FNM_VERSION の形式が不正です: %q (例: v1.38.1)\n' "$NODE_MOD_FNM_VERSION" >&2
+    return 1 2>/dev/null || exit 1
+fi
+if [[ -n "$NODE_MOD_NODE_VERSION" && ! "$NODE_MOD_NODE_VERSION" =~ ^[A-Za-z0-9._/-]+$ ]]; then
+    printf 'ERROR: NODE_VERSION の形式が不正です: %q (例: 22, v22.1.0, lts/iron)\n' "$NODE_MOD_NODE_VERSION" >&2
+    return 1 2>/dev/null || exit 1
+fi
+
 if [[ -n "$NODE_MOD_FNM_VERSION" ]]; then
     NODE_MOD_FNM_REPO="https://github.com/Schniz/fnm/releases/download/${NODE_MOD_FNM_VERSION}"
 else
@@ -285,16 +301,29 @@ _node_install_lts() {
     fi
 
     msg_info "${label} をインストールします..."
-    fnm install "$install_arg" || {
-        msg_error "${label} のインストールに失敗しました。"
-        msg_step "手動でインストールしてください: fnm install ${install_arg}" >&2
+    # stderr を一時ファイル経由でキャプチャし、失敗時に再出力する
+    local fnm_install_err
+    fnm_install_err=$(mktemp /tmp/fnm-install-err-XXXXXXXXXX) || {
+        msg_error "一時ファイルの作成に失敗しました。"
         return 1
     }
+    if ! fnm install "$install_arg" 2>"$fnm_install_err"; then
+        msg_error "${label} のインストールに失敗しました。"
+        if [[ -s "$fnm_install_err" ]]; then
+            printf '  fnm stderr: ' >&2
+            cat "$fnm_install_err" >&2
+        fi
+        msg_step "手動でインストールしてください: fnm install ${install_arg}" >&2
+        rm -f "$fnm_install_err"
+        return 1
+    fi
+    rm -f "$fnm_install_err"
 
-    # デフォルトバージョンに設定
-    fnm default "$default_arg" 2>/dev/null || {
-        msg_warn "デフォルトバージョンの設定に失敗しました。"
-    }
+    # デフォルトバージョンに設定 (stderr を握り潰さず警告で出す)
+    local fnm_default_err
+    if ! fnm_default_err=$(fnm default "$default_arg" 2>&1 >/dev/null); then
+        msg_warn "デフォルトバージョンの設定に失敗しました: ${fnm_default_err}"
+    fi
 
     # fnm env を再評価して node を PATH に通す
     eval "$(fnm env)"

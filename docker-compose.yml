@@ -12,6 +12,9 @@ services:
         FNM_VERSION: ${FNM_VERSION:-}
         NODE_VERSION: ${NODE_VERSION:-}
     init: true
+    # コンテナ内プロセスが setuid バイナリ等で追加権限を獲得できないようにする
+    security_opt:
+      - "no-new-privileges:true"
     volumes:
       - .:/workspaces/dev-templates
       - ~/.ssh:/home/dev/.ssh:ro

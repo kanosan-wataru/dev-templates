@@ -49,7 +49,13 @@ ARG NODE_VERSION=""
 ENV FNM_VERSION=${FNM_VERSION} \
     NODE_VERSION=${NODE_VERSION}
 COPY --chown=$USERNAME:$USERNAME dotfiles/ /tmp/dotfiles/
-RUN cd /tmp/dotfiles \
+# SETUP_MODULES 未指定で実行すると非 TTY フォールバックで --all 相当となり、
+# 既定で除外しているはずの Docker / AWS / 1Password まで入ってしまう。明示的に弾く。
+RUN if [ -z "${SETUP_MODULES// }" ]; then \
+        echo "ERROR: SETUP_MODULES is empty. Specify modules explicitly or pass '--all'." >&2; \
+        exit 1; \
+    fi \
+    && cd /tmp/dotfiles \
     && bash setup.sh $SETUP_MODULES --force \
     && rm -rf /tmp/dotfiles
 
