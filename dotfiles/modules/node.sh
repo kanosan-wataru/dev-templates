@@ -29,9 +29,12 @@ if [[ -n "$NODE_MOD_FNM_VERSION" && ! "$NODE_MOD_FNM_VERSION" =~ ^v?[0-9]+(\.[0-
     printf 'ERROR: FNM_VERSION の形式が不正です: %q (例: v1.38.1)\n' "$NODE_MOD_FNM_VERSION" >&2
     return 1 2>/dev/null || exit 1
 fi
-if [[ -n "$NODE_MOD_NODE_VERSION" && ! "$NODE_MOD_NODE_VERSION" =~ ^[A-Za-z0-9._/-]+$ ]]; then
-    printf 'ERROR: NODE_VERSION の形式が不正です: %q (例: 22, v22.1.0, lts/iron)\n' "$NODE_MOD_NODE_VERSION" >&2
-    return 1 2>/dev/null || exit 1
+if [[ -n "$NODE_MOD_NODE_VERSION" ]]; then
+    # パストラバーサル防止: ".." 部分文字列を明示的に弾く
+    if [[ "$NODE_MOD_NODE_VERSION" == *..* ]] || [[ ! "$NODE_MOD_NODE_VERSION" =~ ^[A-Za-z0-9._/-]+$ ]]; then
+        printf 'ERROR: NODE_VERSION の形式が不正です: %q (例: 22, v22.1.0, lts/iron)\n' "$NODE_MOD_NODE_VERSION" >&2
+        return 1 2>/dev/null || exit 1
+    fi
 fi
 
 if [[ -n "$NODE_MOD_FNM_VERSION" ]]; then
@@ -302,11 +305,14 @@ _node_install_lts() {
 
     msg_info "${label} をインストールします..."
     # stderr を一時ファイル経由でキャプチャし、失敗時に再出力する
+    # trap で SIGINT / 関数 RETURN 時にも確実にクリーンアップする
     local fnm_install_err
     fnm_install_err=$(mktemp /tmp/fnm-install-err-XXXXXXXXXX) || {
         msg_error "一時ファイルの作成に失敗しました。"
         return 1
     }
+    # shellcheck disable=SC2064 # 即時展開で fnm_install_err の値を埋め込む
+    trap "rm -f '$fnm_install_err'" RETURN
     if ! fnm install "$install_arg" 2>"$fnm_install_err"; then
         msg_error "${label} のインストールに失敗しました。"
         if [[ -s "$fnm_install_err" ]]; then
@@ -314,10 +320,8 @@ _node_install_lts() {
             cat "$fnm_install_err" >&2
         fi
         msg_step "手動でインストールしてください: fnm install ${install_arg}" >&2
-        rm -f "$fnm_install_err"
         return 1
     fi
-    rm -f "$fnm_install_err"
 
     # デフォルトバージョンに設定 (stderr を握り潰さず警告で出す)
     local fnm_default_err

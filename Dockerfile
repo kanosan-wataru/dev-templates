@@ -6,6 +6,10 @@
 
 FROM ubuntu:24.04
 
+# Ubuntu の既定 /bin/sh は dash で bash 拡張 (${var//pattern} 等) が使えないため
+# 全 RUN ステップを bash で実行する。pipefail でパイプ途中失敗も拾う。
+SHELL ["/bin/bash", "-o", "pipefail", "-c"]
+
 ARG DEBIAN_FRONTEND=noninteractive
 ENV TZ=Asia/Tokyo \
     LANG=en_US.UTF-8 \
@@ -53,10 +57,16 @@ ARG NODE_VERSION=""
 ENV FNM_VERSION=${FNM_VERSION} \
     NODE_VERSION=${NODE_VERSION}
 COPY --chown=$USERNAME:$USERNAME dotfiles/ /tmp/dotfiles/
-# SETUP_MODULES 未指定で実行すると非 TTY フォールバックで --all 相当となり、
-# 既定で除外しているはずの Docker / AWS / 1Password まで入ってしまう。明示的に弾く。
-RUN if [ -z "${SETUP_MODULES// }" ]; then \
+# SETUP_MODULES の検証:
+# - 空文字 → 非 TTY フォールバックで --all 相当となり除外モジュールも入るため弾く
+# - 不正文字 (シェルメタ文字) → unquoted 展開でインジェクションになるため弾く
+#   許容: 英数字 / - / _ / 空白 のみ (例: "zsh node", "--all")
+RUN if [[ -z "${SETUP_MODULES// /}" ]]; then \
         echo "ERROR: SETUP_MODULES is empty. Specify modules explicitly or pass '--all'." >&2; \
+        exit 1; \
+    fi \
+    && if [[ ! "$SETUP_MODULES" =~ ^[A-Za-z0-9_[:space:]-]+$ ]]; then \
+        echo "ERROR: SETUP_MODULES contains invalid characters. Allowed: [A-Za-z0-9_-] and spaces." >&2; \
         exit 1; \
     fi \
     && cd /tmp/dotfiles \
