@@ -274,6 +274,10 @@ docker compose build
 
 `.env` に書いておけば VS Code Dev Containers (Reopen in Container) でも同じビルド設定が使われます。
 
+**注意事項**:
+- `USER_UID` / `USER_GID` は 1〜60000 の整数のみ許可されます (`0` / 先頭 0 付き / 非数値はビルド時に拒否)
+- ホスト GID が既存システムグループ (例: GID `100` = `users`、macOS の `20` = `staff`) と一致する場合、コンテナ内 `dev` ユーザーのプライマリグループは `dev` ではなく既存名 (`users` / `staff` 等) になります。`chown dev:dev` は失敗するため `chown dev:$(id -gn dev)` を使ってください
+
 VS Code / Cursor から Dev Containers として接続する場合は、コマンドパレットから「Dev Containers: Reopen in Container」を実行してください。
 
 ### ホストファイルのマウント
