@@ -78,6 +78,74 @@ _opencode_download_url() {
     fi
 }
 
+# --- ヘルパー: ダウンロード〜配置 (サブシェルでスコープを閉じる) ---
+# サブシェル `( ... )` でラップすることで EXIT trap が親シェルに漏れない
+_opencode_fetch_and_install() (
+    local download_url="$1"
+    local asset="$2"
+
+    local tmp_dir
+    tmp_dir=$(mktemp -d /tmp/opencode-XXXXXXXXXX) || {
+        msg_error "一時ディレクトリの作成に失敗しました。"
+        return 1
+    }
+    # サブシェル内なので EXIT trap でこのサブシェル終了時のみ発火する
+    # shellcheck disable=SC2064 # 即時展開で tmp_dir を埋め込む
+    trap "rm -rf '$tmp_dir'" EXIT
+
+    local archive_path="${tmp_dir}/${asset}"
+    local curl_err="${tmp_dir}/curl.err"
+
+    if ! curl -fsSL "$download_url" -o "$archive_path" 2>"$curl_err"; then
+        msg_error "opencode のダウンロードに失敗しました。"
+        printf '  URL: %s\n' "$download_url" >&2
+        if [[ -s "$curl_err" ]]; then
+            printf '  curl stderr: ' >&2
+            cat "$curl_err" >&2
+        fi
+        return 1
+    fi
+
+    # 展開前にアーカイブエントリを検証 (絶対パス / 親ディレクトリ参照を含むものを拒否)
+    # NOTE: GitHub Releases は信頼境界だが、リリース侵害時の zip-slip / tar-slip 攻撃を緩和する
+    if [[ "$asset" == *.tar.gz ]]; then
+        if tar -tzf "$archive_path" 2>/dev/null | grep -qE '^/|(^|/)\.\.(/|$)'; then
+            msg_error "アーカイブに不正なパス (絶対パスまたは ..) が含まれています。中断します。"
+            return 1
+        fi
+        tar -xzf "$archive_path" -C "$tmp_dir" --no-same-owner --no-same-permissions || {
+            msg_error "opencode の展開に失敗しました (tar)。"
+            return 1
+        }
+    else
+        if unzip -Z1 "$archive_path" 2>/dev/null | grep -qE '^/|(^|/)\.\.(/|$)'; then
+            msg_error "アーカイブに不正なパス (絶対パスまたは ..) が含まれています。中断します。"
+            return 1
+        fi
+        unzip -oq "$archive_path" -d "$tmp_dir" || {
+            msg_error "opencode の展開に失敗しました (unzip)。"
+            return 1
+        }
+    fi
+
+    # 展開済みバイナリを検索 (アーカイブ構造の差異を吸収)
+    local extracted
+    extracted=$(find "$tmp_dir" -type f -name opencode -perm -u+x 2>/dev/null | head -1)
+    if [[ -z "$extracted" ]]; then
+        # 実行権限が落ちている場合のフォールバック
+        extracted=$(find "$tmp_dir" -type f -name opencode 2>/dev/null | head -1)
+    fi
+    if [[ -z "$extracted" ]]; then
+        msg_error "展開したアーカイブに opencode バイナリが見つかりません。"
+        return 1
+    fi
+
+    install -m 0755 "$extracted" "$OPENCODE_MOD_BIN_PATH" || {
+        msg_error "opencode の配置に失敗しました。"
+        return 1
+    }
+)
+
 # --- セットアップ ---
 setup_opencode() {
     msg_header "opencode"
@@ -161,66 +229,11 @@ setup_opencode() {
         fi
         msg_dry_run "install -m 0755 <tmpdir>/opencode ${OPENCODE_MOD_BIN_PATH}"
     else
-        # 一時作業ディレクトリ (関数 RETURN 時にクリーンアップ)
-        local tmp_dir
-        tmp_dir=$(mktemp -d /tmp/opencode-XXXXXXXXXX) || {
-            msg_error "一時ディレクトリの作成に失敗しました。"
-            return 1
-        }
-        # shellcheck disable=SC2064 # 即時展開で tmp_dir を埋め込む
-        trap "rm -rf '$tmp_dir'" RETURN
-
-        local archive_path="${tmp_dir}/${asset}"
-        local curl_err="${tmp_dir}/curl.err"
-
-        if ! curl -fsSL "$download_url" -o "$archive_path" 2>"$curl_err"; then
-            msg_error "opencode のダウンロードに失敗しました。"
-            printf '  URL: %s\n' "$download_url" >&2
-            if [[ -s "$curl_err" ]]; then
-                printf '  curl stderr: ' >&2
-                cat "$curl_err" >&2
-            fi
+        # DL〜配置をサブシェルに閉じ込めて trap EXIT をローカルにスコープする
+        # (親シェルの RETURN trap を汚染しないため Copilot の指摘 #1 対策)
+        if ! _opencode_fetch_and_install "$download_url" "$asset"; then
             return 1
         fi
-
-        # 展開前にアーカイブエントリを検証 (絶対パス / 親ディレクトリ参照を含むものを拒否)
-        # NOTE: GitHub Releases は信頼境界だが、リリース侵害時の zip-slip / tar-slip 攻撃を緩和する
-        if [[ "$asset" == *.tar.gz ]]; then
-            if tar -tzf "$archive_path" 2>/dev/null | grep -qE '^/|(^|/)\.\.(/|$)'; then
-                msg_error "アーカイブに不正なパス (絶対パスまたは ..) が含まれています。中断します。"
-                return 1
-            fi
-            tar -xzf "$archive_path" -C "$tmp_dir" --no-same-owner --no-same-permissions || {
-                msg_error "opencode の展開に失敗しました (tar)。"
-                return 1
-            }
-        else
-            if unzip -Z1 "$archive_path" 2>/dev/null | grep -qE '^/|(^|/)\.\.(/|$)'; then
-                msg_error "アーカイブに不正なパス (絶対パスまたは ..) が含まれています。中断します。"
-                return 1
-            fi
-            unzip -oq "$archive_path" -d "$tmp_dir" || {
-                msg_error "opencode の展開に失敗しました (unzip)。"
-                return 1
-            }
-        fi
-
-        # 展開済みバイナリを検索 (アーカイブ構造の差異を吸収)
-        local extracted
-        extracted=$(find "$tmp_dir" -type f -name opencode -perm -u+x 2>/dev/null | head -1)
-        if [[ -z "$extracted" ]]; then
-            # 実行権限が落ちている場合のフォールバック
-            extracted=$(find "$tmp_dir" -type f -name opencode 2>/dev/null | head -1)
-        fi
-        if [[ -z "$extracted" ]]; then
-            msg_error "展開したアーカイブに opencode バイナリが見つかりません。"
-            return 1
-        fi
-
-        install -m 0755 "$extracted" "$OPENCODE_MOD_BIN_PATH" || {
-            msg_error "opencode の配置に失敗しました。"
-            return 1
-        }
     fi
 
     # PATH 通過確認 (zsh モジュールが ~/.local/bin を追加しているはず)
