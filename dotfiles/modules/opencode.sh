@@ -22,9 +22,10 @@ OPENCODE_MOD_VERSION="${OPENCODE_MOD_VERSION#"${OPENCODE_MOD_VERSION%%[![:space:
 OPENCODE_MOD_VERSION="${OPENCODE_MOD_VERSION%"${OPENCODE_MOD_VERSION##*[![:space:]]}"}"
 
 # 値検証: パストラバーサル / コマンドインジェクション防止
+# pre-release タグ (v1.0.0-rc.1, v1.0.0-beta.2) も許容しつつ ".." 含む値は明示的に弾く
 if [[ -n "$OPENCODE_MOD_VERSION" ]]; then
-    if [[ "$OPENCODE_MOD_VERSION" == *..* ]] || [[ ! "$OPENCODE_MOD_VERSION" =~ ^v?[0-9]+(\.[0-9]+)*$ ]]; then
-        printf 'ERROR: OPENCODE_VERSION の形式が不正です: %q (例: v1.14.49)\n' "$OPENCODE_MOD_VERSION" >&2
+    if [[ "$OPENCODE_MOD_VERSION" == *..* ]] || [[ ! "$OPENCODE_MOD_VERSION" =~ ^v?[0-9]+(\.[0-9]+)*(-[0-9A-Za-z.]+)?$ ]]; then
+        printf 'ERROR: OPENCODE_VERSION の形式が不正です: %q (例: v1.14.49, v1.0.0-rc.1)\n' "$OPENCODE_MOD_VERSION" >&2
         return 1 2>/dev/null || exit 1
     fi
 fi
@@ -85,13 +86,13 @@ setup_opencode() {
     # べき等性チェック
     if command -v opencode >/dev/null 2>&1 && ! ((UPGRADE)); then
         local current_ver
-        current_ver=$(opencode --version 2>/dev/null || printf '%s' "unknown")
+        current_ver=$(opencode --version 2>/dev/null | head -1 || printf '%s' "unknown")
         msg_info "opencode は既にインストールされています (${current_ver})。スキップします。"
         return 0
     fi
 
     if command -v opencode >/dev/null 2>&1 && ((UPGRADE)); then
-        msg_info "opencode のアップグレードを実行します... (現在: $(opencode --version 2>/dev/null || echo 'unknown'))"
+        msg_info "opencode のアップグレードを実行します... (現在: $(opencode --version 2>/dev/null | head -1 || echo 'unknown'))"
     fi
 
     local os
@@ -182,13 +183,22 @@ setup_opencode() {
             return 1
         fi
 
-        # 展開
+        # 展開前にアーカイブエントリを検証 (絶対パス / 親ディレクトリ参照を含むものを拒否)
+        # NOTE: GitHub Releases は信頼境界だが、リリース侵害時の zip-slip / tar-slip 攻撃を緩和する
         if [[ "$asset" == *.tar.gz ]]; then
-            tar -xzf "$archive_path" -C "$tmp_dir" || {
+            if tar -tzf "$archive_path" 2>/dev/null | grep -qE '^/|(^|/)\.\.(/|$)'; then
+                msg_error "アーカイブに不正なパス (絶対パスまたは ..) が含まれています。中断します。"
+                return 1
+            fi
+            tar -xzf "$archive_path" -C "$tmp_dir" --no-same-owner --no-same-permissions || {
                 msg_error "opencode の展開に失敗しました (tar)。"
                 return 1
             }
         else
+            if unzip -Z1 "$archive_path" 2>/dev/null | grep -qE '^/|(^|/)\.\.(/|$)'; then
+                msg_error "アーカイブに不正なパス (絶対パスまたは ..) が含まれています。中断します。"
+                return 1
+            fi
             unzip -oq "$archive_path" -d "$tmp_dir" || {
                 msg_error "opencode の展開に失敗しました (unzip)。"
                 return 1
