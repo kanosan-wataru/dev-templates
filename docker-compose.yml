@@ -11,6 +11,11 @@ services:
         # 空の場合は latest / --lts
         FNM_VERSION: ${FNM_VERSION:-}
         NODE_VERSION: ${NODE_VERSION:-}
+        # bind mount したファイルの所有をホストと一致させるため id -u / id -g を渡す
+        # 未指定時は 1000:1000 (従来挙動)。USER_UID=$(id -u) USER_GID=$(id -g) docker compose build
+        # USER_GID は USER_UID を上書きしない限り USER_UID と同じ値にフォールバックする
+        USER_UID: ${USER_UID:-1000}
+        USER_GID: ${USER_GID:-${USER_UID:-1000}}
     init: true
     # コンテナ内プロセスが setuid バイナリ等で追加権限を獲得できないようにする
     security_opt:

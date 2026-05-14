@@ -245,13 +245,38 @@ Docker Compose + VS Code Dev Containers でコンテナ内に開発環境を構�
 cp .env.example .env
 # .env を編集して ANTHROPIC_API_KEY 等を設定
 
-# コンテナをビルド
-docker compose build
+# コンテナをビルド (ホストの UID/GID を渡して bind mount の所有を一致させるのを推奨)
+USER_UID=$(id -u) USER_GID=$(id -g) docker compose build
 
 # コンテナを起動
 docker compose up -d
 docker compose exec devcontainer zsh
 ```
+
+#### ホスト UID/GID の同期 (推奨)
+
+リポジトリは `.:/workspaces/dev-templates` として bind mount されるため、
+コンテナ内 `dev` ユーザーの UID/GID とホストユーザーが一致しないと、
+コンテナ内で作成したファイルがホスト側で異なる所有者に見えて編集権限の不整合や
+git の dubious ownership 警告を引き起こします (特にホスト UID が 1000 以外の場合)。
+
+`USER_UID` / `USER_GID` 環境変数を渡すことで一致させられます (未指定時は `1000:1000`):
+
+```bash
+# 一時的に渡す
+USER_UID=$(id -u) USER_GID=$(id -g) docker compose build
+
+# .env に永続化
+echo "USER_UID=$(id -u)" >> .env
+echo "USER_GID=$(id -g)" >> .env
+docker compose build
+```
+
+`.env` に書いておけば VS Code Dev Containers (Reopen in Container) でも同じビルド設定が使われます。
+
+**注意事項**:
+- `USER_UID` / `USER_GID` は 1〜60000 の整数のみ許可されます (`0` / 先頭 0 付き / 非数値はビルド時に拒否)
+- ホスト GID が既存システムグループ (例: GID `100` = `users`、macOS の `20` = `staff`) と一致する場合、コンテナ内 `dev` ユーザーのプライマリグループは `dev` ではなく既存名 (`users` / `staff` 等) になります。`chown dev:dev` は失敗するため `chown dev:$(id -gn dev)` を使ってください
 
 VS Code / Cursor から Dev Containers として接続する場合は、コマンドパレットから「Dev Containers: Reopen in Container」を実行してください。
 
