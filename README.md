@@ -65,6 +65,7 @@ bash dotfiles/setup.sh
   [ ] Codex CLI             OpenAI CLI (Node.js v18+ 必要)
   [ ] GitHub CLI            gh (GitHub CLI)
   [ ] GitHub Copilot CLI    Copilot CLI (Node.js v22+ 必要)
+  [ ] opencode              SST opencode (AI coding agent, 単一バイナリ)
 ```
 
 ### モジュール
@@ -84,6 +85,7 @@ bash dotfiles/setup.sh
 | **Codex CLI** | OpenAI の AI コーディングアシスタント CLI + 設定テンプレート | Node.js v18+ |
 | **GitHub CLI** | `gh` コマンド | Homebrew (macOS) / apt (Linux) |
 | **GitHub Copilot CLI** | `copilot` コマンド | Node.js v22+ |
+| **opencode** | SST opencode (AI coding agent) — GitHub Releases から単一バイナリで導入、Node 非依存 | curl + tar (Linux) / curl + unzip (macOS) |
 
 ### オプション
 
@@ -209,6 +211,14 @@ bash dotfiles/setup.sh --uninstall
 2. `npm install -g @github/copilot`（既にインストール済みならスキップ）
 3. 認証ガイドの表示（`copilot` 起動時に GitHub アカウントでログイン）
 
+#### opencode
+1. アーキテクチャ自動判定（`uname -m`: x86_64 / aarch64, OS: linux / darwin）
+2. [sst/opencode](https://github.com/sst/opencode) の GitHub Releases から単一バイナリをダウンロード（既にインストール済みならスキップ）
+3. 展開前にアーカイブエントリを検証（zip-slip / tar-slip 防御）し、`$HOME/.local/bin/opencode` に配置
+4. バージョン固定可能: `OPENCODE_VERSION=v1.14.49 bash setup.sh opencode`（pre-release タグ `v1.0.0-rc.1` 形式も許容）
+5. 認証ガイドの表示（`opencode auth login` でプロバイダ設定）
+6. アンインストール時はバイナリに加えて `~/.local/share/opencode`、`~/.config/opencode`、`~/.cache/opencode` も完全削除
+
 完了後、`exec zsh` でシェルを再起動してください。
 
 ## インストールされるプラグイン
@@ -274,6 +284,7 @@ VS Code / Cursor から Dev Containers として接続する場合は、コマ�
 - Docker Engine (Docker-in-Docker 用途は別途 socket マウントが必要)
 - AWS CLI v2 (必要に応じて手動インストール)
 - 1Password (ホストでの SSH エージェントが前提)
+- opencode (オプトイン。必要な場合は `SETUP_MODULES` に `opencode` を追加)
 
 #### モジュール選択のカスタマイズ
 
@@ -405,7 +416,7 @@ dev-templates/
 │   │   ├── array.sh                  # 配列操作ユーティリティ
 │   │   ├── backup.sh                 # ファイルバックアップ・リストア
 │   │   └── tui.sh                    # TUI (チェックボックス UI 等)
-│   ├── modules/                      # モジュール定義 (13 モジュール)
+│   ├── modules/                      # モジュール定義 (14 モジュール)
 │   │   ├── zsh.sh                    # Zsh 設定一式
 │   │   ├── git.sh                    # Git グローバル設定
 │   │   ├── 1password.sh              # 1Password CLI + SSH + Git 署名
@@ -418,7 +429,8 @@ dev-templates/
 │   │   ├── python.sh                 # Python 開発環境
 │   │   ├── gemini-cli.sh             # Gemini CLI
 │   │   ├── gh.sh                     # GitHub CLI
-│   │   └── copilot-cli.sh            # GitHub Copilot CLI
+│   │   ├── copilot-cli.sh            # GitHub Copilot CLI
+│   │   └── opencode.sh               # SST opencode (バイナリ DL)
 │   ├── tests/                        # BATS ユニットテスト
 │   │   ├── helpers/setup_functions.bash
 │   │   ├── test_backup_sort.bats
