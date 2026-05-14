@@ -289,10 +289,24 @@ uninstall_opencode() {
         msg_warn "opencode コマンドは見つかりますが ${OPENCODE_MOD_BIN_PATH} には存在しません。手動で削除してください。"
     fi
 
-    # NOTE: 以下はユーザーデータ (認証情報、履歴 DB、プラグイン、キャッシュ) を含むため削除しない
-    printf '\n'
-    printf '%s\n' "NOTE: 以下のユーザーデータは削除されていません。不要な場合は手動で削除してください:"
-    msg_step "rm -rf ${XDG_DATA_HOME:-$HOME/.local/share}/opencode    # 認証トークン / セッション履歴"
-    msg_step "rm -rf ${XDG_CONFIG_HOME:-$HOME/.config}/opencode       # プラグイン (package.json)"
-    msg_step "rm -rf ${XDG_CACHE_HOME:-$HOME/.cache}/opencode         # ランタイムキャッシュ"
+    # ユーザーデータも完全削除する (認証トークン / 履歴 DB / プラグイン / キャッシュ)
+    # 安全のため $HOME 配下のパスのみ対象 (環境変数の差し替えによる事故防止)
+    local -a opencode_data_dirs=(
+        "${XDG_DATA_HOME:-$HOME/.local/share}/opencode"
+        "${XDG_CONFIG_HOME:-$HOME/.config}/opencode"
+        "${XDG_CACHE_HOME:-$HOME/.cache}/opencode"
+    )
+    local data_dir
+    for data_dir in "${opencode_data_dirs[@]}"; do
+        [[ -e "$data_dir" ]] || continue
+        # 防御: $HOME 配下でない場合はスキップ (XDG_* が異常な値だった場合の事故防止)
+        if [[ "$data_dir" != "$HOME"/* ]]; then
+            msg_warn "${data_dir} は \$HOME 配下ではないため削除をスキップします。"
+            continue
+        fi
+        msg_info "${data_dir} を削除します..."
+        run_cmd command rm -rf "$data_dir" || {
+            msg_warn "${data_dir} の削除に失敗しました。"
+        }
+    done
 }
