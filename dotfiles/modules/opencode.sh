@@ -289,9 +289,10 @@ uninstall_opencode() {
         msg_warn "opencode コマンドは見つかりますが ${OPENCODE_MOD_BIN_PATH} には存在しません。手動で削除してください。"
     fi
 
-    # NOTE: ~/.local/share/opencode/ 等はユーザーデータ (セッション、認証情報) を含むため削除しない
+    # NOTE: 以下はユーザーデータ (認証情報、履歴 DB、プラグイン、キャッシュ) を含むため削除しない
     printf '\n'
     printf '%s\n' "NOTE: 以下のユーザーデータは削除されていません。不要な場合は手動で削除してください:"
-    msg_step "rm -rf ${XDG_DATA_HOME:-$HOME/.local/share}/opencode"
-    msg_step "rm -rf ${XDG_CONFIG_HOME:-$HOME/.config}/opencode"
+    msg_step "rm -rf ${XDG_DATA_HOME:-$HOME/.local/share}/opencode    # 認証トークン / セッション履歴"
+    msg_step "rm -rf ${XDG_CONFIG_HOME:-$HOME/.config}/opencode       # プラグイン (package.json)"
+    msg_step "rm -rf ${XDG_CACHE_HOME:-$HOME/.cache}/opencode         # ランタイムキャッシュ"
 }
