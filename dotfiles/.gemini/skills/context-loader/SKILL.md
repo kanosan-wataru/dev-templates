@@ -9,8 +9,6 @@ description: Load project context from .claude/ directory at the start of every 
 
 Load shared project context from `.claude/` directory to ensure Gemini CLI operates with the same knowledge as Claude Code and Codex CLI.
 
-> NOTE: `.claude/` paths resolve from the project working directory (cwd), not this skill file's location.
-
 ## When to Activate
 
 **ALWAYS** - This skill should run at the beginning of research or analysis tasks.
@@ -19,20 +17,20 @@ Load shared project context from `.claude/` directory to ensure Gemini CLI opera
 
 ### Step 1: Load Coding Rules
 
-Read relevant files from `.claude/rules/` (if present):
+Read relevant files from `.claude/rules/`:
 
 ```
 .claude/rules/
-|-- coding-principles.md   # Simplicity, single responsibility, early return
-|-- dev-environment.md     # Package manager, linter, formatter requirements
-|-- language.md            # Language conventions
-|-- security.md            # Secrets, validation, SQLi/XSS prevention
-+-- testing.md             # TDD, AAA pattern, coverage targets
+├── coding-principles.md   # Simplicity, single responsibility, early return
+├── dev-environment.md     # uv, ruff, ty, pytest requirements
+├── language.md            # Think in English, respond in Japanese
+├── security.md            # Secrets, validation, SQLi/XSS prevention
+└── testing.md             # TDD, AAA pattern, 80% coverage
 ```
 
 ### Step 2: Load Design Documentation
 
-Read `.claude/docs/DESIGN.md` (if present) for:
+Read `.claude/docs/DESIGN.md` for:
 - Architecture decisions
 - Implementation patterns
 - Library choices and constraints
@@ -55,7 +53,8 @@ With the loaded context, execute the requested research/analysis following:
 
 1. **Simplicity first** - Recommend readable solutions over complex
 2. **Type hints required** - Suggest typed code
-3. **Security** - Highlight security considerations
+3. **Use uv** - Reference uv for package management
+4. **Security** - Highlight security considerations
 
 ## Language Protocol
 

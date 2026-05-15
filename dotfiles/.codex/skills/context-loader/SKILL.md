@@ -9,8 +9,6 @@ description: ALWAYS activate this skill at the start of every task. Load project
 
 Load shared project context from `.claude/` directory to ensure Codex CLI has the same knowledge as Claude Code.
 
-> NOTE: `.claude/` paths resolve from the project working directory (cwd), not this skill file's location.
-
 ## When to Activate
 
 **ALWAYS** - This skill must run at the beginning of every task to load project context.
@@ -19,21 +17,21 @@ Load shared project context from `.claude/` directory to ensure Codex CLI has th
 
 ### Step 1: Load Coding Rules
 
-Read all files in `.claude/rules/` (if present):
+Read all files in `.claude/rules/`:
 
 ```
 .claude/rules/
-|-- coding-principles.md   # Simplicity, single responsibility, early return
-|-- dev-environment.md     # Package manager, linter, formatter requirements
-|-- language.md            # Language conventions
-|-- security.md            # Secrets, validation, SQLi/XSS prevention
-|-- testing.md             # TDD, AAA pattern, coverage targets
-+-- codex-delegation.md    # (skip - not relevant for Codex itself)
+├── coding-principles.md   # Simplicity, single responsibility, early return
+├── dev-environment.md     # uv, ruff, ty, pytest requirements
+├── language.md            # Think in English, respond in Japanese
+├── security.md            # Secrets, validation, SQLi/XSS prevention
+├── testing.md             # TDD, AAA pattern, 80% coverage
+└── codex-delegation.md    # (skip - not relevant for Codex itself)
 ```
 
 ### Step 2: Load Design Documentation
 
-Read `.claude/docs/DESIGN.md` (if present) for:
+Read `.claude/docs/DESIGN.md` for:
 - Architecture decisions
 - Implementation patterns
 - Library choices and constraints
@@ -60,7 +58,8 @@ After loading, always follow these principles:
 1. **Simplicity first** - Choose readable code over complex
 2. **Single responsibility** - One function/class does one thing
 3. **Type hints required** - All functions need annotations
-4. **Security** - No hardcoded secrets, validate input, parameterize SQL
+4. **Use uv** - Never use pip directly
+5. **Security** - No hardcoded secrets, validate input, parameterize SQL
 
 ## Language Protocol
 
