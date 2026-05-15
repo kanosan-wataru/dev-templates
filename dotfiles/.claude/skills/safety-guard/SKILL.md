@@ -1,106 +1,75 @@
 ---
 name: safety-guard
-description: >
-  Skill to prevent destructive operations during autonomous agent work.
-  Invoke with /safety-guard (specify mode: careful, freeze, guard, or off).
-  Intercepts dangerous commands and restricts file writes to designated areas.
-  Use in scenarios such as: production work, autonomous execution, safety mode,
-  "enable safety", "restrict writes", "careful mode".
+description: Use this skill to prevent destructive operations when working on production systems or running agents autonomously.
+origin: ECC
 ---
 
-# safety-guard: Destructive Operation Prevention Skill
+# Safety Guard — Prevent Destructive Operations
 
-Safety guard for production systems and autonomous agent execution.
+## When to Use
 
-## Arguments
+- When working on production systems
+- When agents are running autonomously (full-auto mode)
+- When you want to restrict edits to a specific directory
+- During sensitive operations (migrations, deploys, data changes)
 
-- `/safety-guard careful` -- Detect destructive commands and request confirmation
-- `/safety-guard freeze <dir>` -- Block writes outside the specified directory
-- `/safety-guard guard --dir <dir>` -- Combine careful + freeze modes
-- `/safety-guard off` -- Disable all guards
-- `/safety-guard status` -- Report current guard state
+## How It Works
 
-## Watched Patterns (Careful Mode)
+Three modes of protection:
 
-Detect the following patterns and request confirmation before execution:
+### Mode 1: Careful Mode
 
-| Pattern | Risk | Safer Alternative |
-|---|---|---|
-| `rm -rf` | Recursive file deletion | Specify targets explicitly |
-| `git push --force` | History overwrite | `--force-with-lease` |
-| `git reset --hard` | Change loss | `git stash` |
-| `git checkout .` | Discard all changes | Restore individual files |
-| `git clean -f` | Delete untracked files | `git clean -n` (dry run first) |
-| `DROP TABLE` / `DROP DATABASE` | Data loss | Backup before execution |
-| `TRUNCATE TABLE` | Data loss | Backup before execution |
-| `docker system prune` | Delete all containers/images | Delete individually |
-| `chmod 777` | Security risk | Use appropriate permissions |
-| `npm publish` | Public package change | `--dry-run` first |
-| `--no-verify` | Skip hooks | Fix hooks instead |
-| `curl \| sh` / `curl \| bash` | Remote code execution | Download and review first |
+Intercepts destructive commands before execution and warns:
 
-### Detection Logic
+```
+Watched patterns:
+- rm -rf (especially /, ~, or project root)
+- git push --force
+- git reset --hard
+- git checkout . (discard all changes)
+- DROP TABLE / DROP DATABASE
+- docker system prune
+- kubectl delete
+- chmod 777
+- sudo rm
+- npm publish (accidental publishes)
+- Any command with --no-verify
+```
 
-1. Parse the command string before Bash tool execution.
-2. Match against watched patterns (case-insensitive, supports aliases).
-3. If matched: report the risk, suggest the safer alternative, and ask for confirmation.
-4. If the user approves: proceed with execution.
-5. If the user declines: skip and report "Blocked by safety-guard."
+When detected: shows what the command does, asks for confirmation, suggests safer alternative.
 
-## Freeze Mode
+### Mode 2: Freeze Mode
 
-Restrict Write/Edit operations to the specified directory tree:
+Locks file edits to a specific directory tree:
 
 ```
 /safety-guard freeze src/components/
--> Only src/components/ and its subdirectories are writable
--> All other files are read-only (Read/Grep/Glob still allowed)
 ```
 
-### Freeze Logic
+Any Write/Edit outside `src/components/` is blocked with an explanation. Useful when you want an agent to focus on one area without touching unrelated code.
 
-1. Record the freeze root path (absolute).
-2. Before every Write or Edit tool call, check if the target path starts with the freeze root.
-3. If outside the freeze root: block and report "Write blocked by freeze mode: <path>".
-4. Reads are always allowed regardless of freeze scope.
+### Mode 3: Guard Mode (Careful + Freeze combined)
 
-## Guard Mode
-
-Activate Careful + Freeze simultaneously:
+Both protections active. Maximum safety for autonomous agents.
 
 ```
-/safety-guard guard --dir src/api/
--> Reads: all files allowed
--> Writes: only src/api/ and subdirectories
--> Destructive commands: all blocked (confirmation required)
+/safety-guard guard --dir src/api/ --allow-read-all
 ```
 
-## Status Reporting
+Agents can read anything but only write to `src/api/`. Destructive commands are blocked everywhere.
 
-`/safety-guard status` reports:
+### Unlock
 
-```markdown
-## Safety Guard Status
-
-| Setting | Value |
-|---|---|
-| Careful Mode | ON / OFF |
-| Freeze Mode | ON / OFF |
-| Freeze Root | (path or N/A) |
-| Blocked Actions | N (since activation) |
-| Last Blocked | (timestamp and command) |
+```
+/safety-guard off
 ```
 
-## Implementation Notes
+## Implementation
 
-This skill operates as a behavioral contract for the agent:
-1. When activated, the agent checks every Bash, Write, and Edit call against active rules.
-2. All blocked actions are logged with timestamp, command, and reason.
-3. Deactivation requires explicit `/safety-guard off` -- guards persist across tool calls within a session.
+Uses PreToolUse hooks to intercept Bash, Write, Edit, and MultiEdit tool calls. Checks the command/path against the active rules before allowing execution.
 
-## Safety Guards
+## Integration
 
-- Log all blocked actions to `~/.claude/safety-guard.log` (append-only)
-- `/safety-guard off` requires explicit invocation (no implicit deactivation)
-- Guard state is reported at the start of each response when active
-- Cannot freeze the root directory `/` or home directory `~/` (too broad)
+- Enable by default for `codex -a never` sessions
+- Pair with observability risk scoring in ECC 2.0
+- Logs all blocked actions to `~/.claude/safety-guard.log`

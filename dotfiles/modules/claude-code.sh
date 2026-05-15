@@ -14,70 +14,72 @@ MODULE_DEPS="node"
 # --- Claude Code 固有変数 ---
 # NOTE: モジュール固有の変数には衝突回避のため CLAUDE_MOD_ プレフィックスを使用
 CLAUDE_MOD_CONFIG_DIR="$HOME/.claude"
-CLAUDE_MOD_MCP_TEMPLATE="$SCRIPT_DIR/.claude/mcp-servers.json"
+CLAUDE_MOD_MCP_TEMPLATE="$SCRIPT_DIR/.claude/mcp-configs/mcp-servers.json"
 CLAUDE_MOD_CLAUDE_JSON="$HOME/.claude.json"
 
 # ルールの言語サブディレクトリ一覧
 CLAUDE_MOD_RULE_LANGS=(
-    common cpp csharp golang java kotlin perl php python rust swift typescript
+    common cpp csharp dart golang java kotlin perl php python rust swift typescript web zh
 )
 
-# 管理対象ファイルのリスト（配布元パス, 配置先パス, 表示名, 未検出時メッセージ）
-# NOTE: 配列の各要素は "src|dst|label|hint" の形式
-# NOTE: rules/ ディレクトリ内のファイルは _claude_mod_install_rules_dir() で一括配置するため、ここには含めない
-CLAUDE_MOD_MANAGED_FILES=(
-    # CLAUDE.md（グローバル設定）
-    "$SCRIPT_DIR/.claude/CLAUDE.md|$CLAUDE_MOD_CONFIG_DIR/CLAUDE.md|CLAUDE.md|"
-    # settings.json（権限・プラグイン設定）
-    "$SCRIPT_DIR/.claude/settings.json|$CLAUDE_MOD_CONFIG_DIR/settings.json|settings.json|"
-    # hookify ルールファイル
-    "$SCRIPT_DIR/.claude/hookify.block-force-push.local.md|$CLAUDE_MOD_CONFIG_DIR/hookify.block-force-push.local.md|hookify.block-force-push.local.md|hookify ルールは手動で設定してください。"
-    "$SCRIPT_DIR/.claude/hookify.block-sensitive-files.local.md|$CLAUDE_MOD_CONFIG_DIR/hookify.block-sensitive-files.local.md|hookify.block-sensitive-files.local.md|hookify ルールは手動で設定してください。"
-    "$SCRIPT_DIR/.claude/hookify.warn-git-add.local.md|$CLAUDE_MOD_CONFIG_DIR/hookify.warn-git-add.local.md|hookify.warn-git-add.local.md|hookify ルールは手動で設定してください。"
-    "$SCRIPT_DIR/.claude/hookify.block-commit-credits.local.md|$CLAUDE_MOD_CONFIG_DIR/hookify.block-commit-credits.local.md|hookify.block-commit-credits.local.md|hookify ルールは手動で設定してください。"
-    # フックスクリプト
-    "$SCRIPT_DIR/.claude/scripts/session-start.sh|$CLAUDE_MOD_CONFIG_DIR/scripts/session-start.sh|scripts/session-start.sh|"
-    "$SCRIPT_DIR/.claude/scripts/suggest-compact.sh|$CLAUDE_MOD_CONFIG_DIR/scripts/suggest-compact.sh|scripts/suggest-compact.sh|"
-    "$SCRIPT_DIR/.claude/scripts/quality-gate.sh|$CLAUDE_MOD_CONFIG_DIR/scripts/quality-gate.sh|scripts/quality-gate.sh|"
-    "$SCRIPT_DIR/.claude/scripts/session-persist.sh|$CLAUDE_MOD_CONFIG_DIR/scripts/session-persist.sh|scripts/session-persist.sh|"
-    # コンテキスト定義
-    "$SCRIPT_DIR/.claude/contexts/dev.md|$CLAUDE_MOD_CONFIG_DIR/contexts/dev.md|contexts/dev.md|"
-    "$SCRIPT_DIR/.claude/contexts/research.md|$CLAUDE_MOD_CONFIG_DIR/contexts/research.md|contexts/research.md|"
-    "$SCRIPT_DIR/.claude/contexts/review.md|$CLAUDE_MOD_CONFIG_DIR/contexts/review.md|contexts/review.md|"
-    # エージェント定義
-    "$SCRIPT_DIR/.claude/agents/general-purpose.md|$CLAUDE_MOD_CONFIG_DIR/agents/general-purpose.md|agents/general-purpose.md|"
-    "$SCRIPT_DIR/.claude/agents/gemini-explore.md|$CLAUDE_MOD_CONFIG_DIR/agents/gemini-explore.md|agents/gemini-explore.md|"
-    "$SCRIPT_DIR/.claude/agents/codex-debugger.md|$CLAUDE_MOD_CONFIG_DIR/agents/codex-debugger.md|agents/codex-debugger.md|"
-    # Shared shell module: .env loading (environment variables for MCP servers)
+# .claude/ 直下に配置する単独ファイル
+CLAUDE_MOD_ROOT_FILES=(
+    "CLAUDE.md"
+    "CLAUDE.jp.md"
+    "settings.json"
+)
+
+# .claude/ 配下で再帰的にコピーするディレクトリ
+# NOTE: rules/ は CLAUDE_MOD_RULE_LANGS で個別管理するため除外
+CLAUDE_MOD_SYNC_DIRS=(
+    "agents"
+    "commands"
+    "skills"
+    "hooks"
+    "scripts"
+    "docs"
+    "hookify-runtime"
+    "lsps-runtime"
+    "mcp-configs"
+)
+
+# .claude/ 外の追加ファイル（src|dst|label|hint 形式）
+CLAUDE_MOD_EXTERNAL_FILES=(
     "$SCRIPT_DIR/.shell/env.sh|${HOME}/.shell/env.sh|.shell/env.sh|"
-    # スキル定義
-    "$SCRIPT_DIR/.claude/skills/benchmark/SKILL.md|$CLAUDE_MOD_CONFIG_DIR/skills/benchmark/SKILL.md|skills/benchmark/SKILL.md|"
-    "$SCRIPT_DIR/.claude/skills/security-review/SKILL.md|$CLAUDE_MOD_CONFIG_DIR/skills/security-review/SKILL.md|skills/security-review/SKILL.md|"
-    "$SCRIPT_DIR/.claude/skills/coding-standards/SKILL.md|$CLAUDE_MOD_CONFIG_DIR/skills/coding-standards/SKILL.md|skills/coding-standards/SKILL.md|"
-    "$SCRIPT_DIR/.claude/skills/continuous-learning/SKILL.md|$CLAUDE_MOD_CONFIG_DIR/skills/continuous-learning/SKILL.md|skills/continuous-learning/SKILL.md|"
-    "$SCRIPT_DIR/.claude/skills/safety-guard/SKILL.md|$CLAUDE_MOD_CONFIG_DIR/skills/safety-guard/SKILL.md|skills/safety-guard/SKILL.md|"
-    "$SCRIPT_DIR/.claude/skills/strategic-compact/SKILL.md|$CLAUDE_MOD_CONFIG_DIR/skills/strategic-compact/SKILL.md|skills/strategic-compact/SKILL.md|"
-    "$SCRIPT_DIR/.claude/skills/verification-loop/SKILL.md|$CLAUDE_MOD_CONFIG_DIR/skills/verification-loop/SKILL.md|skills/verification-loop/SKILL.md|"
 )
 
-# 配置先ディレクトリのリスト（サブディレクトリを事前作成するため）
-# NOTE: install_config は親ディレクトリの自動作成を行わないため、ここで明示的に列挙する
-CLAUDE_MOD_REQUIRED_DIRS=(
-    "$CLAUDE_MOD_CONFIG_DIR"
-    "$CLAUDE_MOD_CONFIG_DIR/agents"
-    "$CLAUDE_MOD_CONFIG_DIR/scripts"
-    "$CLAUDE_MOD_CONFIG_DIR/contexts"
-    "$CLAUDE_MOD_CONFIG_DIR/rules"
-    "$CLAUDE_MOD_CONFIG_DIR/skills"
-    "$CLAUDE_MOD_CONFIG_DIR/skills/benchmark"
-    "$CLAUDE_MOD_CONFIG_DIR/skills/security-review"
-    "$CLAUDE_MOD_CONFIG_DIR/skills/coding-standards"
-    "$CLAUDE_MOD_CONFIG_DIR/skills/continuous-learning"
-    "$CLAUDE_MOD_CONFIG_DIR/skills/safety-guard"
-    "$CLAUDE_MOD_CONFIG_DIR/skills/strategic-compact"
-    "$CLAUDE_MOD_CONFIG_DIR/skills/verification-loop"
-    "${HOME}/.shell"
-)
+# --- ディレクトリ単位の再帰コピー ---
+# 指定したサブディレクトリ配下の全ファイルを install_config で配置する
+# 引数: $1=サブディレクトリ名 (例: agents, skills)
+_claude_mod_install_dir() {
+    local subdir="$1"
+    local src_dir="$SCRIPT_DIR/.claude/${subdir}"
+    local dst_dir="$CLAUDE_MOD_CONFIG_DIR/${subdir}"
+
+    # 配布元ディレクトリの存在確認
+    if [[ ! -d "$src_dir" ]]; then
+        msg_warn "配布元ディレクトリが見つかりません: ${src_dir}"
+        return 0
+    fi
+
+    # 配布元の全ファイルを列挙して配置
+    local src_file rel_path dst_file dst_parent
+    while IFS= read -r -d '' src_file; do
+        rel_path="${src_file#"$src_dir"/}"
+        dst_file="${dst_dir}/${rel_path}"
+        dst_parent="$(dirname "$dst_file")"
+
+        # 親ディレクトリを必要に応じて作成
+        if [[ ! -d "$dst_parent" ]]; then
+            run_cmd command mkdir -p "$dst_parent" || {
+                msg_error "${dst_parent} の作成に失敗しました。"
+                return 1
+            }
+        fi
+
+        install_config "$src_file" "$dst_file" "${subdir}/${rel_path}" ""
+    done < <(find "$src_dir" -type f -print0)
+}
 
 # --- ルールファイルの一括配置 ---
 # 指定した言語サブディレクトリ内の全 .md ファイルを install_config で配置する
@@ -118,10 +120,40 @@ _claude_mod_install_rules_dir() {
     done
 }
 
+# --- ディレクトリ単位のアンインストール ---
+# 指定したサブディレクトリ配下のファイルをバックアップから復元する
+# 引数: $1=サブディレクトリ名
+# 復元発生時はグローバル CLAUDE_MOD_RESTORED_COUNT をインクリメント
+# NOTE: 人間向けメッセージは stderr へ送る（呼び出し側が $() でキャプチャしないため）
+_claude_mod_uninstall_dir() {
+    local subdir="$1"
+    local dst_dir="$CLAUDE_MOD_CONFIG_DIR/${subdir}"
+
+    [[ -d "$dst_dir" ]] || return 0
+
+    local file label newest
+    while IFS= read -r -d '' file; do
+        label="${subdir}/${file#"$dst_dir"/}"
+        newest=$(find_newest_backup "${file}.backup."'*') || true
+
+        if [[ -n "$newest" ]]; then
+            printf '%s\n' "復元: ${label} をバックアップ ($(basename "$newest")) から戻します。" >&2
+            run_cmd command mv "$newest" "$file" || {
+                msg_error "${label} の復元に失敗しました。"
+                return 1
+            }
+            CLAUDE_MOD_RESTORED_COUNT=$((CLAUDE_MOD_RESTORED_COUNT + 1))
+        elif [[ -f "$file" || -L "$file" ]]; then
+            msg_warn "${label} のバックアップが見つかりません。手動で確認してください: ${file}"
+        fi
+    done < <(find "$dst_dir" -type f ! -name '*.backup.*' -print0)
+}
+
 # --- ルールファイルの一括削除・復元 ---
-# 指定した言語サブディレクトリ内の全 .md ファイルをバックアップから復元または削除する
+# 指定した言語サブディレクトリ内の全 .md ファイルをバックアップから復元する
 # 引数: $1=言語名 (例: common, python, rust)
-# 戻り値: 復元が発生した場合は stdout に "restored" を出力
+# 復元発生時はグローバル CLAUDE_MOD_RESTORED_COUNT をインクリメント
+# NOTE: 人間向けメッセージは stderr へ送る（呼び出し側が $() でキャプチャしないため）
 _claude_mod_uninstall_rules_dir() {
     local lang="$1"
     local dst_dir="$CLAUDE_MOD_CONFIG_DIR/rules/${lang}"
@@ -138,12 +170,12 @@ _claude_mod_uninstall_rules_dir() {
         newest=$(find_newest_backup "${file}.backup."'*') || true
 
         if [[ -n "$newest" ]]; then
-            printf '%s\n' "復元: ${label} をバックアップ ($(basename "$newest")) から戻します。"
+            printf '%s\n' "復元: ${label} をバックアップ ($(basename "$newest")) から戻します。" >&2
             run_cmd command mv "$newest" "$file" || {
                 msg_error "${label} の復元に失敗しました。"
                 return 1
             }
-            printf '%s' "restored"
+            CLAUDE_MOD_RESTORED_COUNT=$((CLAUDE_MOD_RESTORED_COUNT + 1))
         elif [[ -f "$file" || -L "$file" ]]; then
             msg_warn "${label} のバックアップが見つかりません。手動で確認してください: ${file}"
         fi
@@ -462,25 +494,34 @@ setup_claude_code() {
     printf '\n'
     msg_info "設定ファイルを配置します..."
 
-    # 必要なディレクトリを事前作成
-    for dir in "${CLAUDE_MOD_REQUIRED_DIRS[@]}"; do
-        if [[ ! -d "$dir" ]]; then
-            run_cmd command mkdir -p "$dir" || {
-                msg_error "${dir} の作成に失敗しました。"
-                return 1
-            }
-            if ((DRY_RUN)); then
-                msg_info "${dir} を作成予定です（dry-run）。"
-            else
-                msg_info "${dir} を作成しました。"
-            fi
-        fi
+    # ベースディレクトリを作成
+    if [[ ! -d "$CLAUDE_MOD_CONFIG_DIR" ]]; then
+        run_cmd command mkdir -p "$CLAUDE_MOD_CONFIG_DIR" || {
+            msg_error "${CLAUDE_MOD_CONFIG_DIR} の作成に失敗しました。"
+            return 1
+        }
+    fi
+    if [[ ! -d "${HOME}/.shell" ]]; then
+        run_cmd command mkdir -p "${HOME}/.shell" || {
+            msg_error "${HOME}/.shell の作成に失敗しました。"
+            return 1
+        }
+    fi
+
+    # .claude/ 直下の単独ファイルを配置
+    local filename
+    for filename in "${CLAUDE_MOD_ROOT_FILES[@]}"; do
+        install_config \
+            "$SCRIPT_DIR/.claude/${filename}" \
+            "$CLAUDE_MOD_CONFIG_DIR/${filename}" \
+            "${filename}" \
+            ""
     done
 
-    # 設定ファイルの配置（ルール以外）
-    for entry in "${CLAUDE_MOD_MANAGED_FILES[@]}"; do
-        IFS='|' read -r src dst label hint <<<"$entry"
-        install_config "$src" "$dst" "$label" "$hint"
+    # .claude/ 配下のディレクトリを再帰コピー
+    local subdir
+    for subdir in "${CLAUDE_MOD_SYNC_DIRS[@]}"; do
+        _claude_mod_install_dir "$subdir"
     done
 
     # ルールファイルの一括配置（言語別サブディレクトリ）
@@ -488,14 +529,21 @@ setup_claude_code() {
         _claude_mod_install_rules_dir "$lang"
     done
 
-    # フックスクリプトに実行権限を付与
-    if ! ((DRY_RUN)); then
-        for script in "${CLAUDE_MOD_CONFIG_DIR}/scripts"/*.sh; do
-            [[ -f "$script" ]] || continue
+    # .claude/ 外の追加ファイルを配置
+    local entry
+    for entry in "${CLAUDE_MOD_EXTERNAL_FILES[@]}"; do
+        IFS='|' read -r src dst label hint <<<"$entry"
+        install_config "$src" "$dst" "$label" "$hint"
+    done
+
+    # scripts/ 配下のシェルスクリプトに実行権限を付与
+    if ! ((DRY_RUN)) && [[ -d "${CLAUDE_MOD_CONFIG_DIR}/scripts" ]]; then
+        local script
+        while IFS= read -r -d '' script; do
             if [[ ! -x "$script" ]]; then
                 chmod +x "$script" || msg_warn "実行権限の付与に失敗しました: ${script}"
             fi
-        done
+        done < <(find "${CLAUDE_MOD_CONFIG_DIR}/scripts" -type f -name '*.sh' -print0)
     fi
 
     # MCP サーバー設定のマージ（~/.claude.json に追加）
@@ -517,7 +565,8 @@ module_status() {
 
 # --- アンインストール ---
 uninstall_claude_code() {
-    local restored=0
+    # 復元件数をグローバルカウンタで集計（サブシェルでインクリメントしないよう関数を直接呼び出す）
+    CLAUDE_MOD_RESTORED_COUNT=0
 
     # =========================================
     # MCP サーバー設定の削除（~/.claude.json から除去）
@@ -525,42 +574,64 @@ uninstall_claude_code() {
     _claude_mod_remove_mcp_servers || return 1
 
     # =========================================
-    # 設定ファイルの復元・削除（ルール以外）
+    # .claude/ 直下の単独ファイルの復元・警告
     # =========================================
-    for entry in "${CLAUDE_MOD_MANAGED_FILES[@]}"; do
-        IFS='|' read -r _src dst label _hint <<<"$entry"
+    local filename root_dst root_newest root_label
+    for filename in "${CLAUDE_MOD_ROOT_FILES[@]}"; do
+        root_dst="$CLAUDE_MOD_CONFIG_DIR/${filename}"
+        root_label="${filename}"
+        root_newest=$(find_newest_backup "${root_dst}.backup."'*') || true
 
-        # find_newest_backup で最新のバックアップを検索
-        local newest
-        newest=$(find_newest_backup "${dst}.backup."'*') || true
-
-        if [[ -n "$newest" ]]; then
-            printf '%s\n' "復元: ${label} をバックアップ ($(basename "$newest")) から戻します。"
-            run_cmd command mv "$newest" "$dst" || {
-                msg_error "${label} の復元に失敗しました。"
+        if [[ -n "$root_newest" ]]; then
+            printf '%s\n' "復元: ${root_label} をバックアップ ($(basename "$root_newest")) から戻します。" >&2
+            run_cmd command mv "$root_newest" "$root_dst" || {
+                msg_error "${root_label} の復元に失敗しました。"
                 return 1
             }
-            restored=1
-        elif [[ -f "$dst" || -L "$dst" ]]; then
-            msg_warn "${label} のバックアップが見つかりません。手動で確認してください: ${dst}"
-        else
-            msg_info "${label} は配置されていません。スキップします。"
+            CLAUDE_MOD_RESTORED_COUNT=$((CLAUDE_MOD_RESTORED_COUNT + 1))
+        elif [[ -f "$root_dst" || -L "$root_dst" ]]; then
+            msg_warn "${root_label} のバックアップが見つかりません。手動で確認してください: ${root_dst}"
         fi
+    done
+
+    # =========================================
+    # .claude/ 配下のディレクトリの復元
+    # =========================================
+    local subdir
+    for subdir in "${CLAUDE_MOD_SYNC_DIRS[@]}"; do
+        _claude_mod_uninstall_dir "$subdir" || return 1
     done
 
     # =========================================
     # ルールファイルの復元・削除（言語別サブディレクトリ）
     # =========================================
+    local lang
     for lang in "${CLAUDE_MOD_RULE_LANGS[@]}"; do
-        local result
-        result=$(_claude_mod_uninstall_rules_dir "$lang") || return 1
-        if [[ "$result" == *"restored"* ]]; then
-            restored=1
+        _claude_mod_uninstall_rules_dir "$lang" || return 1
+    done
+
+    # =========================================
+    # .claude/ 外の追加ファイルの復元・警告
+    # =========================================
+    local entry ext_src ext_dst ext_label ext_hint ext_newest
+    for entry in "${CLAUDE_MOD_EXTERNAL_FILES[@]}"; do
+        IFS='|' read -r ext_src ext_dst ext_label ext_hint <<<"$entry"
+        ext_newest=$(find_newest_backup "${ext_dst}.backup."'*') || true
+
+        if [[ -n "$ext_newest" ]]; then
+            printf '%s\n' "復元: ${ext_label} をバックアップ ($(basename "$ext_newest")) から戻します。" >&2
+            run_cmd command mv "$ext_newest" "$ext_dst" || {
+                msg_error "${ext_label} の復元に失敗しました。"
+                return 1
+            }
+            CLAUDE_MOD_RESTORED_COUNT=$((CLAUDE_MOD_RESTORED_COUNT + 1))
+        elif [[ -f "$ext_dst" || -L "$ext_dst" ]]; then
+            msg_warn "${ext_label} のバックアップが見つかりません。手動で確認してください: ${ext_dst}"
         fi
     done
 
-    if ((restored)); then
-        msg_success "Claude Code 設定ファイルのアンインストールが完了しました。"
+    if ((CLAUDE_MOD_RESTORED_COUNT > 0)); then
+        msg_success "Claude Code 設定ファイルのアンインストールが完了しました（復元: ${CLAUDE_MOD_RESTORED_COUNT} 件）。"
     else
         msg_info "Claude Code 設定ファイルの復元・削除対象はありませんでした。"
     fi
@@ -589,5 +660,10 @@ uninstall_claude_code() {
     }
     msg_success "Claude Code をアンインストールしました。"
     printf '%s\n' "NOTE: ~/.claude/ ディレクトリの空ディレクトリは削除されていません。不要な場合は手動で削除してください:"
-    msg_step "rm -rf ~/.claude/rules/ ~/.claude/scripts/ ~/.claude/contexts/ ~/.claude/skills/"
+    local cleanup_dirs="rules"
+    local d
+    for d in "${CLAUDE_MOD_SYNC_DIRS[@]}"; do
+        cleanup_dirs+=" ${d}"
+    done
+    msg_step "cd ~/.claude && rm -rf ${cleanup_dirs}"
 }
