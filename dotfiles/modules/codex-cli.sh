@@ -13,31 +13,8 @@ MODULE_DEPS="node"
 
 # --- Codex CLI 固有変数 ---
 # NOTE: モジュール固有の変数には衝突回避のため CODEX_MOD_ プレフィックスを使用
+CODEX_MOD_CONFIG_SRC="$SCRIPT_DIR/.codex"
 CODEX_MOD_CONFIG_DIR="$HOME/.codex"
-CODEX_MOD_RULES_DIR="$CODEX_MOD_CONFIG_DIR/rules"
-CODEX_MOD_SKILLS_DIR="$CODEX_MOD_CONFIG_DIR/skills"
-
-# 管理対象ファイルのリスト（配布元パス, 配置先パス, 表示名, 未検出時メッセージ）
-# NOTE: 配列の各要素は "src|dst|label|hint" の形式
-CODEX_MOD_MANAGED_FILES=(
-    # config.toml (model and reasoning settings)
-    "$SCRIPT_DIR/.codex/config.toml|$CODEX_MOD_CONFIG_DIR/config.toml|config.toml|"
-    # rules/default.rules (sandbox allow/deny rules)
-    "$SCRIPT_DIR/.codex/rules/default.rules|$CODEX_MOD_RULES_DIR/default.rules|rules/default.rules|"
-    # AGENTS.md (agent identity and capabilities)
-    "$SCRIPT_DIR/.codex/AGENTS.md|$CODEX_MOD_CONFIG_DIR/AGENTS.md|AGENTS.md|"
-    # skills/context-loader (project context loading skill)
-    "$SCRIPT_DIR/.codex/skills/context-loader/SKILL.md|$CODEX_MOD_SKILLS_DIR/context-loader/SKILL.md|skills/context-loader/SKILL.md|"
-)
-
-# 配置先ディレクトリのリスト（サブディレクトリを事前作成するため）
-# NOTE: install_config は親ディレクトリの自動作成を行わないため、ここで明示的に列挙する
-CODEX_MOD_REQUIRED_DIRS=(
-    "$CODEX_MOD_CONFIG_DIR"
-    "$CODEX_MOD_RULES_DIR"
-    "$CODEX_MOD_SKILLS_DIR"
-    "$CODEX_MOD_SKILLS_DIR/context-loader"
-)
 
 # --- セットアップ ---
 setup_codex_cli() {
@@ -91,31 +68,22 @@ setup_codex_cli() {
     printf '\n'
     msg_info "設定ファイルを配置します..."
 
-    # 必要なディレクトリを事前作成（権限 700）
-    for dir in "${CODEX_MOD_REQUIRED_DIRS[@]}"; do
-        if [[ ! -d "$dir" ]]; then
-            run_cmd command mkdir -p "$dir" || {
-                msg_error "${dir} の作成に失敗しました。"
-                return 1
-            }
-            # NOTE: config may contain sensitive settings; restrict permissions
-            run_cmd command chmod 700 "$dir" || {
-                msg_error "${dir} の権限設定に失敗しました。"
-                return 1
-            }
-            if ((DRY_RUN)); then
-                msg_info "${dir} を作成予定です（dry-run）。"
-            else
-                msg_info "${dir} を作成しました。"
-            fi
-        fi
-    done
-
-    # 設定ファイルの配置
-    for entry in "${CODEX_MOD_MANAGED_FILES[@]}"; do
-        IFS='|' read -r src dst label hint <<<"$entry"
-        install_config "$src" "$dst" "$label" "$hint"
-    done
+    # 機密設定保護: umask 077 で新規作成ディレクトリを 0700 にする
+    # NOTE: trap は使わず明示 save/restore する。INT/TERM 中断時は setup.sh 自体が
+    # 終了するため umask 漏洩の影響範囲は当該プロセスに限定される。
+    local _old_umask _rc
+    _old_umask=$(umask)
+    umask 077
+    install_tree \
+        "$CODEX_MOD_CONFIG_SRC" \
+        "$CODEX_MOD_CONFIG_DIR" \
+        ".codex"
+    _rc=$?
+    umask "$_old_umask"
+    if ((_rc != 0)); then
+        msg_error "Codex CLI 設定ファイルの配置に失敗しました。"
+        return 1
+    fi
 
     msg_success "Codex CLI 設定ファイルの配置が完了しました。"
 }
@@ -133,34 +101,18 @@ module_status() {
 
 # --- アンインストール ---
 uninstall_codex_cli() {
-    local restored=0
-
     # =========================================
     # 設定ファイルの復元
     # =========================================
-    for entry in "${CODEX_MOD_MANAGED_FILES[@]}"; do
-        IFS='|' read -r _src dst label _hint <<<"$entry"
+    CODEX_MOD_RESTORED_COUNT=0
+    uninstall_tree \
+        "$CODEX_MOD_CONFIG_SRC" \
+        "$CODEX_MOD_CONFIG_DIR" \
+        ".codex" \
+        CODEX_MOD_RESTORED_COUNT || return 1
 
-        # find_newest_backup で最新のバックアップを検索
-        local newest
-        newest=$(find_newest_backup "${dst}.backup."'*') || true
-
-        if [[ -n "$newest" ]]; then
-            printf '%s\n' "復元: ${label} をバックアップ ($(basename "$newest")) から戻します。"
-            run_cmd command mv "$newest" "$dst" || {
-                msg_error "${label} の復元に失敗しました。"
-                return 1
-            }
-            restored=1
-        elif [[ -f "$dst" || -L "$dst" ]]; then
-            msg_warn "${label} のバックアップが見つかりません。手動で確認してください: ${dst}"
-        else
-            msg_info "${label} は配置されていません。スキップします。"
-        fi
-    done
-
-    if ((restored)); then
-        msg_success "Codex CLI 設定ファイルのアンインストールが完了しました。"
+    if ((CODEX_MOD_RESTORED_COUNT > 0)); then
+        msg_success "Codex CLI 設定ファイルのアンインストールが完了しました（復元: ${CODEX_MOD_RESTORED_COUNT} 件）。"
     else
         msg_info "Codex CLI 設定ファイルの復元・削除対象はありませんでした。"
     fi

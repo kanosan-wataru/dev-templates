@@ -53,133 +53,23 @@ CLAUDE_MOD_EXTERNAL_FILES=(
 # 引数: $1=サブディレクトリ名 (例: agents, skills)
 _claude_mod_install_dir() {
     local subdir="$1"
-    local src_dir="$SCRIPT_DIR/.claude/${subdir}"
-    local dst_dir="$CLAUDE_MOD_CONFIG_DIR/${subdir}"
-
-    # 配布元ディレクトリの存在確認
-    if [[ ! -d "$src_dir" ]]; then
-        msg_warn "配布元ディレクトリが見つかりません: ${src_dir}"
-        return 0
-    fi
-
-    # 配布元の全ファイルを列挙して配置
-    local src_file rel_path dst_file dst_parent
-    while IFS= read -r -d '' src_file; do
-        rel_path="${src_file#"$src_dir"/}"
-        dst_file="${dst_dir}/${rel_path}"
-        dst_parent="$(dirname "$dst_file")"
-
-        # 親ディレクトリを必要に応じて作成
-        if [[ ! -d "$dst_parent" ]]; then
-            run_cmd command mkdir -p "$dst_parent" || {
-                msg_error "${dst_parent} の作成に失敗しました。"
-                return 1
-            }
-        fi
-
-        install_config "$src_file" "$dst_file" "${subdir}/${rel_path}" ""
-    done < <(find "$src_dir" -type f -print0)
-}
-
-# --- ルールファイルの一括配置 ---
-# 指定した言語サブディレクトリ内の全 .md ファイルを install_config で配置する
-# 引数: $1=言語名 (例: common, python, rust)
-_claude_mod_install_rules_dir() {
-    local lang="$1"
-    local src_dir="$SCRIPT_DIR/.claude/rules/${lang}"
-    local dst_dir="$CLAUDE_MOD_CONFIG_DIR/rules/${lang}"
-
-    # 配布元ディレクトリの存在確認
-    if [[ ! -d "$src_dir" ]]; then
-        msg_warn "ルールディレクトリが見つかりません: ${src_dir}"
-        return 0
-    fi
-
-    # 配置先ディレクトリの作成
-    if [[ ! -d "$dst_dir" ]]; then
-        run_cmd command mkdir -p "$dst_dir" || {
-            msg_error "${dst_dir} の作成に失敗しました。"
-            return 1
-        }
-        if ((DRY_RUN)); then
-            msg_info "${dst_dir} を作成予定です（dry-run）。"
-        else
-            msg_info "${dst_dir} を作成しました。"
-        fi
-    fi
-
-    # 配布元ディレクトリ内の全 .md ファイルを配置
-    local src_file
-    for src_file in "${src_dir}"/*.md; do
-        # glob がマッチしない場合のガード
-        [[ -f "$src_file" ]] || continue
-
-        local filename
-        filename=$(basename "$src_file")
-        install_config "$src_file" "${dst_dir}/${filename}" "rules/${lang}/${filename}" ""
-    done
+    install_tree \
+        "$SCRIPT_DIR/.claude/${subdir}" \
+        "$CLAUDE_MOD_CONFIG_DIR/${subdir}" \
+        "${subdir}"
 }
 
 # --- ディレクトリ単位のアンインストール ---
 # 指定したサブディレクトリ配下のファイルをバックアップから復元する
 # 引数: $1=サブディレクトリ名
-# 復元発生時はグローバル CLAUDE_MOD_RESTORED_COUNT をインクリメント
-# NOTE: 人間向けメッセージは stderr へ送る（呼び出し側が $() でキャプチャしないため）
+# uninstall_tree が nameref 経由で CLAUDE_MOD_RESTORED_COUNT を更新する
 _claude_mod_uninstall_dir() {
     local subdir="$1"
-    local dst_dir="$CLAUDE_MOD_CONFIG_DIR/${subdir}"
-
-    [[ -d "$dst_dir" ]] || return 0
-
-    local file label newest
-    while IFS= read -r -d '' file; do
-        label="${subdir}/${file#"$dst_dir"/}"
-        newest=$(find_newest_backup "${file}.backup."'*') || true
-
-        if [[ -n "$newest" ]]; then
-            printf '%s\n' "復元: ${label} をバックアップ ($(basename "$newest")) から戻します。" >&2
-            run_cmd command mv "$newest" "$file" || {
-                msg_error "${label} の復元に失敗しました。"
-                return 1
-            }
-            CLAUDE_MOD_RESTORED_COUNT=$((CLAUDE_MOD_RESTORED_COUNT + 1))
-        elif [[ -f "$file" || -L "$file" ]]; then
-            msg_warn "${label} のバックアップが見つかりません。手動で確認してください: ${file}"
-        fi
-    done < <(find "$dst_dir" -type f ! -name '*.backup.*' -print0)
-}
-
-# --- ルールファイルの一括削除・復元 ---
-# 指定した言語サブディレクトリ内の全 .md ファイルをバックアップから復元する
-# 引数: $1=言語名 (例: common, python, rust)
-# 復元発生時はグローバル CLAUDE_MOD_RESTORED_COUNT をインクリメント
-# NOTE: 人間向けメッセージは stderr へ送る（呼び出し側が $() でキャプチャしないため）
-_claude_mod_uninstall_rules_dir() {
-    local lang="$1"
-    local dst_dir="$CLAUDE_MOD_CONFIG_DIR/rules/${lang}"
-
-    [[ -d "$dst_dir" ]] || return 0
-
-    local file
-    for file in "${dst_dir}"/*.md; do
-        [[ -f "$file" ]] || continue
-
-        local label
-        label="rules/${lang}/$(basename "$file")"
-        local newest
-        newest=$(find_newest_backup "${file}.backup."'*') || true
-
-        if [[ -n "$newest" ]]; then
-            printf '%s\n' "復元: ${label} をバックアップ ($(basename "$newest")) から戻します。" >&2
-            run_cmd command mv "$newest" "$file" || {
-                msg_error "${label} の復元に失敗しました。"
-                return 1
-            }
-            CLAUDE_MOD_RESTORED_COUNT=$((CLAUDE_MOD_RESTORED_COUNT + 1))
-        elif [[ -f "$file" || -L "$file" ]]; then
-            msg_warn "${label} のバックアップが見つかりません。手動で確認してください: ${file}"
-        fi
-    done
+    uninstall_tree \
+        "$SCRIPT_DIR/.claude/${subdir}" \
+        "$CLAUDE_MOD_CONFIG_DIR/${subdir}" \
+        "${subdir}" \
+        CLAUDE_MOD_RESTORED_COUNT
 }
 
 # --- MCP サーバー設定のマージ ---
@@ -515,25 +405,30 @@ setup_claude_code() {
             "$SCRIPT_DIR/.claude/${filename}" \
             "$CLAUDE_MOD_CONFIG_DIR/${filename}" \
             "${filename}" \
-            ""
+            "" || return 1
     done
 
     # .claude/ 配下のディレクトリを再帰コピー
     local subdir
     for subdir in "${CLAUDE_MOD_SYNC_DIRS[@]}"; do
-        _claude_mod_install_dir "$subdir"
+        _claude_mod_install_dir "$subdir" || return 1
     done
 
     # ルールファイルの一括配置（言語別サブディレクトリ）
+    # NOTE: install_tree で再帰配置するため、各 lang 配下に .md 以外のファイルを置くと
+    # それも配布される。現状 rules/<lang>/ は .md のみのため動作互換。
     for lang in "${CLAUDE_MOD_RULE_LANGS[@]}"; do
-        _claude_mod_install_rules_dir "$lang"
+        install_tree \
+            "$SCRIPT_DIR/.claude/rules/${lang}" \
+            "$CLAUDE_MOD_CONFIG_DIR/rules/${lang}" \
+            "rules/${lang}" || return 1
     done
 
     # .claude/ 外の追加ファイルを配置
     local entry
     for entry in "${CLAUDE_MOD_EXTERNAL_FILES[@]}"; do
         IFS='|' read -r src dst label hint <<<"$entry"
-        install_config "$src" "$dst" "$label" "$hint"
+        install_config "$src" "$dst" "$label" "$hint" || return 1
     done
 
     # scripts/ 配下のシェルスクリプトに実行権限を付与
@@ -576,22 +471,12 @@ uninstall_claude_code() {
     # =========================================
     # .claude/ 直下の単独ファイルの復元・警告
     # =========================================
-    local filename root_dst root_newest root_label
+    local filename
     for filename in "${CLAUDE_MOD_ROOT_FILES[@]}"; do
-        root_dst="$CLAUDE_MOD_CONFIG_DIR/${filename}"
-        root_label="${filename}"
-        root_newest=$(find_newest_backup "${root_dst}.backup."'*') || true
-
-        if [[ -n "$root_newest" ]]; then
-            printf '%s\n' "復元: ${root_label} をバックアップ ($(basename "$root_newest")) から戻します。" >&2
-            run_cmd command mv "$root_newest" "$root_dst" || {
-                msg_error "${root_label} の復元に失敗しました。"
-                return 1
-            }
-            CLAUDE_MOD_RESTORED_COUNT=$((CLAUDE_MOD_RESTORED_COUNT + 1))
-        elif [[ -f "$root_dst" || -L "$root_dst" ]]; then
-            msg_warn "${root_label} のバックアップが見つかりません。手動で確認してください: ${root_dst}"
-        fi
+        restore_file_from_backup \
+            "$CLAUDE_MOD_CONFIG_DIR/${filename}" \
+            "${filename}" \
+            CLAUDE_MOD_RESTORED_COUNT || return 1
     done
 
     # =========================================
@@ -607,27 +492,20 @@ uninstall_claude_code() {
     # =========================================
     local lang
     for lang in "${CLAUDE_MOD_RULE_LANGS[@]}"; do
-        _claude_mod_uninstall_rules_dir "$lang" || return 1
+        uninstall_tree \
+            "$SCRIPT_DIR/.claude/rules/${lang}" \
+            "$CLAUDE_MOD_CONFIG_DIR/rules/${lang}" \
+            "rules/${lang}" \
+            CLAUDE_MOD_RESTORED_COUNT || return 1
     done
 
     # =========================================
     # .claude/ 外の追加ファイルの復元・警告
     # =========================================
-    local entry ext_src ext_dst ext_label ext_hint ext_newest
+    local entry ext_src ext_dst ext_label ext_hint
     for entry in "${CLAUDE_MOD_EXTERNAL_FILES[@]}"; do
         IFS='|' read -r ext_src ext_dst ext_label ext_hint <<<"$entry"
-        ext_newest=$(find_newest_backup "${ext_dst}.backup."'*') || true
-
-        if [[ -n "$ext_newest" ]]; then
-            printf '%s\n' "復元: ${ext_label} をバックアップ ($(basename "$ext_newest")) から戻します。" >&2
-            run_cmd command mv "$ext_newest" "$ext_dst" || {
-                msg_error "${ext_label} の復元に失敗しました。"
-                return 1
-            }
-            CLAUDE_MOD_RESTORED_COUNT=$((CLAUDE_MOD_RESTORED_COUNT + 1))
-        elif [[ -f "$ext_dst" || -L "$ext_dst" ]]; then
-            msg_warn "${ext_label} のバックアップが見つかりません。手動で確認してください: ${ext_dst}"
-        fi
+        restore_file_from_backup "$ext_dst" "$ext_label" CLAUDE_MOD_RESTORED_COUNT || return 1
     done
 
     if ((CLAUDE_MOD_RESTORED_COUNT > 0)); then

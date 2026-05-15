@@ -16,6 +16,10 @@ MODULE_DEPS="node"
 COPILOT_MOD_NPM_PACKAGE="@github/copilot"
 COPILOT_MOD_MIN_NODE_VERSION=22
 
+# 配布対象: dotfiles/.copilot/ → ~/.copilot/
+COPILOT_MOD_CONFIG_SRC="$SCRIPT_DIR/.copilot"
+COPILOT_MOD_CONFIG_DST="${HOME}/.copilot"
+
 # --- セットアップ ---
 setup_copilot_cli() {
     msg_header "GitHub Copilot CLI"
@@ -59,6 +63,16 @@ setup_copilot_cli() {
         msg_step "または GH_TOKEN 環境変数を設定"
         msg_step "詳細: https://docs.github.com/en/copilot/how-tos/set-up/install-copilot-cli"
     fi
+
+    # ~/.copilot/ への設定ファイル配布
+    msg_info "Copilot 設定ファイルを ${COPILOT_MOD_CONFIG_DST} へ配布します..."
+    install_tree \
+        "$COPILOT_MOD_CONFIG_SRC" \
+        "$COPILOT_MOD_CONFIG_DST" \
+        ".copilot" || {
+        msg_error "Copilot 設定ファイルの配布に失敗しました。"
+        return 1
+    }
 }
 
 # --- ステータス表示 ---
@@ -74,6 +88,17 @@ module_status() {
 
 # --- アンインストール ---
 uninstall_copilot_cli() {
+    # ~/.copilot/ 配下の設定ファイルを復元・警告
+    local COPILOT_MOD_RESTORED_COUNT=0
+    uninstall_tree \
+        "$COPILOT_MOD_CONFIG_SRC" \
+        "$COPILOT_MOD_CONFIG_DST" \
+        ".copilot" \
+        COPILOT_MOD_RESTORED_COUNT || return 1
+    if ((COPILOT_MOD_RESTORED_COUNT > 0)); then
+        msg_success "Copilot 設定ファイルを ${COPILOT_MOD_RESTORED_COUNT} 件復元しました。"
+    fi
+
     # インストール状態を判定（コマンドの存在 or npm パッケージの存在）
     if ! command -v copilot >/dev/null 2>&1; then
         if ! { command -v npm >/dev/null 2>&1 && npm ls -g "$COPILOT_MOD_NPM_PACKAGE" >/dev/null 2>&1; }; then
