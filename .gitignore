@@ -29,10 +29,10 @@ __pycache__/
 *.pyc
 
 # Claude Code
-# NOTE: ルート直下の CLAUDE.md のみ除外（dotfiles/.claude/CLAUDE.md はテンプレートとして管理する）
+# - dotfiles/.claude/ はテンプレートとして管理対象
+# - project ルートの .claude/ と CLAUDE.md は全てユーザー固有データのため除外
+# - dotfiles/.claude/docs/research/ は調査メモを個人管理 (.gitkeep のみ commit)
 /CLAUDE.md
-.claude/settings.local.json
-.claude/logs/
-.claude/checkpoints/
-.claude/docs/research/*.md
-!.claude/docs/research/.gitkeep
+/.claude/
+dotfiles/.claude/docs/research/*.md
+!dotfiles/.claude/docs/research/.gitkeep
