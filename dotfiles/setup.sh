@@ -32,6 +32,8 @@ source "${SCRIPT_DIR}/lib/array.sh"
 source "${SCRIPT_DIR}/lib/backup.sh"
 # shellcheck source=./lib/tui.sh
 source "${SCRIPT_DIR}/lib/tui.sh"
+# shellcheck source=./lib/install_tree.sh
+source "${SCRIPT_DIR}/lib/install_tree.sh"
 _setup_colors
 
 # ==============================================
