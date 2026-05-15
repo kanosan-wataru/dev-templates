@@ -1,5 +1,7 @@
 {
-  "env": {},
+  "env": {
+    "ENABLE_LSP_TOOL": "1"
+  },
   "permissions": {
     "allow": [],
     "deny": [
@@ -345,8 +347,18 @@
       }
     ]
   },
-  "enabledPlugins": {},
-  "extraKnownMarketplaces": {},
+  "enabledPlugins": {
+    "pyright@claude-code-lsps": true,
+    "vtsls@claude-code-lsps": true
+  },
+  "extraKnownMarketplaces": {
+    "claude-code-lsps": {
+      "source": {
+        "source": "github",
+        "repo": "Piebald-AI/claude-code-lsps"
+      }
+    }
+  },
   "language": "日本語",
   "effortLevel": "high",
   "autoMemoryEnabled": true
