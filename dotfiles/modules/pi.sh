@@ -78,6 +78,24 @@ _pi_download_url() {
     fi
 }
 
+# --- ヘルパー: --version 出力のサニタイズ ---
+# Bun でコンパイルされたバイナリが侵害された場合 (改竄 / 別バイナリ差し替え) に
+# 制御文字や ANSI エスケープでターミナルを操作されるのを防ぐ (terminal injection 緩和)
+_pi_safe_version() {
+    if [[ ! -x "$PI_MOD_LIB_BIN" ]]; then
+        printf '%s' "unknown"
+        return
+    fi
+    local raw
+    raw=$("$PI_MOD_LIB_BIN" --version 2>/dev/null | head -1)
+    if [[ -z "$raw" ]]; then
+        printf '%s' "unknown"
+        return
+    fi
+    # 印字可能 ASCII のみ通し、長さも 80 字に制限
+    LC_ALL=C printf '%s' "$raw" | LC_ALL=C tr -cd '[:print:]' | cut -c1-80
+}
+
 # --- ヘルパー: ダウンロード〜配置 (サブシェルでスコープを閉じる) ---
 # サブシェル `( ... )` でラップすることで EXIT trap が親シェルに漏れない
 #
@@ -132,12 +150,22 @@ _pi_fetch_and_install() (
         return 1
     }
 
+    # シンボリックリンク禁止: アーカイブが symlink を含む場合、後段の chmod や mv が
+    # リンク先 (tmp_dir 外) のファイルに作用する可能性があるため、展開後に検出して拒否する
+    if find "$tmp_dir" -type l 2>/dev/null | grep -q .; then
+        msg_error "アーカイブにシンボリックリンクが含まれています。中断します。"
+        return 1
+    fi
+
     # 展開後の pi バイナリを検出 (-mindepth 2 で tmp_dir 直下を除外)
     # 期待構造: ${tmp_dir}/pi/pi (バイナリ) + ${tmp_dir}/pi/package.json + ...
+    # フォールバックでも package.json 同居を強制し、関係ないファイル混入を防ぐ
     local extracted_bin
-    extracted_bin=$(find "$tmp_dir" -mindepth 2 -maxdepth 3 -type f -name pi -perm -u+x 2>/dev/null | head -1)
+    extracted_bin=$(find "$tmp_dir" -mindepth 2 -maxdepth 3 -type f -name pi -perm -u+x \
+        -execdir test -f package.json \; -print 2>/dev/null | head -1)
     if [[ -z "$extracted_bin" ]]; then
-        extracted_bin=$(find "$tmp_dir" -mindepth 2 -maxdepth 3 -type f -name pi 2>/dev/null | head -1)
+        extracted_bin=$(find "$tmp_dir" -mindepth 2 -maxdepth 3 -type f -name pi \
+            -execdir test -f package.json \; -print 2>/dev/null | head -1)
     fi
     if [[ -z "$extracted_bin" ]]; then
         msg_error "展開したアーカイブに pi バイナリが見つかりません。"
@@ -171,9 +199,20 @@ _pi_fetch_and_install() (
 
     # atomic swap で旧版を保護しつつ libdir を入れ替える
     # 手順: 旧版を backup_dir に退避 → 新版を mv → 成功なら backup を削除、失敗なら復旧
-    local backup_dir="${PI_MOD_LIB_DIR}.old.$$"
+    # NOTE: $$ ベースの予測可能名は TOCTOU 攻撃 (先回り symlink 配置) を許す。
+    #       mktemp -d でランダム名を確保→空ディレクトリを rmdir してから mv で奪取する。
+    local backup_dir=""
     local has_backup=0
     if [[ -e "$PI_MOD_LIB_DIR" ]]; then
+        backup_dir=$(mktemp -d "${PI_MOD_LIB_DIR}.old.XXXXXXXXXX") || {
+            msg_error "旧 libdir 退避用ディレクトリの確保に失敗しました。"
+            return 1
+        }
+        # mktemp で作った空ディレクトリは mv の上書き対象として使えないため、一度削除
+        rmdir "$backup_dir" || {
+            msg_error "退避先 ${backup_dir} の rmdir に失敗しました。"
+            return 1
+        }
         if ! mv "$PI_MOD_LIB_DIR" "$backup_dir"; then
             msg_error "旧 libdir の退避に失敗しました (${PI_MOD_LIB_DIR} -> ${backup_dir})。"
             return 1
@@ -221,14 +260,12 @@ setup_pi() {
     # べき等性チェック (libdir のバイナリで判定)
     # NOTE: `pi` は短い汎用名のため command -v ではなく実体パスで判定する
     if [[ -x "$PI_MOD_LIB_BIN" ]] && ! ((UPGRADE)); then
-        local current_ver
-        current_ver=$("$PI_MOD_LIB_BIN" --version 2>/dev/null | head -1 || printf '%s' "unknown")
-        msg_info "pi は既にインストールされています (${current_ver})。スキップします。"
+        msg_info "pi は既にインストールされています ($(_pi_safe_version))。スキップします。"
         return 0
     fi
 
     if [[ -x "$PI_MOD_LIB_BIN" ]] && ((UPGRADE)); then
-        msg_info "pi のアップグレードを実行します... (現在: $("$PI_MOD_LIB_BIN" --version 2>/dev/null | head -1 || echo 'unknown'))"
+        msg_info "pi のアップグレードを実行します... (現在: $(_pi_safe_version))"
     fi
 
     local os
@@ -304,7 +341,7 @@ setup_pi() {
     else
         msg_success "pi のインストールが完了しました。"
         if [[ -x "$PI_MOD_LIB_BIN" ]]; then
-            msg_step "$("$PI_MOD_LIB_BIN" --version 2>/dev/null | head -1 || printf '%s' 'バージョン不明')"
+            msg_step "$(_pi_safe_version)"
         fi
         printf '\n'
         printf '%s\n' "初回セットアップ:"
@@ -321,7 +358,7 @@ module_status() {
     # libdir の実体パスを優先確認する
     if [[ -x "$PI_MOD_LIB_BIN" ]]; then
         local version
-        version=$("$PI_MOD_LIB_BIN" --version 2>/dev/null | head -1 || printf '%s' "installed")
+        version=$(_pi_safe_version)
         printf '  %-14s %s%-18s%s %s\n' "$MODULE_ID" "${C_GREEN}" "✓ installed" "${C_RESET}" "$version"
     else
         printf '  %-14s %s%-18s%s %s\n' "$MODULE_ID" "${C_RED}" "✗ not found" "${C_RESET}" "-"

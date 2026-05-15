@@ -224,10 +224,11 @@ bash dotfiles/setup.sh --uninstall
 #### pi
 1. アーキテクチャ自動判定（`uname -m`: x86_64 / aarch64, OS: linux / darwin）
 2. [earendil-works/pi](https://github.com/earendil-works/pi) の GitHub Releases から Bun 単一バイナリ (`pi-{os}-{arch}.tar.gz`) をダウンロード（既にインストール済みならスキップ）
-3. 展開前にアーカイブエントリを検証（tar-slip 防御）し、`$HOME/.local/bin/pi` に配置
-4. バージョン固定可能: `PI_VERSION=v0.74.0 bash setup.sh pi`（pre-release タグ `v0.74.0-rc.1` 形式も許容）
-5. 初回起動: `pi` で対話モード（プロバイダ設定はガイドに従う）。`~/.pi/agent/extensions/*.ts` に拡張を配置すると自動読込
-6. アンインストール時はバイナリに加えてユーザーデータ `~/.pi/` も完全削除
+3. 展開前にアーカイブエントリを検証（tar-slip 防御 / symlink 拒否）し、`$HOME/.local/share/pi/` に libdir として一括配置（pi バイナリは Bun コンパイル成果物で `package.json`・WASM 等との同居が必須）
+4. `$HOME/.local/bin/pi` から libdir 内バイナリへ symlink を張り、PATH 経由で起動可能にする（アップグレード時は旧 libdir を退避→新版 mv→退避削除の atomic swap で旧版を保護）
+5. バージョン固定可能: `PI_VERSION=v0.74.0 bash setup.sh pi`（pre-release タグ `v0.74.0-rc.1` 形式も許容）
+6. 初回起動: `pi` で対話モード（プロバイダ設定はガイドに従う）。`~/.pi/agent/extensions/*.ts` に拡張を配置すると自動読込
+7. アンインストール時は symlink (`~/.local/bin/pi`) と libdir (`~/.local/share/pi/`) に加え、ユーザーデータ `~/.pi/` も完全削除
 
 完了後、`exec zsh` でシェルを再起動してください。
 
