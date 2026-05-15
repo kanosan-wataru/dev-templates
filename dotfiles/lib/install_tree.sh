@@ -22,6 +22,7 @@ install_tree() {
     fi
 
     local src_file rel_path dst_file dst_parent
+    local count=0
     while IFS= read -r -d '' src_file; do
         rel_path="${src_file#"$src_dir"/}"
         dst_file="${dst_dir}/${rel_path}"
@@ -38,8 +39,14 @@ install_tree() {
         # install_config が失敗 (戻り値非0) を返した場合は伝播する
         # NOTE: 現状 install_config はハード失敗時 exit 1 だが、将来の戻り値変更で
         # サイレント失敗にならないよう明示的に伝播する
-        install_config "$src_file" "$dst_file" "${label_prefix}/${rel_path}" "" || return $?
+        # quiet=1: 個別 info を抑制し、ループ完了後にサマリ 1 行のみ出力する
+        install_config "$src_file" "$dst_file" "${label_prefix}/${rel_path}" "" 1 || return $?
+        count=$((count + 1))
     done < <(find "$src_dir" -type f -print0)
+
+    if ((count > 0)); then
+        msg_info "${label_prefix}: ${count} ファイルを配置/同期しました。"
+    fi
 }
 
 # 配布元の管理対象ファイルに対応する配置先をバックアップから復元する

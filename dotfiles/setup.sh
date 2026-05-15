@@ -126,6 +126,7 @@ run_cmd() {
 
 # Config file backup and deployment helper (idempotent)
 # Args: $1=source path $2=destination path $3=display name $4=hint when missing
+#       $5=quiet (0|1, default 0) — install_tree 経由のときだけ per-file info を抑制
 #
 # Behavior:
 #   - If destination does not exist: deploy without asking (new file)
@@ -135,7 +136,7 @@ run_cmd() {
 #       --dry-run: show preview message only
 #       otherwise: show diff and ask user for confirmation
 install_config() {
-    local src="$1" dst="$2" label="$3" missing_hint="${4:-}"
+    local src="$1" dst="$2" label="$3" missing_hint="${4:-}" quiet="${5:-0}"
 
     # Warn if source file does not exist
     if [[ ! -f "$src" ]]; then
@@ -150,7 +151,7 @@ install_config() {
 
     # Idempotency check: skip if not a symlink and content is identical
     if [[ -f "$dst" && ! -L "$dst" ]] && cmp -s "$src" "$dst"; then
-        msg_info "${label} は既に最新の状態です。スキップします。"
+        ((quiet)) || msg_info "${label} は既に最新の状態です。スキップします。"
         return 0
     fi
 
@@ -158,7 +159,7 @@ install_config() {
     if [[ -f "$dst" || -L "$dst" ]]; then
         if ((DRY_RUN)); then
             # Dry-run: show what would happen, then return
-            msg_dry_run "${label} を更新予定です。"
+            ((quiet)) || msg_dry_run "${label} を更新予定です。"
             return 0
         fi
 
@@ -199,7 +200,7 @@ install_config() {
             msg_error "${label} のバックアップに失敗しました。"
             exit 1
         }
-        msg_info "既存の ${label} を ${dst}${BACKUP_SUFFIX} にバックアップしました。"
+        ((quiet)) || msg_info "既存の ${label} を ${dst}${BACKUP_SUFFIX} にバックアップしました。"
     fi
 
     # Deploy file
@@ -211,7 +212,7 @@ install_config() {
         fi
         exit 1
     }
-    msg_info "${label} を配置しました。"
+    ((quiet)) || msg_info "${label} を配置しました。"
 }
 
 # Deploy config via source separation
