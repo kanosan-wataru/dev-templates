@@ -161,6 +161,16 @@ bash dotfiles/setup.sh --uninstall
 1. OS 判定（macOS: Homebrew / Linux: apt）
 2. 各ツール（eza, bat, fd, ripgrep）を順次インストール（既にインストール済みならスキップ）
 3. エイリアス（`ls` → eza, `cat` → bat 等）は `.shell/aliases.sh` で条件付き設定済み
+4. **skillshare** (AI CLI スキル/エージェント同期) のインストールと設定
+   - `~/.local/bin/skillshare` に配置
+   - `~/.config/skillshare/config.yaml` を `dotfiles/.config/skillshare/config.yaml.template` から生成
+   - `~/.config/skillshare/skills` を `dotfiles/.claude/skills/` への symlink にする（真実のソース）
+   - `~/.config/skillshare/agents` を `dotfiles/.claude/agents/` への symlink にする
+   - ターゲット:
+     - skills: Gemini / Codex / OpenCode（Claude は意図的に独立扱いで除外）
+     - agents: Gemini / OpenCode（Claude は独立）
+   - `skillshare sync --all` で各 AI CLI 配下に symlink を配信
+   - **Codex agents (TOML)**: `scripts/sync-codex-agents.py` で .md → .toml に自動変換配信（同モジュール内で続けて実行）
 
 #### Node.js 開発環境
 1. [fnm](https://github.com/Schniz/fnm) (Fast Node Manager) のインストール（macOS: Homebrew / Linux: GitHub Releases）
