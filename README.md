@@ -66,6 +66,7 @@ bash dotfiles/setup.sh
   [ ] GitHub CLI            gh (GitHub CLI)
   [ ] GitHub Copilot CLI    Copilot CLI (Node.js v22+ 必要)
   [ ] opencode              SST opencode (AI coding agent, 単一バイナリ)
+  [ ] pi                    earendil-works/pi (AI coding agent, Bun 単一バイナリ)
 ```
 
 ### モジュール
@@ -86,6 +87,7 @@ bash dotfiles/setup.sh
 | **GitHub CLI** | `gh` コマンド | Homebrew (macOS) / apt (Linux) |
 | **GitHub Copilot CLI** | `copilot` コマンド | Node.js v22+ |
 | **opencode** | SST opencode (AI coding agent) — GitHub Releases から単一バイナリで導入、Node 非依存 | curl + tar (Linux) / curl + unzip (macOS) |
+| **pi** | earendil-works/pi (AI coding agent) — GitHub Releases から Bun 単一バイナリで導入、Node 非依存。最小コア + TypeScript 拡張で組み立てる思想 | curl + tar |
 
 ### オプション
 
@@ -218,6 +220,14 @@ bash dotfiles/setup.sh --uninstall
 4. バージョン固定可能: `OPENCODE_VERSION=v1.14.49 bash setup.sh opencode`（pre-release タグ `v1.0.0-rc.1` 形式も許容）
 5. 認証ガイドの表示（`opencode auth login` でプロバイダ設定）
 6. アンインストール時はバイナリに加えて `~/.local/share/opencode`、`~/.config/opencode`、`~/.cache/opencode` も完全削除
+
+#### pi
+1. アーキテクチャ自動判定（`uname -m`: x86_64 / aarch64, OS: linux / darwin）
+2. [earendil-works/pi](https://github.com/earendil-works/pi) の GitHub Releases から Bun 単一バイナリ (`pi-{os}-{arch}.tar.gz`) をダウンロード（既にインストール済みならスキップ）
+3. 展開前にアーカイブエントリを検証（tar-slip 防御）し、`$HOME/.local/bin/pi` に配置
+4. バージョン固定可能: `PI_VERSION=v0.74.0 bash setup.sh pi`（pre-release タグ `v0.74.0-rc.1` 形式も許容）
+5. 初回起動: `pi` で対話モード（プロバイダ設定はガイドに従う）。`~/.pi/agent/extensions/*.ts` に拡張を配置すると自動読込
+6. アンインストール時はバイナリに加えてユーザーデータ `~/.pi/` も完全削除
 
 完了後、`exec zsh` でシェルを再起動してください。
 
@@ -455,7 +465,8 @@ dev-templates/
 │   │   ├── gemini-cli.sh             # Gemini CLI
 │   │   ├── gh.sh                     # GitHub CLI
 │   │   ├── copilot-cli.sh            # GitHub Copilot CLI
-│   │   └── opencode.sh               # SST opencode (バイナリ DL)
+│   │   ├── opencode.sh               # SST opencode (バイナリ DL)
+│   │   └── pi.sh                     # earendil-works/pi (バイナリ DL)
 │   ├── tests/                        # BATS ユニットテスト
 │   │   ├── helpers/setup_functions.bash
 │   │   ├── test_backup_sort.bats
