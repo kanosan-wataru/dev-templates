@@ -25,6 +25,10 @@ MCLI_MOD_TOOLS=(
 # NOTE: ソースは dotfiles/.claude/skills/ をそのまま symlink で利用する (真実のソース)
 MCLI_MOD_SKILLSHARE_INSTALL_DIR="${HOME}/.local/bin"
 MCLI_MOD_SKILLSHARE_REPO="runkids/skillshare"
+# install.sh は供給元固定のため main ではなくリリースタグから取得する。
+# 上流に SHA256 検証は無いが、tag pin で「ある時点の install.sh の供給」を固定し
+# main ブランチが後から書き換わっても影響を受けないようにする。
+MCLI_MOD_SKILLSHARE_VERSION="v0.19.12"
 MCLI_MOD_SKILLSHARE_CONFIG_DIR="${HOME}/.config/skillshare"
 MCLI_MOD_SKILLSHARE_CONFIG_TEMPLATE="${SCRIPT_DIR}/.config/skillshare/config.yaml.template"
 # 真実のソース (dotfiles 内の .claude/{skills,agents} を git で追跡する想定)
@@ -136,8 +140,10 @@ _mcli_install_skillshare() {
         return 0
     fi
 
+    local installer_url="https://raw.githubusercontent.com/${MCLI_MOD_SKILLSHARE_REPO}/${MCLI_MOD_SKILLSHARE_VERSION}/install.sh"
+
     if ((DRY_RUN)); then
-        msg_dry_run "wget -qO /tmp/skillshare-install.sh https://raw.githubusercontent.com/${MCLI_MOD_SKILLSHARE_REPO}/main/install.sh"
+        msg_dry_run "wget -qO /tmp/skillshare-install.sh ${installer_url}"
         msg_dry_run "INSTALL_DIR=${install_dir} sh /tmp/skillshare-install.sh"
         return 0
     fi
@@ -153,9 +159,9 @@ _mcli_install_skillshare() {
         return 1
     }
 
-    msg_step "skillshare インストーラーをダウンロードします..."
-    if ! wget -qO "$installer_path" "https://raw.githubusercontent.com/${MCLI_MOD_SKILLSHARE_REPO}/main/install.sh"; then
-        if ! curl -fsSL "https://raw.githubusercontent.com/${MCLI_MOD_SKILLSHARE_REPO}/main/install.sh" -o "$installer_path"; then
+    msg_step "skillshare インストーラーをダウンロードします (${MCLI_MOD_SKILLSHARE_VERSION})..."
+    if ! wget -qO "$installer_path" "$installer_url"; then
+        if ! curl -fsSL "$installer_url" -o "$installer_path"; then
             msg_error "skillshare インストーラーのダウンロードに失敗しました。"
             rm -f "$installer_path"
             return 1
@@ -201,11 +207,102 @@ _mcli_link_skillshare_source() {
     fi
 }
 
-# --- ヘルパー: skillshare の設定とターゲット同期 ---
-# - ~/.config/skillshare/config.yaml をテンプレートから生成
-# - ~/.config/skillshare/skills を dotfiles の .claude/skills へ symlink
-# - 存在する AI CLI のディレクトリのみを target として追加 (claude は意図的に除外)
-# - skillshare sync で symlink を配信
+# --- ヘルパー: config.yaml をテンプレートから生成 ---
+# sed -e "s|...|...|" だとパスに | & \ が含まれると壊れるため、bash の
+# parameter expansion (${var//pattern/replacement}) を使う。これは sed と異なり
+# 置換文字列内のメタ文字 (&, \) を特殊扱いしない安全なリテラル置換。
+_mcli_skillshare_render_config() {
+    local config_path="$1" template="$2" skills_src="$3" agents_src="$4"
+
+    if [[ -f "$config_path" ]] && ! ((UPGRADE)) && ! ((FORCE)); then
+        msg_info "skillshare config.yaml は既に存在します。スキップします。"
+        return 0
+    fi
+
+    if ((DRY_RUN)); then
+        msg_dry_run "config.yaml を ${template} から生成 (置換: __SKILLS_SOURCE__ / __AGENTS_SOURCE__ / __HOME__)"
+        return 0
+    fi
+
+    msg_step "skillshare config.yaml を生成します..."
+    local content
+    content=$(<"$template") || {
+        msg_error "config.yaml テンプレートの読み込みに失敗しました。"
+        return 1
+    }
+    content="${content//__SKILLS_SOURCE__/$skills_src}"
+    content="${content//__AGENTS_SOURCE__/$agents_src}"
+    content="${content//__HOME__/$HOME}"
+    printf '%s\n' "$content" >"$config_path" || {
+        msg_error "config.yaml の生成に失敗しました。"
+        return 1
+    }
+}
+
+# --- ヘルパー: skillshare ターゲットを登録 ---
+# 存在する AI CLI のディレクトリのみ target に追加する (claude は意図的に除外)。
+_mcli_skillshare_register_targets() {
+    local -a targets=(
+        "gemini|${HOME}/.gemini/skills"
+        "codex|${HOME}/.codex/skills"
+        "opencode|${HOME}/.config/opencode/skills"
+    )
+    local entry name path parent
+    for entry in "${targets[@]}"; do
+        IFS='|' read -r name path <<<"$entry"
+        parent=$(dirname "$path")
+        if [[ ! -d "$parent" ]]; then
+            msg_info "${name} がインストールされていません。target を追加しません。"
+            continue
+        fi
+        if skillshare target list 2>/dev/null | grep -qE "^  ${name}\b"; then
+            msg_info "skillshare target '${name}' は既に登録済みです。"
+            continue
+        fi
+        if ((DRY_RUN)); then
+            msg_dry_run "skillshare target add ${name} ${path}"
+        else
+            run_cmd skillshare target add "$name" "$path" || msg_warn "${name} の target 追加に失敗しました。"
+        fi
+    done
+}
+
+# --- ヘルパー: skillshare sync を実行 ---
+# `--force` で既存ファイル上書きを明示。skillshare CLI は --yes 系フラグを提供
+# していないため、対話プロンプトが残る場合に備え stdin で "y" を流し込む。
+_mcli_skillshare_run_sync() {
+    if ((DRY_RUN)); then
+        msg_dry_run "skillshare sync --all --force"
+        return 0
+    fi
+    msg_step "skillshare sync --all --force を実行します (skills + agents)..."
+    printf "y\n" | skillshare sync --all --force >/dev/null 2>&1 \
+        || msg_warn "skillshare sync に失敗しました (手動で 'skillshare sync --all' を実行してください)。"
+}
+
+# --- ヘルパー: Codex 用に .md エージェントを .toml に変換 ---
+# Skillshare は .md のみ扱うため、TOML を要求する Codex には変換スクリプトで対応する。
+_mcli_skillshare_convert_codex() {
+    local agents_src="$1"
+    local converter="${SCRIPT_DIR}/scripts/sync-codex-agents.py"
+
+    if [[ ! -d "$agents_src" ]] || [[ ! -x "$converter" ]] || [[ ! -d "${HOME}/.codex" ]]; then
+        return 0
+    fi
+    if ((DRY_RUN)); then
+        msg_dry_run "python3 ${converter} ${agents_src} ${HOME}/.codex/agents"
+        return 0
+    fi
+    if ! command -v python3 >/dev/null 2>&1; then
+        msg_warn "python3 が見つかりません。Codex agents 変換をスキップします。"
+        return 0
+    fi
+    msg_step "Codex 用に .md → .toml 変換を実行します..."
+    python3 "$converter" "$agents_src" "${HOME}/.codex/agents" \
+        || msg_warn "Codex agents の変換に失敗しました。"
+}
+
+# --- ヘルパー: skillshare の設定とターゲット同期 (オーケストレーター) ---
 _mcli_setup_skillshare() {
     local config_dir="$MCLI_MOD_SKILLSHARE_CONFIG_DIR"
     local config_template="$MCLI_MOD_SKILLSHARE_CONFIG_TEMPLATE"
@@ -217,48 +314,19 @@ _mcli_setup_skillshare() {
         msg_step "dotfiles/.claude/skills/ にスキルを配置してください。skillshare のセットアップをスキップします。"
         return 0
     fi
-
     if [[ ! -f "$config_template" ]]; then
         msg_warn "config.yaml テンプレートが見つかりません: ${config_template}"
         return 0
     fi
-
     if ! command -v skillshare >/dev/null 2>&1; then
         msg_warn "skillshare コマンドが利用できません。設定をスキップします。"
         return 0
     fi
 
-    # 1. ~/.config/skillshare/ を準備
     run_cmd mkdir -p "$config_dir" || return 1
 
-    # 2. config.yaml を生成 (プレースホルダー置換)
-    local config_path="${config_dir}/config.yaml"
-    if [[ -f "$config_path" ]] && ! ((UPGRADE)) && ! ((FORCE)); then
-        msg_info "skillshare config.yaml は既に存在します。スキップします。"
-    else
-        if ((DRY_RUN)); then
-            msg_dry_run "config.yaml を ${config_template} から生成します (置換: __SKILLS_SOURCE__ / __AGENTS_SOURCE__ / __HOME__)"
-        else
-            msg_step "skillshare config.yaml を生成します..."
-            # NOTE: sed -e "s|...|...|" だとパスに | & \ が含まれると壊れるため、bash の
-            # parameter expansion (${var//pattern/replacement}) を使う。これは sed と異なり
-            # 置換文字列内のメタ文字 (&, \) を特殊扱いしない安全なリテラル置換。
-            local template_content
-            template_content=$(<"$config_template") || {
-                msg_error "config.yaml テンプレートの読み込みに失敗しました。"
-                return 1
-            }
-            template_content="${template_content//__SKILLS_SOURCE__/$skills_src}"
-            template_content="${template_content//__AGENTS_SOURCE__/$agents_src}"
-            template_content="${template_content//__HOME__/$HOME}"
-            printf '%s\n' "$template_content" >"$config_path" || {
-                msg_error "config.yaml の生成に失敗しました。"
-                return 1
-            }
-        fi
-    fi
+    _mcli_skillshare_render_config "${config_dir}/config.yaml" "$config_template" "$skills_src" "$agents_src" || return 1
 
-    # 3. ~/.config/skillshare/{skills,agents} を symlink で source に向ける
     _mcli_link_skillshare_source "$skills_src" "${config_dir}/skills" "skills" || return 1
     if [[ -d "$agents_src" ]]; then
         _mcli_link_skillshare_source "$agents_src" "${config_dir}/agents" "agents" || return 1
@@ -266,57 +334,9 @@ _mcli_setup_skillshare() {
         msg_info "agents ソース ${agents_src} が見つかりません。agents の symlink をスキップします。"
     fi
 
-    # 4. ターゲット追加 (存在するもののみ、claude は除外)
-    local -a targets=(
-        "gemini|${HOME}/.gemini/skills"
-        "codex|${HOME}/.codex/skills"
-        "opencode|${HOME}/.config/opencode/skills"
-    )
-    for entry in "${targets[@]}"; do
-        IFS='|' read -r name path <<<"$entry"
-        # 親ディレクトリの存在のみ確認 (skills 自体は skillshare が作る)
-        local parent
-        parent=$(dirname "$path")
-        if [[ ! -d "$parent" ]]; then
-            msg_info "${name} がインストールされていません。target を追加しません。"
-            continue
-        fi
-        # 既に登録済みか確認
-        if skillshare target list 2>/dev/null | grep -qE "^  ${name}\b"; then
-            msg_info "skillshare target '${name}' は既に登録済みです。"
-            continue
-        fi
-        if ((DRY_RUN)); then
-            msg_dry_run "skillshare target add ${name} ${path}"
-        else
-            run_cmd skillshare target add "$name" "$path" || msg_warn "${name} の target 追加に失敗しました。"
-        fi
-    done
-
-    # 5. sync 実行 (skills + agents)
-    if ((DRY_RUN)); then
-        msg_dry_run "skillshare sync --all"
-    else
-        msg_step "skillshare sync --all を実行します (skills + agents)..."
-        printf "y\n" | skillshare sync --all >/dev/null 2>&1 || msg_warn "skillshare sync に失敗しました (手動で 'skillshare sync --all' を実行してください)。"
-    fi
-
-    # 6. Codex 専用: .md エージェント → .toml 変換
-    #    Skillshare は同形式 (.md) のみ扱うため、TOML を要求する Codex には変換スクリプトで対応する。
-    local codex_converter="${SCRIPT_DIR}/scripts/sync-codex-agents.py"
-    if [[ -d "$agents_src" ]] && [[ -x "$codex_converter" ]] && [[ -d "${HOME}/.codex" ]]; then
-        if ((DRY_RUN)); then
-            msg_dry_run "python3 ${codex_converter} ${agents_src} ${HOME}/.codex/agents"
-        else
-            msg_step "Codex 用に .md → .toml 変換を実行します..."
-            if command -v python3 >/dev/null 2>&1; then
-                python3 "$codex_converter" "$agents_src" "${HOME}/.codex/agents" || \
-                    msg_warn "Codex agents の変換に失敗しました。"
-            else
-                msg_warn "python3 が見つかりません。Codex agents 変換をスキップします。"
-            fi
-        fi
-    fi
+    _mcli_skillshare_register_targets
+    _mcli_skillshare_run_sync
+    _mcli_skillshare_convert_codex "$agents_src"
 }
 
 # --- セットアップ ---
