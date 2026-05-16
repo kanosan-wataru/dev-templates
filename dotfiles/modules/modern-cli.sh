@@ -29,6 +29,11 @@ MCLI_MOD_SKILLSHARE_REPO="runkids/skillshare"
 # 上流に SHA256 検証は無いが、tag pin で「ある時点の install.sh の供給」を固定し
 # main ブランチが後から書き換わっても影響を受けないようにする。
 MCLI_MOD_SKILLSHARE_VERSION="v0.19.12"
+# opt-in: install.sh の SHA256 期待値。空文字列なら検証スキップ。
+# `sha256sum install.sh` で計算した値を環境変数で渡すか、ここに直接埋めるとダウンロード後に
+# 一致確認する。不一致なら fatal で abort。上流の install.sh が改竄/差し替えされた場合の
+# 防御線として利用する。
+MCLI_MOD_SKILLSHARE_INSTALLER_SHA256="${MCLI_MOD_SKILLSHARE_INSTALLER_SHA256:-}"
 MCLI_MOD_SKILLSHARE_CONFIG_DIR="${HOME}/.config/skillshare"
 MCLI_MOD_SKILLSHARE_CONFIG_TEMPLATE="${SCRIPT_DIR}/.config/skillshare/config.yaml.template"
 # 真実のソース (dotfiles 内の .claude/{skills,agents} を git で追跡する想定)
@@ -129,6 +134,26 @@ _mcli_install_eza_apt() {
     }
 }
 
+# --- ヘルパー: ファイルの SHA256 を期待値と照合する ---
+# 戻り値: 0=一致 / 1=不一致 or 検証ツール無し。
+# sha256sum (Linux) と shasum -a 256 (macOS) の両方をサポート。
+_mcli_verify_sha256() {
+    local file="$1" expected="$2" actual=""
+    if command -v sha256sum >/dev/null 2>&1; then
+        actual=$(sha256sum "$file" | awk '{print $1}')
+    elif command -v shasum >/dev/null 2>&1; then
+        actual=$(shasum -a 256 "$file" | awk '{print $1}')
+    else
+        msg_error "sha256sum / shasum が見つかりません。SHA256 検証を実行できません。"
+        return 1
+    fi
+    if [[ "$actual" != "$expected" ]]; then
+        msg_error "SHA256 不一致: actual=${actual} expected=${expected}"
+        return 1
+    fi
+    msg_success "SHA256 検証成功 (${actual:0:12}...)"
+}
+
 # --- ヘルパー: skillshare CLI のインストール ---
 # GitHub Releases から最新バイナリを取得して ~/.local/bin に配置する。
 # NOTE: curl|sh は使わず、スクリプトをダウンロードしてから明示的に実行する。
@@ -163,6 +188,14 @@ _mcli_install_skillshare() {
     if ! wget -qO "$installer_path" "$installer_url"; then
         if ! curl -fsSL "$installer_url" -o "$installer_path"; then
             msg_error "skillshare インストーラーのダウンロードに失敗しました。"
+            rm -f "$installer_path"
+            return 1
+        fi
+    fi
+
+    # opt-in: 期待値が設定されていればダウンロード後に SHA256 を照合する。
+    if [[ -n "$MCLI_MOD_SKILLSHARE_INSTALLER_SHA256" ]]; then
+        if ! _mcli_verify_sha256 "$installer_path" "$MCLI_MOD_SKILLSHARE_INSTALLER_SHA256"; then
             rm -f "$installer_path"
             return 1
         fi
