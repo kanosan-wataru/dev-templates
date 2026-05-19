@@ -161,16 +161,17 @@ bash dotfiles/setup.sh --uninstall
 1. OS 判定（macOS: Homebrew / Linux: apt）
 2. 各ツール（eza, bat, fd, ripgrep）を順次インストール（既にインストール済みならスキップ）
 3. エイリアス（`ls` → eza, `cat` → bat 等）は `.shell/aliases.sh` で条件付き設定済み
-4. **skillshare** (AI CLI スキル/エージェント同期) のインストールと設定
-   - `~/.local/bin/skillshare` に配置
-   - `~/.config/skillshare/config.yaml` を `dotfiles/.config/skillshare/config.yaml.template` から生成
-   - `~/.config/skillshare/skills` を `dotfiles/.claude/skills/` への symlink にする（真実のソース）
-   - `~/.config/skillshare/agents` を `dotfiles/.claude/agents/` への symlink にする
-   - ターゲット:
-     - skills: Gemini / Codex / OpenCode（Claude は意図的に独立扱いで除外）
-     - agents: Gemini / OpenCode（Claude は独立）
-   - `skillshare sync --all` で各 AI CLI 配下に symlink を配信
-   - **Codex agents (TOML)**: `scripts/sync-codex-agents.py` で .md → .toml に自動変換配信（同モジュール内で続けて実行）
+
+#### Skillshare (AI CLI スキル同期)
+独立モジュール (`modules/skillshare.sh`)。AI CLI モジュール群より後に走り、
+対象 CLI が一つも検出されない場合は自動的にスキップする。
+1. AI CLI の検出（`~/.claude` / `~/.gemini` / `~/.codex` / `~/.config/opencode` のいずれか）
+2. skillshare CLI を `~/.local/bin/skillshare` に配置（リリースタグ pin。`SKILLSHARE_INSTALLER_SHA256` で opt-in SHA256 検証可）
+3. `~/.config/skillshare/config.yaml` を `dotfiles/.config/skillshare/config.yaml.template` から生成
+4. `~/.config/skillshare/{skills,agents}` を `dotfiles/.claude/{skills,agents}/` への symlink にする（真実のソース）
+5. ターゲット登録（実存検出ベース。`~/.gemini` / `~/.codex` / `~/.config/opencode` 各設定ディレクトリが実在するものだけ追加。Claude は真実のソースのため除外）
+6. `skillshare sync --all --force` で各 AI CLI 配下に symlink を配信
+7. **Codex agents (TOML)**: `~/.codex` がある場合のみ `scripts/sync-codex-agents.py` で .md → .toml に自動変換配信
 
 #### Node.js 開発環境
 1. [fnm](https://github.com/Schniz/fnm) (Fast Node Manager) のインストール（macOS: Homebrew / Linux: GitHub Releases）
@@ -461,8 +462,10 @@ dev-templates/
 │   │   ├── colors.sh                 # カラー出力ヘルパー
 │   │   ├── array.sh                  # 配列操作ユーティリティ
 │   │   ├── backup.sh                 # ファイルバックアップ・リストア
+│   │   ├── install_tree.sh           # ディレクトリ単位の再帰配置
+│   │   ├── skillshare.sh             # skillshare CLI セットアップヘルパー群
 │   │   └── tui.sh                    # TUI (チェックボックス UI 等)
-│   ├── modules/                      # モジュール定義 (14 モジュール)
+│   ├── modules/                      # モジュール定義 (15 モジュール)
 │   │   ├── zsh.sh                    # Zsh 設定一式
 │   │   ├── git.sh                    # Git グローバル設定
 │   │   ├── 1password.sh              # 1Password CLI + SSH + Git 署名
@@ -477,6 +480,7 @@ dev-templates/
 │   │   ├── gh.sh                     # GitHub CLI
 │   │   ├── copilot-cli.sh            # GitHub Copilot CLI
 │   │   ├── opencode.sh               # SST opencode (バイナリ DL)
+│   │   ├── skillshare.sh             # AI CLI 間スキル/エージェント同期
 │   │   └── pi.sh                     # earendil-works/pi (バイナリ DL)
 │   ├── tests/                        # BATS ユニットテスト
 │   │   ├── helpers/setup_functions.bash

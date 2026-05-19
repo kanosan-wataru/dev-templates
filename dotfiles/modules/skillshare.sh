@@ -1,0 +1,115 @@
+# ---------------------------------------------
+# モジュール: Skillshare
+# AI CLI 間のスキル/エージェント同期 (Claude/Codex/Gemini/OpenCode)
+#
+# このモジュールは独立して動作するが、対象となる AI CLI が一つもインストール
+# されていない場合は自動的にスキップする (検出ベース)。
+# ---------------------------------------------
+
+# --- メタデータ ---
+MODULE_ID="skillshare"
+MODULE_NAME="Skillshare"
+MODULE_DESC="AI CLI 間スキル/エージェント同期 (Claude/Codex/Gemini/OpenCode)"
+MODULE_DEFAULT=1
+# AI CLI モジュール (claude-code=20, gemini-cli=30, codex-cli=31, copilot-cli=32,
+# opencode=33) より後に走らせる必要があるため 40 を割り当てる。
+MODULE_ORDER=40
+MODULE_DEPS=""
+
+# --- 設定値 (env で override 可能) ---
+# NOTE: ソースは dotfiles/.claude/skills/agents をそのまま symlink で利用する (真実のソース)
+SKILLSHARE_MOD_CONFIG_DIR="${HOME}/.config/skillshare"
+SKILLSHARE_MOD_CONFIG_TEMPLATE="${SCRIPT_DIR}/.config/skillshare/config.yaml.template"
+SKILLSHARE_MOD_SKILLS_SRC="${SCRIPT_DIR}/.claude/skills"
+SKILLSHARE_MOD_AGENTS_SRC="${SCRIPT_DIR}/.claude/agents"
+SKILLSHARE_MOD_CODEX_CONVERTER="${SCRIPT_DIR}/scripts/sync-codex-agents.py"
+
+# --- ヘルパー: AI CLI が一つでも検出できるかを判定する ---
+# claude/gemini/codex/opencode のいずれかの設定ディレクトリがあれば 0、なければ 1。
+_skillshare_mod_any_ai_cli_present() {
+    [[ -d "${HOME}/.claude" ]] && return 0
+    [[ -d "${HOME}/.gemini" ]] && return 0
+    [[ -d "${HOME}/.codex" ]] && return 0
+    [[ -d "${HOME}/.config/opencode" ]] && return 0
+    return 1
+}
+
+# --- セットアップ ---
+setup_skillshare() {
+    msg_header "Skillshare (AI CLI スキル同期)"
+    print_separator
+
+    # AI CLI が一つも検出されなければスキップ (検出ベース)
+    if ! _skillshare_mod_any_ai_cli_present; then
+        msg_info "対象となる AI CLI (claude/gemini/codex/opencode) が見つかりません。"
+        msg_step "AI CLI モジュールを先にインストールしてください。skillshare セットアップをスキップします。"
+        return 0
+    fi
+
+    local config_dir="$SKILLSHARE_MOD_CONFIG_DIR"
+    local config_template="$SKILLSHARE_MOD_CONFIG_TEMPLATE"
+    local skills_src="$SKILLSHARE_MOD_SKILLS_SRC"
+    local agents_src="$SKILLSHARE_MOD_AGENTS_SRC"
+
+    if [[ ! -d "$skills_src" ]]; then
+        msg_warn "スキルソースが見つかりません: ${skills_src}"
+        msg_step "dotfiles/.claude/skills/ にスキルを配置してください。skillshare のセットアップをスキップします。"
+        return 0
+    fi
+    if [[ ! -f "$config_template" ]]; then
+        msg_warn "config.yaml テンプレートが見つかりません: ${config_template}"
+        return 0
+    fi
+
+    # skillshare CLI のインストール (lib/skillshare.sh)
+    skillshare_install_cli || {
+        msg_warn "skillshare CLI のインストールに失敗しました。スキル同期セットアップをスキップします。"
+        return 0
+    }
+    if ! command -v skillshare >/dev/null 2>&1; then
+        msg_warn "skillshare コマンドが利用できません。設定をスキップします。"
+        return 0
+    fi
+
+    run_cmd mkdir -p "$config_dir" || return 1
+
+    skillshare_render_config "${config_dir}/config.yaml" "$config_template" "$skills_src" "$agents_src" || return 1
+
+    skillshare_link_source "$skills_src" "${config_dir}/skills" "skills" || return 1
+    if [[ -d "$agents_src" ]]; then
+        skillshare_link_source "$agents_src" "${config_dir}/agents" "agents" || return 1
+    else
+        msg_info "agents ソース ${agents_src} が見つかりません。agents の symlink をスキップします。"
+    fi
+
+    skillshare_register_targets
+    skillshare_run_sync
+    skillshare_convert_codex_agents "$agents_src" "$SKILLSHARE_MOD_CODEX_CONVERTER" "${HOME}/.codex/agents"
+
+    msg_success "Skillshare セットアップが完了しました。"
+}
+
+# --- ステータス表示 ---
+module_status() {
+    if command -v skillshare &>/dev/null; then
+        local version
+        version=$(skillshare --version 2>/dev/null | head -1 | awk '{print $NF}')
+        printf '  %-14s %s%-18s%s %s\n' "$MODULE_ID" "${C_GREEN}" "✓ installed" "${C_RESET}" "skillshare ${version}"
+    else
+        printf '  %-14s %s%-18s%s %s\n' "$MODULE_ID" "${C_RED}" "✗ not found" "${C_RESET}" "-"
+    fi
+}
+
+# --- アンインストール ---
+# NOTE: 各 AI CLI 側に同期されたスキル/エージェントは個別管理が必要なため、
+#       自動削除はせず手順の表示のみとする (skillshare target remove で先に解除すべき)。
+uninstall_skillshare() {
+    printf '%s\n' "Skillshare のアンインストール手順:"
+    msg_step "skillshare target list  # 登録済み target を確認"
+    msg_step "skillshare target remove <name>  # 各 target を順に解除"
+    msg_step "rm -f ${HOME}/.local/bin/skillshare"
+    msg_step "rm -rf ${SKILLSHARE_MOD_CONFIG_DIR}"
+    printf '\n'
+    printf '%s\n' "NOTE: 各 AI CLI 側に同期済みのスキル/エージェントは、target remove で"
+    printf '%s\n' "      symlink 解除した後、必要に応じて手動で確認・削除してください。"
+}

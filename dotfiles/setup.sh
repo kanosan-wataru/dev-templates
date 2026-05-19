@@ -34,6 +34,8 @@ source "${SCRIPT_DIR}/lib/backup.sh"
 source "${SCRIPT_DIR}/lib/tui.sh"
 # shellcheck source=./lib/install_tree.sh
 source "${SCRIPT_DIR}/lib/install_tree.sh"
+# shellcheck source=./lib/skillshare.sh
+source "${SCRIPT_DIR}/lib/skillshare.sh"
 _setup_colors
 
 # ==============================================
