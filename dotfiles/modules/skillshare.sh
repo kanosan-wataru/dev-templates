@@ -20,7 +20,10 @@ MODULE_ORDER=40
 MODULE_DEPS=""
 
 # --- 設定値 (env で override 可能) ---
-# NOTE: ソースは dotfiles/.claude/skills/agents をそのまま symlink で利用する (真実のソース)
+# NOTE: skillshare CLI は config.yaml の source: / agents_source: フィールドのみを
+#       真実のソースとして参照する。setup.sh は config.yaml にこれら絶対パスを書き込む。
+#       過去存在した ~/.config/skillshare/{skills,agents} 補助 symlink は廃止 (Docker
+#       ビルドで一時パスを指して dangling になるため、lib 側で清掃のみ行う)。
 SKILLSHARE_MOD_CONFIG_DIR="${HOME}/.config/skillshare"
 SKILLSHARE_MOD_CONFIG_TEMPLATE="${SCRIPT_DIR}/.config/skillshare/config.yaml.template"
 SKILLSHARE_MOD_SKILLS_SRC="${SCRIPT_DIR}/.claude/skills"
@@ -78,16 +81,20 @@ setup_skillshare() {
 
     skillshare_render_config "${config_dir}/config.yaml" "$config_template" "$skills_src" "$agents_src" || return 1
 
-    skillshare_link_source "$skills_src" "${config_dir}/skills" "skills" || return 1
-    if [[ -d "$agents_src" ]]; then
-        skillshare_link_source "$agents_src" "${config_dir}/agents" "agents" || return 1
-    else
-        msg_info "agents ソース ${agents_src} が見つかりません。agents の symlink をスキップします。"
-    fi
+    # 旧バージョンが残した補助 symlink を清掃 (現バージョンでは使わない)
+    skillshare_cleanup_legacy_links
 
     skillshare_register_targets
     skillshare_run_sync
     skillshare_convert_codex_agents "$agents_src" "$SKILLSHARE_MOD_CODEX_CONVERTER" "${HOME}/.codex/agents"
+
+    # Docker ビルド時に source が一時パス (/tmp/dotfiles) のままだと、
+    # ビルド完了後に削除されて config.yaml が壊れる。env で恒久パスが指定
+    # されていれば config.yaml をその値に書き換える (ローカル運用では no-op)。
+    skillshare_remap_runtime_paths \
+        "${config_dir}/config.yaml" \
+        "${SKILLSHARE_RUNTIME_SKILLS_SRC:-}" \
+        "${SKILLSHARE_RUNTIME_AGENTS_SRC:-}"
 
     msg_success "Skillshare セットアップが完了しました。"
 }

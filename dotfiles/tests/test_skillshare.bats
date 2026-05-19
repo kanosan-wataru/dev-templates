@@ -98,9 +98,35 @@ SETUP_FILE="$DOTFILES_DIR/setup.sh"
     [ "$status" -eq 0 ]
 }
 
-@test "lib/skillshare.sh: defines skillshare_link_source" {
-    run grep -q '^skillshare_link_source()' "$LIB_FILE"
+@test "lib/skillshare.sh: defines skillshare_cleanup_legacy_links (replaces removed skillshare_link_source)" {
+    run grep -q '^skillshare_cleanup_legacy_links()' "$LIB_FILE"
     [ "$status" -eq 0 ]
+}
+
+@test "lib/skillshare.sh: defines skillshare_remap_runtime_paths (Docker dangling path fix)" {
+    run grep -q '^skillshare_remap_runtime_paths()' "$LIB_FILE"
+    [ "$status" -eq 0 ]
+}
+
+@test "modules/skillshare.sh: calls skillshare_remap_runtime_paths after sync" {
+    run grep -q 'skillshare_remap_runtime_paths' "$MODULE_FILE"
+    [ "$status" -eq 0 ]
+}
+
+@test "Dockerfile: sets SKILLSHARE_RUNTIME_SKILLS_SRC env (Docker dangling path fix)" {
+    run grep -q 'SKILLSHARE_RUNTIME_SKILLS_SRC' "$DOTFILES_DIR/../Dockerfile"
+    [ "$status" -eq 0 ]
+}
+
+@test "lib/skillshare.sh: skillshare_link_source was removed (auxiliary symlinks no longer created)" {
+    # 旧関数の定義が残っていないことを保証 (Docker dangling 防止のため廃止した)
+    run grep -q '^skillshare_link_source()' "$LIB_FILE"
+    [ "$status" -ne 0 ]
+}
+
+@test "modules/skillshare.sh: no longer calls skillshare_link_source" {
+    run grep -q 'skillshare_link_source' "$MODULE_FILE"
+    [ "$status" -ne 0 ]
 }
 
 @test "lib/skillshare.sh: defines skillshare_register_targets" {
@@ -265,4 +291,111 @@ setup_sha256_test() {
     printf 'hello' >"$file"
     run skillshare_verify_sha256 "$file" "0000000000000000000000000000000000000000000000000000000000000000"
     [ "$status" -ne 0 ]
+}
+
+# ============================================================
+# Behavior: skillshare_remap_runtime_paths
+# config.yaml の source / agents_source をランタイムパスに書き換える挙動
+# ============================================================
+
+setup_remap_test() {
+    msg_error()   { :; }
+    msg_dry_run() { :; }
+    msg_info()    { :; }
+    SCRIPT_DIR="$DOTFILES_DIR"
+    DRY_RUN=0
+    # shellcheck disable=SC1090
+    source "$LIB_FILE"
+}
+
+@test "skillshare_remap_runtime_paths: rewrites source: and agents_source: lines" {
+    setup_remap_test
+    local cfg="$BATS_TEST_TMPDIR/config.yaml"
+    cat >"$cfg" <<'EOF'
+source: /tmp/dotfiles/.claude/skills
+agents_source: /tmp/dotfiles/.claude/agents
+extras_source: /home/dev/.config/skillshare/extras
+mode: merge
+EOF
+    run skillshare_remap_runtime_paths "$cfg" "/workspaces/p/skills" "/workspaces/p/agents"
+    [ "$status" -eq 0 ]
+    grep -q '^source: /workspaces/p/skills$' "$cfg"
+    grep -q '^agents_source: /workspaces/p/agents$' "$cfg"
+    # 他の行は変更されないこと
+    grep -q '^extras_source: /home/dev/.config/skillshare/extras$' "$cfg"
+    grep -q '^mode: merge$' "$cfg"
+}
+
+@test "skillshare_remap_runtime_paths: no-op when both runtime paths are empty" {
+    setup_remap_test
+    local cfg="$BATS_TEST_TMPDIR/config.yaml"
+    printf 'source: /tmp/x\nagents_source: /tmp/y\n' >"$cfg"
+    local before
+    before=$(cat "$cfg")
+    run skillshare_remap_runtime_paths "$cfg" "" ""
+    [ "$status" -eq 0 ]
+    [ "$(cat "$cfg")" = "$before" ]
+}
+
+@test "skillshare_remap_runtime_paths: preserves original file permissions (no 0600 regression)" {
+    setup_remap_test
+    local cfg="$BATS_TEST_TMPDIR/config.yaml"
+    printf 'source: /old\nagents_source: /old\n' >"$cfg"
+    chmod 644 "$cfg"
+    run skillshare_remap_runtime_paths "$cfg" "/new/skills" "/new/agents"
+    [ "$status" -eq 0 ]
+    local mode
+    mode=$(stat -c '%a' "$cfg" 2>/dev/null || stat -f '%Lp' "$cfg")
+    [ "$mode" = "644" ]
+}
+
+# ============================================================
+# Behavior: skillshare_cleanup_legacy_links
+# 旧バージョンが残した補助 symlink を削除する挙動の検証
+# ============================================================
+
+setup_cleanup_test() {
+    msg_info()    { :; }
+    msg_dry_run() { :; }
+    SCRIPT_DIR="$DOTFILES_DIR"
+    DRY_RUN=0
+    HOME="$BATS_TEST_TMPDIR/home"
+    mkdir -p "$HOME/.config/skillshare"
+    # shellcheck disable=SC1090
+    source "$LIB_FILE"
+}
+
+@test "skillshare_cleanup_legacy_links: removes dangling symlink" {
+    setup_cleanup_test
+    ln -s /nonexistent/path "$HOME/.config/skillshare/skills"
+    [ -L "$HOME/.config/skillshare/skills" ]
+    run skillshare_cleanup_legacy_links
+    [ "$status" -eq 0 ]
+    [ ! -L "$HOME/.config/skillshare/skills" ]
+}
+
+@test "skillshare_cleanup_legacy_links: protects real directory (does not delete)" {
+    setup_cleanup_test
+    mkdir -p "$HOME/.config/skillshare/skills"
+    run skillshare_cleanup_legacy_links
+    [ "$status" -eq 0 ]
+    # 実ディレクトリは保護される (symlink でないので削除されない)
+    [ -d "$HOME/.config/skillshare/skills" ]
+}
+
+@test "skillshare_cleanup_legacy_links: no-op when no aux paths exist" {
+    setup_cleanup_test
+    run skillshare_cleanup_legacy_links
+    [ "$status" -eq 0 ]
+}
+
+@test "skillshare_remap_runtime_paths: only rewrites the side that is provided" {
+    setup_remap_test
+    local cfg="$BATS_TEST_TMPDIR/config.yaml"
+    printf 'source: /old/skills\nagents_source: /old/agents\n' >"$cfg"
+    run skillshare_remap_runtime_paths "$cfg" "/new/skills" ""
+    [ "$status" -eq 0 ]
+    grep -q '^source: /new/skills$' "$cfg"
+    # agents_source は変更されないこと
+    grep -q '^agents_source: /old/agents$' "$cfg"
 }

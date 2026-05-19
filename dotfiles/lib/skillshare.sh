@@ -133,28 +133,67 @@ skillshare_render_config() {
     }
 }
 
-# --- ヘルパー: skillshare の source 配下に symlink を作成 ---
-# 引数: $1=ソース(実体ディレクトリ) $2=symlinkを置くパス $3=ラベル(skills/agents)
-# 既存 symlink が同じターゲットを指していればスキップ、別ターゲットなら更新、
-# 実ディレクトリが存在する場合は警告のみ (破壊しない)。
-skillshare_link_source() {
-    local src="$1" link="$2" label="$3"
+# --- ヘルパー: config.yaml の source: / agents_source: をランタイムパスに書き換える ---
+# Docker ビルド時に `SCRIPT_DIR=/tmp/dotfiles` で sync を完了させた後、
+# `/tmp/dotfiles` がビルドステップ終了で削除されると config.yaml の source パスが
+# 解決不能になる。ホストの bind-mount 先 (`/workspaces/<project>/...`) を
+# 環境変数 SKILLSHARE_RUNTIME_SKILLS_SRC / SKILLSHARE_RUNTIME_AGENTS_SRC で渡せれば、
+# ビルド完了後に config.yaml をその恒久パスへ書き換える。
+# 両変数とも空ならスキップ (ローカル運用は SCRIPT_DIR が永続パスなので不要)。
+skillshare_remap_runtime_paths() {
+    local config_path="$1" runtime_skills="${2:-}" runtime_agents="${3:-}"
+    [[ -f "$config_path" ]] || return 0
+    [[ -z "$runtime_skills" && -z "$runtime_agents" ]] && return 0
 
-    if [[ -L "$link" ]]; then
-        local current
-        current=$(readlink "$link")
-        if [[ "$current" == "$src" ]]; then
-            msg_info "${link} -> ${src} は既に正しく設定されています (${label})。"
-        else
-            run_cmd ln -sfn "$src" "$link" || return 1
-        fi
-    elif [[ -d "$link" ]]; then
-        msg_warn "${link} が既存ディレクトリです。${label} の symlink 化は手動で行ってください。"
-        msg_step "  mv ${link} ${link}.bak && ln -sfn ${src} ${link}"
-    else
-        run_cmd ln -sfn "$src" "$link" || return 1
-        msg_success "skillshare ${label} ソースを ${src} へ symlink しました。"
+    if ((DRY_RUN)); then
+        [[ -n "$runtime_skills" ]] && msg_dry_run "config.yaml の source: を ${runtime_skills} に書き換え"
+        [[ -n "$runtime_agents" ]] && msg_dry_run "config.yaml の agents_source: を ${runtime_agents} に書き換え"
+        return 0
     fi
+
+    # awk は OS 非依存で安全。BSD sed と GNU sed の -i 差分を回避する。
+    # NOTE: awk の -v VAR=VALUE は値内の C エスケープ (\n 等) を解釈してしまうため、
+    #       環境変数経由で渡して ENVIRON[] でリテラル参照する。
+    local tmp
+    tmp=$(mktemp "${config_path}.XXXXXX") || {
+        msg_error "config.yaml 書き換え用の一時ファイル作成に失敗しました。"
+        return 1
+    }
+    if ! NEW_SKILLS="$runtime_skills" NEW_AGENTS="$runtime_agents" awk '
+        /^source: / && ENVIRON["NEW_SKILLS"] != ""        { print "source: " ENVIRON["NEW_SKILLS"]; next }
+        /^agents_source: / && ENVIRON["NEW_AGENTS"] != "" { print "agents_source: " ENVIRON["NEW_AGENTS"]; next }
+        { print }
+    ' "$config_path" >"$tmp"; then
+        rm -f "$tmp"
+        msg_error "config.yaml のランタイムパス書き換えに失敗しました。"
+        return 1
+    fi
+    # mktemp は 0600 で作るため、元の config.yaml のパーミッションを継承させる。
+    # GNU/BSD chmod 両対応のため --reference を試し、失敗時は 644 にフォールバック。
+    chmod --reference="$config_path" "$tmp" 2>/dev/null || chmod 644 "$tmp"
+    if ! mv "$tmp" "$config_path"; then
+        rm -f "$tmp"
+        msg_error "config.yaml の置換 (mv) に失敗しました。"
+        return 1
+    fi
+    msg_info "config.yaml の source パスをランタイム値に更新しました。"
+}
+
+# --- ヘルパー: 過去に作成された ~/.config/skillshare/{skills,agents} の補助 symlink を掃除 ---
+# 旧バージョンの dev-templates は設定ディレクトリ配下に補助 symlink を貼っていたが、
+# skillshare CLI は config.yaml の source: / agents_source: のみを真実のソースとして
+# 使うため冗長だった (検証済み)。さらに Docker ビルドで一時ディレクトリを指して
+# dangling になる事故が起きたため恒久的に廃止し、過去の symlink は清掃する。
+skillshare_cleanup_legacy_links() {
+    local link
+    for link in "${HOME}/.config/skillshare/skills" "${HOME}/.config/skillshare/agents"; do
+        [[ -L "$link" ]] || continue
+        if ((DRY_RUN)); then
+            msg_dry_run "rm ${link}  # legacy aux symlink"
+        else
+            rm -f "$link" && msg_info "旧補助 symlink ${link} を削除しました。"
+        fi
+    done
 }
 
 # --- ヘルパー: skillshare ターゲットを登録 ---

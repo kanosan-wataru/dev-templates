@@ -167,10 +167,10 @@ bash dotfiles/setup.sh --uninstall
 対象 CLI が一つも検出されない場合は自動的にスキップする。
 1. AI CLI の検出（`~/.claude` / `~/.gemini` / `~/.codex` / `~/.config/opencode` のいずれか）
 2. skillshare CLI を `~/.local/bin/skillshare` に配置（リリースタグ pin。`SKILLSHARE_INSTALLER_SHA256` で opt-in SHA256 検証可）
-3. `~/.config/skillshare/config.yaml` を `dotfiles/.config/skillshare/config.yaml.template` から生成
-4. `~/.config/skillshare/{skills,agents}` を `dotfiles/.claude/{skills,agents}/` への symlink にする（真実のソース）
+3. `~/.config/skillshare/config.yaml` を `dotfiles/.config/skillshare/config.yaml.template` から生成（`source:` / `agents_source:` に `dotfiles/.claude/{skills,agents}` の絶対パスを埋め込み、これが真実のソース）
+4. 旧バージョンが残した補助 symlink (`~/.config/skillshare/{skills,agents}`) があれば清掃（skillshare CLI は config.yaml の `source:` のみを参照するため不要）
 5. ターゲット登録（実存検出ベース。`~/.gemini` / `~/.codex` / `~/.config/opencode` 各設定ディレクトリが実在するものだけ追加。Claude は真実のソースのため除外）
-6. `skillshare sync --all --force` で各 AI CLI 配下に symlink を配信
+6. `skillshare sync --all --force` で各 AI CLI 配下に skill を配信
 7. **Codex agents (TOML)**: `~/.codex` がある場合のみ `scripts/sync-codex-agents.py` で .md → .toml に自動変換配信
 
 #### Node.js 開発環境

@@ -79,8 +79,16 @@ WORKDIR /home/$USERNAME
 ARG SETUP_MODULES="zsh git modern-cli node python claude-code codex-cli gemini-cli gh copilot-cli"
 ARG FNM_VERSION=""
 ARG NODE_VERSION=""
+# skillshare の config.yaml はビルド時 SCRIPT_DIR (/tmp/dotfiles) を source として
+# 書き込むが、setup.sh 末尾でこれを bind-mount path に書き換えてランタイムでの
+# dangling を防ぐ。compose 側で docker-compose.yml が /workspaces/dev-templates を
+# bind-mount する前提のデフォルト値を持つ (個別運用では build-arg で上書き可)。
+ARG SKILLSHARE_RUNTIME_SKILLS_SRC="/workspaces/dev-templates/dotfiles/.claude/skills"
+ARG SKILLSHARE_RUNTIME_AGENTS_SRC="/workspaces/dev-templates/dotfiles/.claude/agents"
 ENV FNM_VERSION=${FNM_VERSION} \
-    NODE_VERSION=${NODE_VERSION}
+    NODE_VERSION=${NODE_VERSION} \
+    SKILLSHARE_RUNTIME_SKILLS_SRC=${SKILLSHARE_RUNTIME_SKILLS_SRC} \
+    SKILLSHARE_RUNTIME_AGENTS_SRC=${SKILLSHARE_RUNTIME_AGENTS_SRC}
 COPY --chown=$USERNAME:$USERNAME dotfiles/ /tmp/dotfiles/
 # SETUP_MODULES の検証:
 # - 空文字 → 非 TTY フォールバックで --all 相当となり除外モジュールも入るため弾く
