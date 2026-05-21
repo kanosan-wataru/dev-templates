@@ -74,8 +74,8 @@ SETUP_FILE="$DOTFILES_DIR/setup.sh"
     [ "$status" -eq 0 ]
 }
 
-@test "skillshare: defines _skillshare_mod_any_ai_cli_present detector" {
-    run grep -q '^_skillshare_mod_any_ai_cli_present()' "$MODULE_FILE"
+@test "skillshare: defines _skillshare_mod_claude_present detector" {
+    run grep -q '^_skillshare_mod_claude_present()' "$MODULE_FILE"
     [ "$status" -eq 0 ]
 }
 
@@ -211,12 +211,12 @@ SETUP_FILE="$DOTFILES_DIR/setup.sh"
 }
 
 # ============================================================
-# Behavior: _skillshare_mod_any_ai_cli_present
-# AI CLI 検出ロジックの動作確認 (HOME を mock した上で実行)
+# Behavior: _skillshare_mod_claude_present
+# Claude 必須化 (~/.claude 存在チェック) の動作確認
 # ============================================================
 
 setup_detector() {
-    # 一時的な HOME を作って各 AI CLI の有無を制御する
+    # 一時的な HOME を作って Claude ディレクトリの有無を制御する
     export HOME="$BATS_TEST_TMPDIR/home"
     mkdir -p "$HOME"
     # MODULE_ORDER 等の load_modules 副作用を回避するため変数だけリセットして source
@@ -226,38 +226,38 @@ setup_detector() {
     source "$MODULE_FILE"
 }
 
-@test "_skillshare_mod_any_ai_cli_present: returns 1 when no AI CLI is present" {
+@test "_skillshare_mod_claude_present: returns 1 when ~/.claude is absent" {
     setup_detector
-    run _skillshare_mod_any_ai_cli_present
+    run _skillshare_mod_claude_present
     [ "$status" -eq 1 ]
 }
 
-@test "_skillshare_mod_any_ai_cli_present: returns 0 when ~/.claude exists" {
+@test "_skillshare_mod_claude_present: returns 0 when ~/.claude exists" {
     setup_detector
     mkdir -p "$HOME/.claude"
-    run _skillshare_mod_any_ai_cli_present
+    run _skillshare_mod_claude_present
     [ "$status" -eq 0 ]
 }
 
-@test "_skillshare_mod_any_ai_cli_present: returns 0 when ~/.codex exists (codex-only user)" {
+@test "_skillshare_mod_claude_present: returns 1 when only ~/.codex exists (Claude is required)" {
     setup_detector
     mkdir -p "$HOME/.codex"
-    run _skillshare_mod_any_ai_cli_present
-    [ "$status" -eq 0 ]
+    run _skillshare_mod_claude_present
+    [ "$status" -eq 1 ]
 }
 
-@test "_skillshare_mod_any_ai_cli_present: returns 0 when ~/.gemini exists" {
+@test "_skillshare_mod_claude_present: returns 1 when only ~/.gemini exists (Claude is required)" {
     setup_detector
     mkdir -p "$HOME/.gemini"
-    run _skillshare_mod_any_ai_cli_present
-    [ "$status" -eq 0 ]
+    run _skillshare_mod_claude_present
+    [ "$status" -eq 1 ]
 }
 
-@test "_skillshare_mod_any_ai_cli_present: returns 0 when ~/.config/opencode exists" {
+@test "_skillshare_mod_claude_present: returns 1 when only ~/.config/opencode exists (Claude is required)" {
     setup_detector
     mkdir -p "$HOME/.config/opencode"
-    run _skillshare_mod_any_ai_cli_present
-    [ "$status" -eq 0 ]
+    run _skillshare_mod_claude_present
+    [ "$status" -eq 1 ]
 }
 
 # ============================================================

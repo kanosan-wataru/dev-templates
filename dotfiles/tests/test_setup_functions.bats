@@ -1,7 +1,8 @@
 #!/usr/bin/env bats
 
-# Tests for ensure_node() and resolve_module_deps() from setup.sh
-# These functions are extracted inline to avoid setup.sh side effects.
+# Tests for ensure_node() and resolve_module_deps()
+# 本番実装は lib/setup_helpers.sh に分離されているのでそれを直接 source
+# (以前は verbatim copy を保持していたが silent drift の原因になっていた)。
 
 setup() {
     PROJECT_ROOT="$(cd "$BATS_TEST_DIRNAME/.." && pwd)"
@@ -11,110 +12,9 @@ setup() {
     source "$PROJECT_ROOT/lib/array.sh"
     _setup_colors
 
-    _define_ensure_node
-    _define_resolve_module_deps
-}
-
-# Extract ensure_node from setup.sh without triggering side effects.
-# NOTE: This is a verbatim copy of setup.sh ensure_node (lines ~263-298).
-# If the production ensure_node changes, review and update this test version.
-_define_ensure_node() {
-    ensure_node() {
-        local min_version="${1:-18}"
-
-        if ! command -v node >/dev/null 2>&1; then
-            msg_error "Node.js がインストールされていません。"
-            printf '  nvm, fnm, volta 等で Node.js v%s 以上をインストールしてください。\n' "$min_version" >&2
-            printf '  例: curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.1/install.sh | bash\n' >&2
-            return 1
-        fi
-
-        local node_ver
-        node_ver=$(node -v | sed 's/^v//' | cut -d. -f1)
-
-        # Validate numeric values
-        if [[ ! "$min_version" =~ ^[0-9]+$ ]]; then
-            msg_error "ensure_node に不正な引数が渡されました: ${min_version}"
-            return 1
-        fi
-        if [[ ! "$node_ver" =~ ^[0-9]+$ ]]; then
-            msg_error "Node.js のバージョンを取得できませんでした。"
-            return 1
-        fi
-
-        if ((node_ver < min_version)); then
-            msg_error "Node.js v${min_version} 以上が必要です（現在: v${node_ver}）"
-            printf '  Node.js をアップグレードしてください。\n' >&2
-            return 1
-        fi
-
-        if ! command -v npm >/dev/null 2>&1; then
-            msg_error "npm がインストールされていません。"
-            printf '  Node.js に付属の npm が利用可能か確認してください。\n' >&2
-            return 1
-        fi
-
-        return 0
-    }
-}
-
-# Extract resolve_module_deps from setup.sh without triggering side effects.
-# NOTE: This is a verbatim copy of setup.sh resolve_module_deps (lines ~512-563).
-# If the production resolve_module_deps changes, review and update this test version.
-_define_resolve_module_deps() {
-    resolve_module_deps() {
-        local -a added_deps=()
-        local changed=1
-
-        # Iterate until no more transitive dependencies are found
-        while ((changed)); do
-            changed=0
-            for mod_id in "${selected_module_ids[@]}"; do
-                local deps="${MODULE_DEPS_MAP[$mod_id]:-}"
-                [[ -z "$deps" ]] && continue
-
-                # MODULE_DEPS is a space-separated list
-                read -ra _deps <<<"$deps"
-                local dep
-                for dep in "${_deps[@]}"; do
-                    # Check if dep is already selected
-                    if ! array_contains "$dep" "${selected_module_ids[@]}"; then
-                        # O(1) existence check
-                        if [[ -n "${MODULE_ID_SET[$dep]:-}" ]]; then
-                            selected_module_ids+=("$dep")
-                            added_deps+=("$dep")
-                            changed=1
-                        else
-                            msg_warn "モジュール '${mod_id}' の依存先 '${dep}' が見つかりません。"
-                        fi
-                    fi
-                done
-            done
-        done
-
-        # Notify user of auto-added dependencies
-        if ((${#added_deps[@]} > 0)); then
-            printf '\n'
-            color_print "$C_CYAN" "依存関係の自動解決:"
-            for dep in "${added_deps[@]}"; do
-                printf '  + %s (依存先として自動追加)\n' "$dep"
-            done
-            printf '\n'
-        fi
-
-        # Re-sort by MODULE_ORDER so dependencies are installed first
-        if ((${#added_deps[@]} > 0)); then
-            local -a sorted_ids=()
-            local entry entry_id
-            for entry in "${MODULES[@]}"; do
-                entry_id="${entry%%|*}"
-                if array_contains "$entry_id" "${selected_module_ids[@]}"; then
-                    sorted_ids+=("$entry_id")
-                fi
-            done
-            selected_module_ids=("${sorted_ids[@]}")
-        fi
-    }
+    # 本番実装をそのまま読み込む (drift 防止)
+    # shellcheck source=../lib/setup_helpers.sh
+    source "$PROJECT_ROOT/lib/setup_helpers.sh"
 }
 
 # ============================================================
@@ -366,4 +266,21 @@ _setup_module_registry() {
     [ "${#selected_module_ids[@]}" -eq 2 ]
     [ "${selected_module_ids[0]}" = "node" ]
     [ "${selected_module_ids[1]}" = "copilot-cli" ]
+}
+
+@test "resolve_module_deps: max_iter guard fires when loop fails to converge" {
+    # array_contains を常に false にすると同じ dep が無限に追加され続け、
+    # max_iter ガードに到達して exit 1 する。
+    # 通常運用では trigger され得ないが、防御的上限の動作を確認するため
+    # 異常系をシミュレートする。
+    array_contains() { return 1; }
+
+    declare -A MODULE_DEPS_MAP=([modA]="modB")
+    declare -A MODULE_ID_SET=([modA]=1 [modB]=1)
+    _setup_module_registry "modA|A|desc|1" "modB|B|desc|1"
+    declare -a selected_module_ids=(modA)
+
+    run resolve_module_deps
+    [ "$status" -ne 0 ]
+    [[ "$output" == *"循環依存または異常なメタデータ"* ]]
 }

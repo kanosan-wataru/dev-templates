@@ -36,6 +36,8 @@ source "${SCRIPT_DIR}/lib/tui.sh"
 source "${SCRIPT_DIR}/lib/install_tree.sh"
 # shellcheck source=./lib/skillshare.sh
 source "${SCRIPT_DIR}/lib/skillshare.sh"
+# shellcheck source=./lib/setup_helpers.sh
+source "${SCRIPT_DIR}/lib/setup_helpers.sh"
 _setup_colors
 
 # ==============================================
@@ -104,6 +106,14 @@ fi
 
 if ((UNINSTALL)) && ((${#SELECT_MODULES[@]} > 0)); then
     msg_error "--uninstall はモジュール指定と併用できません（全モジュールが対象です）"
+    exit 1
+fi
+
+# --all は明示モジュール指定 (--select / 位置引数) と矛盾するため拒否
+# (以前は silently SELECT_MODULES 側が優先され、--all が無視されていた)
+if ((ALL_FLAG)) && ((${#SELECT_MODULES[@]} > 0)); then
+    msg_error "--all とモジュール指定 (--select / 位置引数) は同時に使えません"
+    printf '  どちらか一方を指定してください。\n' >&2
     exit 1
 fi
 
@@ -262,46 +272,9 @@ install_source_config() {
     msg_success "$(basename "$user_file") に source 行を追加しました。"
 }
 
-# Verify Node.js and npm availability
-# Args: $1=minimum major version (default: 18)
-# Returns: 0=available, 1=unavailable
-ensure_node() {
-    local min_version="${1:-18}"
-
-    if ! command -v node >/dev/null 2>&1; then
-        msg_error "Node.js がインストールされていません。"
-        printf '  nvm, fnm, volta 等で Node.js v%s 以上をインストールしてください。\n' "$min_version" >&2
-        printf '  例: curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.1/install.sh | bash\n' >&2
-        return 1
-    fi
-
-    local node_ver
-    node_ver=$(node -v | sed 's/^v//' | cut -d. -f1)
-
-    # Validate numeric values
-    if [[ ! "$min_version" =~ ^[0-9]+$ ]]; then
-        msg_error "ensure_node に不正な引数が渡されました: ${min_version}"
-        return 1
-    fi
-    if [[ ! "$node_ver" =~ ^[0-9]+$ ]]; then
-        msg_error "Node.js のバージョンを取得できませんでした。"
-        return 1
-    fi
-
-    if ((node_ver < min_version)); then
-        msg_error "Node.js v${min_version} 以上が必要です（現在: v${node_ver}）"
-        printf '  Node.js をアップグレードしてください。\n' >&2
-        return 1
-    fi
-
-    if ! command -v npm >/dev/null 2>&1; then
-        msg_error "npm がインストールされていません。"
-        printf '  Node.js に付属の npm が利用可能か確認してください。\n' >&2
-        return 1
-    fi
-
-    return 0
-}
+# NOTE: ensure_node() / resolve_module_deps() は lib/setup_helpers.sh に
+#       移管した (テスト側で verbatim copy を維持していたため drift リスクが
+#       あった。lib に切り出して setup.sh とテスト双方から source)。
 
 # ==============================================
 # Dynamic module loading
@@ -512,61 +485,7 @@ run_module_uninstall() {
     fi
 }
 
-# Resolve module dependencies and auto-add missing dependency modules
-# Modifies: selected_module_ids (adds missing dependencies)
-resolve_module_deps() {
-    local -a added_deps=()
-    local changed=1
-
-    # Iterate until no more transitive dependencies are found
-    while ((changed)); do
-        changed=0
-        for mod_id in "${selected_module_ids[@]}"; do
-            local deps="${MODULE_DEPS_MAP[$mod_id]:-}"
-            [[ -z "$deps" ]] && continue
-
-            # MODULE_DEPS is a space-separated list
-            read -ra _deps <<<"$deps"
-            local dep
-            for dep in "${_deps[@]}"; do
-                # Check if dep is already selected
-                if ! array_contains "$dep" "${selected_module_ids[@]}"; then
-                    # O(1) existence check
-                    if [[ -n "${MODULE_ID_SET[$dep]:-}" ]]; then
-                        selected_module_ids+=("$dep")
-                        added_deps+=("$dep")
-                        changed=1
-                    else
-                        msg_warn "モジュール '${mod_id}' の依存先 '${dep}' が見つかりません。"
-                    fi
-                fi
-            done
-        done
-    done
-
-    # Notify user of auto-added dependencies
-    if ((${#added_deps[@]} > 0)); then
-        printf '\n'
-        color_print "$C_CYAN" "依存関係の自動解決:"
-        for dep in "${added_deps[@]}"; do
-            printf '  + %s (依存先として自動追加)\n' "$dep"
-        done
-        printf '\n'
-    fi
-
-    # Re-sort by MODULE_ORDER so dependencies are installed first
-    if ((${#added_deps[@]} > 0)); then
-        local -a sorted_ids=()
-        local entry entry_id
-        for entry in "${MODULES[@]}"; do
-            entry_id="${entry%%|*}"
-            if array_contains "$entry_id" "${selected_module_ids[@]}"; then
-                sorted_ids+=("$entry_id")
-            fi
-        done
-        selected_module_ids=("${sorted_ids[@]}")
-    fi
-}
+# NOTE: resolve_module_deps() は lib/setup_helpers.sh に移管
 
 # ==============================================
 # Uninstall mode

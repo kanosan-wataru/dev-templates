@@ -2,8 +2,9 @@
 # モジュール: Skillshare
 # AI CLI 間のスキル/エージェント同期 (Claude/Codex/Gemini/OpenCode)
 #
-# このモジュールは独立して動作するが、対象となる AI CLI が一つもインストール
-# されていない場合は自動的にスキップする (検出ベース)。
+# Claude (~/.claude) は dotfiles/.claude/skills の真実のソースに対応する
+# 必須前提条件として扱う。インストールされていない場合はエラーを出して
+# skillshare セットアップ全体をスキップする。
 #
 # NOTE: UPGRADE フラグの扱いは lib/skillshare.sh の skillshare_install_cli() に
 #       委譲する (skillshare CLI 自体の再インストール判定をそこで行う)。
@@ -30,14 +31,11 @@ SKILLSHARE_MOD_SKILLS_SRC="${SCRIPT_DIR}/.claude/skills"
 SKILLSHARE_MOD_AGENTS_SRC="${SCRIPT_DIR}/.claude/agents"
 SKILLSHARE_MOD_CODEX_CONVERTER="${SCRIPT_DIR}/scripts/sync-codex-agents.py"
 
-# --- ヘルパー: AI CLI が一つでも検出できるかを判定する ---
-# claude/gemini/codex/opencode のいずれかの設定ディレクトリがあれば 0、なければ 1。
-_skillshare_mod_any_ai_cli_present() {
-    [[ -d "${HOME}/.claude" ]] && return 0
-    [[ -d "${HOME}/.gemini" ]] && return 0
-    [[ -d "${HOME}/.codex" ]] && return 0
-    [[ -d "${HOME}/.config/opencode" ]] && return 0
-    return 1
+# --- ヘルパー: Claude がインストールされているかを判定する ---
+# ~/.claude が存在すれば 0、なければ 1。Claude は dotfiles/.claude/skills の
+# 真実のソースに対応する必須前提条件として扱う。
+_skillshare_mod_claude_present() {
+    [[ -d "${HOME}/.claude" ]]
 }
 
 # --- セットアップ ---
@@ -45,10 +43,10 @@ setup_skillshare() {
     msg_header "Skillshare (AI CLI スキル同期)"
     print_separator
 
-    # AI CLI が一つも検出されなければスキップ (検出ベース)
-    if ! _skillshare_mod_any_ai_cli_present; then
-        msg_info "対象となる AI CLI (claude/gemini/codex/opencode) が見つかりません。"
-        msg_step "AI CLI モジュールを先にインストールしてください。skillshare セットアップをスキップします。"
+    # Claude が無ければエラー出力してスキップ (真実のソースの宛先が無いため)
+    if ! _skillshare_mod_claude_present; then
+        msg_error "Claude (~/.claude) が見つかりません。skillshare は Claude を前提とします。"
+        msg_step "claude-code モジュールを先にインストールしてください。skillshare セットアップをスキップします。"
         return 0
     fi
 

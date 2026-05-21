@@ -193,3 +193,41 @@ teardown() {
     [ "$(cat "${DST_DIR}/config")" = "old content" ]
     [[ "$output" == *"更新予定"* ]]
 }
+
+# ============================================================
+# --all と --select / 位置引数の排他チェック
+# 以前は silently SELECT 側が優先されていたが、明示エラーで弾く。
+# NOTE: setup.sh の mutex check は順序依存。--upgrade/--uninstall との組合せは
+#       別 mutex check が先に発動するためここでは対象外 (test_upgrade.bats で
+#       --upgrade x --uninstall を検証済み)。
+# ============================================================
+
+@test "all_with_select_errors_out" {
+    run bash "${DOTFILES_DIR}/setup.sh" --all --select zsh --dry-run
+    [ "$status" -ne 0 ]
+    [[ "$output" == *"--all とモジュール指定"* ]]
+}
+
+@test "all_with_positional_arg_errors_out" {
+    run bash "${DOTFILES_DIR}/setup.sh" --all zsh --dry-run
+    [ "$status" -ne 0 ]
+    [[ "$output" == *"--all とモジュール指定"* ]]
+}
+
+@test "all_with_multiple_selects_errors_out" {
+    # 複数 --select でも矛盾検知が効くこと
+    run bash "${DOTFILES_DIR}/setup.sh" --all --select zsh --select git --dry-run
+    [ "$status" -ne 0 ]
+    [[ "$output" == *"--all とモジュール指定"* ]]
+}
+
+@test "all_alone_runs_without_error" {
+    # 排他チェックが --all 単独を誤って弾かないこと
+    run bash "${DOTFILES_DIR}/setup.sh" --all --dry-run
+    [ "$status" -eq 0 ]
+}
+
+@test "select_alone_runs_without_error" {
+    run bash "${DOTFILES_DIR}/setup.sh" --select zsh --dry-run
+    [ "$status" -eq 0 ]
+}
