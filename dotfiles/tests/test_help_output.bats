@@ -50,3 +50,37 @@ SETUP_SH="$(cd "$(dirname "$BATS_TEST_FILENAME")/.." && pwd)/setup.sh"
     # 旧 example "bash setup.sh zsh claude-code" は "zsh git docker" に置換済み
     [[ "$output" == *"zsh git docker"* ]]
 }
+
+# ============================================================
+# tput 不在時の確認プロンプト (regression / source-level)
+# 動的呼出は </dev/tty を要するため、ここではコードパスの存在を確認する
+# ============================================================
+
+@test "tput-fallback: script defines [d] default / [a] all / [q] quit choices" {
+    grep -q '\[d\] デフォルト' "$SETUP_SH"
+    grep -q '\[a\] 全モジュール' "$SETUP_SH"
+    grep -q '\[q\] 中止' "$SETUP_SH"
+}
+
+@test "tput-fallback: prompt reads from /dev/tty (works under stdin pipe)" {
+    # tput 不在ブランチで stdin が pipe でも /dev/tty から読むこと
+    grep -q 'read -r answer </dev/tty' "$SETUP_SH"
+}
+
+@test "tput-fallback: empty input (just Enter) is treated as quit" {
+    # [qQ] | "" でマッチして exit 0 する設計を保証
+    grep -qE '\[qQ\][^[:alnum:]].*""' "$SETUP_SH"
+}
+
+@test "tput-fallback: invalid input loops back to prompt" {
+    # while true ... case ... *) re-prompt の構造を確認
+    grep -q 'd / a / q のいずれか' "$SETUP_SH"
+}
+
+@test "tput-fallback: prompt shows module counts for visibility" {
+    # MEDIUM 指摘: [a] は破壊的な選択なので、何個入るかは見せたい
+    grep -q '_fallback_default_count' "$SETUP_SH"
+    grep -q '_fallback_total_count' "$SETUP_SH"
+    grep -qF '[d] デフォルトのモジュールのみ (%d 個)' "$SETUP_SH"
+    grep -qF '[a] 全モジュール (%d 個、--all 相当)' "$SETUP_SH"
+}

@@ -576,13 +576,55 @@ elif [[ -t 0 ]]; then
     printf '\n'
 
     if ! command -v tput >/dev/null 2>&1; then
-        # tput unavailable: install only default-selected modules
-        msg_warn "tput が利用できないため、デフォルトのモジュールをインストールします。"
+        # tput unavailable: チェックボックスメニューは描画できないので、
+        # ユーザーに 3 択 (default / all / quit) で確認する。
+        # 以前は default 固定で進めていたが、ユーザーが選択肢を失う UX が悪かった。
+        msg_warn "tput が利用できないためチェックボックスメニューを表示できません。"
+
+        # 選択肢の規模を可視化するためにカウントを事前計算する
+        # NOTE: 変数名は _fallback_ 接頭辞でトップレベル汚染を最小化
+        _fallback_default_count=0
+        _fallback_total_count=0
         for entry in "${MODULES[@]}"; do
-            IFS='|' read -r mod_id _mod_name _mod_desc mod_default <<<"$entry"
-            if ((mod_default == 1)); then
-                selected_module_ids+=("$mod_id")
-            fi
+            IFS='|' read -r _mod_id _mod_name _mod_desc mod_default <<<"$entry"
+            ((_fallback_total_count++)) || true
+            ((mod_default == 1)) && { ((_fallback_default_count++)) || true; }
+        done
+
+        printf '\n  [d] デフォルトのモジュールのみ (%d 個)\n' "$_fallback_default_count"
+        printf '  [a] 全モジュール (%d 個、--all 相当)\n' "$_fallback_total_count"
+        printf '  [q] 中止\n\n'
+        # NOTE: 関数外なので local は使えないが declare で意図を明示
+        declare answer=""
+        while true; do
+            printf 'インストール方針を選択してください [d/a/q]: '
+            read -r answer </dev/tty
+            case "$answer" in
+            [dD])
+                for entry in "${MODULES[@]}"; do
+                    IFS='|' read -r mod_id _mod_name _mod_desc mod_default <<<"$entry"
+                    if ((mod_default == 1)); then
+                        selected_module_ids+=("$mod_id")
+                    fi
+                done
+                break
+                ;;
+            [aA])
+                for entry in "${MODULES[@]}"; do
+                    IFS='|' read -r mod_id _rest <<<"$entry"
+                    selected_module_ids+=("$mod_id")
+                done
+                break
+                ;;
+            [qQ] | "")
+                printf '\n'
+                msg_info "中止しました。"
+                exit 0
+                ;;
+            *)
+                printf 'd / a / q のいずれかを入力してください。\n'
+                ;;
+            esac
         done
     else
         # Build menu items for checkbox menu
