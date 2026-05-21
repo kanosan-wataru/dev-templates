@@ -416,18 +416,27 @@ if ((HELP_FLAG)); then
     printf '  --help, -h         このヘルプを表示\n'
     printf '\n'
     printf '位置引数:\n'
-    printf '  MODULE ...         インストールするモジュールを直接指定（--select の短縮形）\n'
+    printf '  MODULE ...         インストールするモジュール名を空白区切りで指定\n'
+    printf '                     (--select と等価。複数指定可)\n'
+    printf '                     例: zsh git docker\n'
     printf '\n'
-    printf 'モジュール:\n'
+    printf '注意:\n'
+    printf '  --all とモジュール指定 (--select / 位置引数) は同時に使用できません。\n'
+    printf '\n'
+    printf 'モジュール: (* = デフォルト ON / インタラクティブ選択で既定でチェック済み)\n'
+    # NOTE: mark / mod_* はトップレベルスコープに残るが、直後 exit 0 で
+    #       プロセス終了するため漏洩の実害なし (`local` は関数外で使えない)。
     for entry in "${MODULES[@]}"; do
-        IFS='|' read -r mod_id mod_name mod_desc _mod_default <<<"$entry"
-        printf '  %-14s %s (%s)\n' "$mod_id" "$mod_name" "$mod_desc"
+        IFS='|' read -r mod_id mod_name mod_desc mod_default <<<"$entry"
+        mark=" "
+        ((mod_default == 1)) && mark="*"
+        printf '  %s %-14s %s (%s)\n' "$mark" "$mod_id" "$mod_name" "$mod_desc"
     done
     printf '\n'
     printf '例:\n'
     printf '  bash %s                              インタラクティブ選択\n' "$0"
     printf '  bash %s --all                        全モジュール一括\n' "$0"
-    printf '  bash %s zsh claude-code                  位置引数で複数指定\n' "$0"
+    printf '  bash %s zsh git docker               位置引数で複数指定\n' "$0"
     printf '  bash %s --select zsh --select claude-code  --select で複数指定\n' "$0"
     printf '  bash %s --all --dry-run              全モジュールをプレビュー\n' "$0"
     exit 0
