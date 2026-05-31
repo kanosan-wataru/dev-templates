@@ -42,8 +42,9 @@ if [[ -n "${functions[zinit]}" ]]; then
     zinit ice ver"v1.2.0"
     zinit light Aloxaf/fzf-tab
 
-    # --- Turbo mode（遅延読み込み）---
-    # プロンプト表示後にバックグラウンドで読み込み、シェル起動を高速化
+    # --- Turbo mode（遅延読み込み）: fzf 系のみ ---
+    # プロンプト表示後にバックグラウンドで読み込み、シェル起動を高速化（即時に必要ない fzf 連携）
+    # NOTE: autosuggestions/syntax-highlighting は下部で同期ロードする（最初の行から有効化するため）
 
     # fzf キーバインディング (Ctrl-R: 履歴検索, Ctrl-T: ファイル検索, Alt-C: ディレクトリ移動)
     zinit ice wait lucid
@@ -52,11 +53,15 @@ if [[ -n "${functions[zinit]}" ]]; then
     zinit ice wait lucid
     zinit snippet "${FZF_RAW_URL}/completion.zsh"
 
-    # オートサジェスチョン (v0.7.1)
-    zinit ice wait lucid ver"v0.7.1"
+    # --- 同期読み込み（最初のプロンプトから有効化）---
+    # NOTE: autosuggestions/syntax-highlighting を turbo(wait) でロードすると、最初の
+    #       プロンプトでは ZLE フックが間に合わず効かない（Ctrl+C で再描画後に有効化される）。
+    #       最初の行から効くよう wait を外して同期ロードする。
+    # オートサジェスチョン (v0.7.1) — 同期ロード（lucid は turbo の完了通知抑制用のため付けない）
+    zinit ice ver"v0.7.1"
     zinit light zsh-users/zsh-autosuggestions
-    # シンタックスハイライト (プラグイン群の中で最後に読み込む) (0.8.0)
-    zinit ice wait lucid ver"0.8.0"
+    # シンタックスハイライト (プラグイン群の中で最後に読み込む) (0.8.0) — 同期ロード
+    zinit ice ver"0.8.0"
     zinit light zsh-users/zsh-syntax-highlighting
 else
     print -P "%F{160}Zinit が見つからない、または読み込みに失敗しました。セットアップスクリプトを確認してください。%f"

@@ -19,15 +19,17 @@ ZSH_MOD_ZINIT_VERSION="v3.14.0"
 
 # Source separation: deploy templates to subdirectories, add source line to user dotfiles
 # NOTE: Elements are "src|user_file|deploy_dir|deploy_name|label"
+# NOTE: .zshrc は完全な設定本体のため直接配置する（下記 _zsh_direct_files）。
+#       source 分離方式だとユーザーの既存 .zshrc と二重ロードになるため。
+#       .bashrc は OS デフォルト (.bashrc) を尊重するため source 分離方式のまま。
 ZSH_MOD_SOURCE_CONFIGS=(
-    "$SCRIPT_DIR/.zshrc|$ZSH_MOD_BASE_DIR/.zshrc|$ZSH_MOD_BASE_DIR/.zshrc.d|dev-templates.zsh|.zshrc"
     "$SCRIPT_DIR/.bashrc|$HOME/.bashrc|$HOME/.bashrc.d|dev-templates.bash|.bashrc"
 )
 
 # 管理対象ファイルのリスト（配布元パス, 配置先パス, 表示名, 未検出時メッセージ）
 # NOTE: 配列の各要素は "src|dst|label|hint" の形式
 ZSH_MOD_MANAGED_FILES=(
-    "$ZSH_MOD_BASE_DIR/.zshrc.d/dev-templates.zsh|$ZSH_MOD_BASE_DIR/.zshrc.d/dev-templates.zsh|.zshrc (template)|"
+    "$SCRIPT_DIR/.zshrc|$ZSH_MOD_BASE_DIR/.zshrc|.zshrc|"
     "$HOME/.bashrc.d/dev-templates.bash|$HOME/.bashrc.d/dev-templates.bash|.bashrc (template)|"
     "$SCRIPT_DIR/.zsh/.p10k.zsh|$ZSH_MOD_CONFIG_DIR/.p10k.zsh|.p10k.zsh|Powerlevel10k のデフォルト設定が使用されます。"
     "$SCRIPT_DIR/.zsh/plugins.zsh|$ZSH_MOD_CONFIG_DIR/plugins.zsh|plugins.zsh|プラグインは手動で設定してください。"
@@ -120,6 +122,48 @@ _zsh_set_default_shell() {
     fi
 }
 
+# --- ヘルパー: 旧 source 分離方式 (.zshrc) の名残をクリーンアップ ---
+# 以前は完全な .zshrc を .zshrc.d/dev-templates.zsh として配置し、.zshrc に source
+# 行を追記していた。.zshrc を直接配置する方式へ移行したため、孤立した旧ファイルを退避する。
+# NOTE: .zshrc 本体の source 行除去は install_config による上書き配置が担う。本関数は
+#       .zshrc が dev-templates.zsh をまだ source していないことを確認してから退避するため、
+#       直接配置がスキップされた場合は何もせず環境を壊さない。
+#       必ず .zshrc の直接配置 (install_config) より後に呼ぶこと。
+_zsh_cleanup_legacy_dev_templates() {
+    local zshrc="$ZSH_MOD_BASE_DIR/.zshrc"
+    local legacy="$ZSH_MOD_BASE_DIR/.zshrc.d/dev-templates.zsh"
+
+    # 孤立した旧ファイル（通常ファイル）が無ければ何もしない。
+    # シンボリックリンクは意図的な配置の可能性があるため触らない。
+    [[ -f "$legacy" && ! -L "$legacy" ]] || return 0
+
+    # .zshrc がまだ dev-templates.zsh を source している場合、.zshrc は旧テンプレートに
+    # 依存している（直接配置がスキップされた等）。退避すると .zshrc が壊れるため触らない。
+    # source / . (ドットコマンド) の両形式を検出する。パス区切り (/) を要求して
+    # my-dev-templates.zsh のような別名ファイルへの source を誤検出しないようにする。
+    if [[ -f "$zshrc" ]] && command grep -qE '^[[:space:]]*(source|\.)[[:space:]].*/dev-templates\.zsh' "$zshrc" 2>/dev/null; then
+        msg_warn ".zshrc がまだ dev-templates.zsh を source しています。直接配置の適用後に旧ファイルが整理されます。"
+        return 0
+    fi
+
+    # 孤立した旧 dev-templates.zsh を退避する（mv の成否を検知）。
+    # 退避先は uninstall_zsh の復元対象外のため、不要なら手動削除でよい。
+    # BACKUP_SUFFIX 未定義（スタンドアロン source 等）だと dest==legacy となり mv が
+    # "same file" で失敗するため、防御的にスキップする。
+    if [[ -z "${BACKUP_SUFFIX:-}" ]]; then
+        msg_warn "BACKUP_SUFFIX が未定義のため ${legacy} の退避をスキップします。"
+        return 0
+    fi
+    local dest="${legacy}${BACKUP_SUFFIX}"
+    if ((DRY_RUN)); then
+        msg_dry_run "孤立した ${legacy} を ${dest} へ退避予定です。"
+    elif command mv "$legacy" "$dest"; then
+        msg_info "孤立した旧 dev-templates.zsh を ${dest} へ退避しました（不要なら手動削除してください）。"
+    else
+        msg_warn "${legacy} の退避に失敗しました。手動で削除してください。"
+    fi
+}
+
 # --- セットアップ ---
 setup_zsh() {
     msg_header "Zsh 設定一式"
@@ -193,14 +237,17 @@ setup_zsh() {
     # 設定ファイルの配置
     msg_info "設定ファイルを配置します..."
 
-    # Source separation: .zshrc and .bashrc deploy to subdirectories
+    # Source separation: .bashrc deploys to a subdirectory (OS デフォルトを尊重)
     for entry in "${ZSH_MOD_SOURCE_CONFIGS[@]}"; do
         IFS='|' read -r src user_file deploy_dir deploy_name label <<<"$entry"
         install_source_config "$src" "$user_file" "$deploy_dir" "$deploy_name" "$label"
     done
 
-    # Direct deployment: other config files
+    # Direct deployment: .zshrc 本体 + その他の設定ファイル
+    # NOTE: .zshrc は完全な設定本体のため直接配置する（source 分離は二重ロードの原因）。
+    #       ユーザーカスタマイズは ~/.zsh/*.zsh と ~/.shell/*.sh で受けられる。
     local _zsh_direct_files=(
+        "$SCRIPT_DIR/.zshrc|$ZSH_MOD_BASE_DIR/.zshrc|.zshrc|"
         "$SCRIPT_DIR/.zsh/.p10k.zsh|$ZSH_MOD_CONFIG_DIR/.p10k.zsh|.p10k.zsh|Powerlevel10k のデフォルト設定が使用されます。"
         "$SCRIPT_DIR/.zsh/plugins.zsh|$ZSH_MOD_CONFIG_DIR/plugins.zsh|plugins.zsh|プラグインは手動で設定してください。"
         "$SCRIPT_DIR/.shell/aliases.sh|$HOME/.shell/aliases.sh|aliases.sh|エイリアスは手動で設定してください。"
@@ -209,6 +256,10 @@ setup_zsh() {
         IFS='|' read -r src dst label hint <<<"$entry"
         install_config "$src" "$dst" "$label" "$hint"
     done
+
+    # 旧 source 分離方式の名残（孤立した dev-templates.zsh）を整理する。
+    # NOTE: .zshrc の直接配置が済んだ後に呼ぶ（順序が重要）。
+    _zsh_cleanup_legacy_dev_templates
 
     # デフォルトシェルを zsh に変更
     if ! _zsh_set_default_shell; then
