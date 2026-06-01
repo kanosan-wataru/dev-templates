@@ -15,6 +15,18 @@ OP_MOD_DEBSIG_KEY_ID="AC2D62742012EA22"
 OP_MOD_TOKEN_DIR="${HOME}/.config/op"
 OP_MOD_TOKEN_FILE="${OP_MOD_TOKEN_DIR}/.env"
 
+# --- npiperelay (WSL SSH エージェントブリッジ用) ---
+# WSL では Windows 側 1Password の SSH エージェント (名前付きパイプ
+# //./pipe/openssh-ssh-agent) を npiperelay + socat で WSL の UNIX ソケットへ
+# ブリッジする。これによりネイティブ WSL の ssh/git/scp/rsync が 1Password を使える。
+# バージョンは固定し、ダウンロード成果物は SHA256 で検証する。
+OP_MOD_NPIPERELAY_REPO="jstarks/npiperelay"
+OP_MOD_NPIPERELAY_VERSION="v0.1.0"
+OP_MOD_NPIPERELAY_BIN_DIR="${HOME}/.local/bin"
+OP_MOD_NPIPERELAY_BIN_PATH="${OP_MOD_NPIPERELAY_BIN_DIR}/npiperelay.exe"
+# v0.1.0 amd64 アセットの SHA256 (公式 checksums.txt より)
+OP_MOD_NPIPERELAY_SHA256_AMD64="6b9ef61ffd17c03507a9a3d54d815dceb3dae669ac67fc3bf4225d1e764ce5f6"
+
 # 管理対象ファイル（配布元パス, 配置先パス, 表示名, 未検出時メッセージ）
 OP_MOD_MANAGED_FILES=(
     "$SCRIPT_DIR/.shell/1password.sh|$HOME/.shell/1password.sh|1password.sh|"
@@ -140,6 +152,167 @@ _1password_install_op_brew() {
     fi
 }
 
+# --- ヘルパー: npiperelay アセット名判定 (WSL は基本 amd64) ---
+_1password_npiperelay_asset() {
+    case "$(uname -m)" in
+    x86_64 | amd64) printf '%s' "npiperelay_windows_amd64.zip" ;;
+    *) printf '%s' "" ;;
+    esac
+}
+
+# --- ヘルパー: npiperelay アセットの期待 SHA256 ---
+_1password_npiperelay_sha256() {
+    case "$(uname -m)" in
+    x86_64 | amd64) printf '%s' "$OP_MOD_NPIPERELAY_SHA256_AMD64" ;;
+    *) printf '%s' "" ;;
+    esac
+}
+
+# --- ヘルパー: npiperelay ダウンロード URL 生成 (バージョン固定) ---
+_1password_npiperelay_url() {
+    local asset="$1"
+    printf '%s' "https://github.com/${OP_MOD_NPIPERELAY_REPO}/releases/download/${OP_MOD_NPIPERELAY_VERSION}/${asset}"
+}
+
+# --- ヘルパー: WSL ブリッジ用の依存 (curl/unzip/socat) を確保 ---
+_1password_ensure_wsl_deps() {
+    local -a missing=()
+    local cmd
+    for cmd in curl unzip socat; do
+        command -v "$cmd" >/dev/null 2>&1 || missing+=("$cmd")
+    done
+    ((${#missing[@]} == 0)) && return 0
+
+    msg_step "WSL ブリッジ用の依存 (${missing[*]}) をインストールします..."
+    if ! command -v apt-get >/dev/null 2>&1; then
+        msg_error "apt-get が見つかりません。${missing[*]} を手動でインストールしてください。"
+        return 1
+    fi
+    run_cmd sudo apt-get update -qq || msg_warn "apt update に失敗しました。"
+    run_cmd sudo apt-get install -y "${missing[@]}" || {
+        msg_error "${missing[*]} のインストールに失敗しました。"
+        return 1
+    }
+}
+
+# --- ヘルパー: npiperelay.exe のダウンロード〜配置 (サブシェルでスコープを閉じる) ---
+# pi.sh と同じ防御方針: 一時 dir + EXIT trap、SHA256 検証、対象ファイルのみ展開。
+_1password_fetch_npiperelay() (
+    local url="$1" asset="$2" expected_sha="$3"
+
+    mkdir -p "$OP_MOD_NPIPERELAY_BIN_DIR" || {
+        msg_error "${OP_MOD_NPIPERELAY_BIN_DIR} の作成に失敗しました。"
+        return 1
+    }
+
+    local tmp_dir
+    tmp_dir=$(mktemp -d "${OP_MOD_NPIPERELAY_BIN_DIR}/.npiperelay-staging.XXXXXXXXXX") || {
+        msg_error "ステージングディレクトリの作成に失敗しました。"
+        return 1
+    }
+    # shellcheck disable=SC2064 # 即時展開で tmp_dir を埋め込む
+    trap "rm -rf -- ${tmp_dir@Q}" EXIT
+
+    local archive_path="${tmp_dir}/${asset}"
+    local curl_err="${tmp_dir}/curl.err"
+
+    if ! curl -fsSL "$url" -o "$archive_path" 2>"$curl_err"; then
+        msg_error "npiperelay のダウンロードに失敗しました。"
+        printf '  URL: %s\n' "$url" >&2
+        if [[ -s "$curl_err" ]]; then
+            printf '  curl stderr: ' >&2
+            cat "$curl_err" >&2
+        fi
+        return 1
+    fi
+
+    # SHA256 検証 (リリース侵害 / 改竄の緩和)
+    if [[ -n "$expected_sha" ]]; then
+        local actual_sha
+        actual_sha=$(sha256sum "$archive_path" 2>/dev/null | awk '{print $1}')
+        if [[ "$actual_sha" != "$expected_sha" ]]; then
+            msg_error "npiperelay のチェックサムが一致しません。中断します。"
+            printf '  expected: %s\n  actual:   %s\n' "$expected_sha" "$actual_sha" >&2
+            return 1
+        fi
+    else
+        msg_warn "このアーキテクチャ用のチェックサムが未登録です。検証なしで続行します。"
+    fi
+
+    # アーカイブに npiperelay.exe が含まれるか確認 (不一致なら unzip は非0)
+    if ! unzip -l "$archive_path" 'npiperelay.exe' >/dev/null 2>&1; then
+        msg_error "アーカイブに npiperelay.exe が含まれていません。中断します。"
+        return 1
+    fi
+
+    # アーカイブには LICENSE/README.md 等も含まれるが、対象名 npiperelay.exe の
+    # エントリのみ -j (内部パス除去) で展開し path traversal を回避する。
+    # amd64 では zip 全体を SHA256 検証済みのため想定外エントリは混入しない
+    # (チェックサム未登録アーキは _1password_setup_npiperelay_wsl が手前でスキップする)。
+    if ! unzip -o -j "$archive_path" 'npiperelay.exe' -d "$tmp_dir" >/dev/null 2>&1; then
+        msg_error "npiperelay の展開に失敗しました。"
+        return 1
+    fi
+
+    local extracted="${tmp_dir}/npiperelay.exe"
+    if [[ ! -f "$extracted" ]]; then
+        msg_error "展開後に npiperelay.exe が見つかりません。"
+        return 1
+    fi
+
+    chmod 0755 "$extracted" || {
+        msg_error "npiperelay.exe の権限設定に失敗しました。"
+        return 1
+    }
+
+    # 同一 FS 内の mv で atomic に配置
+    if ! mv -f "$extracted" "$OP_MOD_NPIPERELAY_BIN_PATH"; then
+        msg_error "${OP_MOD_NPIPERELAY_BIN_PATH} への配置に失敗しました。"
+        return 1
+    fi
+)
+
+# --- ヘルパー: WSL の SSH エージェントブリッジ (npiperelay + socat) をセットアップ ---
+_1password_setup_npiperelay_wsl() {
+    printf '\n'
+    printf '%s\n' "WSL SSH エージェントブリッジ (npiperelay + socat):"
+
+    local asset
+    asset=$(_1password_npiperelay_asset)
+    if [[ -z "$asset" ]]; then
+        msg_warn "未対応のアーキテクチャ ($(uname -m)) のため npiperelay 導入をスキップします。"
+        msg_step "ssh.exe エイリアスのフォールバックで動作します。"
+        return 0
+    fi
+
+    # 依存 (curl / unzip / socat) を確保
+    _1password_ensure_wsl_deps || return 1
+
+    # べき等性: 既に配置済みかつ非 UPGRADE ならスキップ
+    if [[ -f "$OP_MOD_NPIPERELAY_BIN_PATH" ]] && ! ((UPGRADE)); then
+        msg_step "npiperelay は既に配置済みです (${OP_MOD_NPIPERELAY_BIN_PATH})。スキップします。"
+        return 0
+    fi
+
+    local url sha
+    url=$(_1password_npiperelay_url "$asset")
+    sha=$(_1password_npiperelay_sha256)
+
+    msg_step "npiperelay ${OP_MOD_NPIPERELAY_VERSION} を取得します (${asset})..."
+    if ((DRY_RUN)); then
+        msg_dry_run "curl -fsSL ${url} -o <tmp>/${asset}"
+        msg_dry_run "sha256 検証 (${sha:0:12}...)"
+        msg_dry_run "unzip npiperelay.exe -> ${OP_MOD_NPIPERELAY_BIN_PATH}"
+        return 0
+    fi
+
+    if ! _1password_fetch_npiperelay "$url" "$asset" "$sha"; then
+        return 1
+    fi
+    msg_step "$(printf '%s%s%s' "${C_GREEN}" "npiperelay を配置しました: ${OP_MOD_NPIPERELAY_BIN_PATH}" "${C_RESET}")"
+    msg_step "次回シェル起動時に ~/.shell/1password.sh がブリッジを自動起動します。"
+}
+
 # --- ヘルパー: SSH エージェント設定の案内 ---
 _1password_setup_ssh_agent() {
     local env="$1"
@@ -151,7 +324,17 @@ _1password_setup_ssh_agent() {
     wsl)
         msg_step "WSL 環境を検出しました。"
         msg_step "Windows 側の 1Password デスクトップアプリで SSH エージェントを有効にしてください。"
-        msg_step "1password.zsh により ssh/ssh-add が Windows 側にリダイレクトされます。"
+        msg_step "  設定 → 開発者 → SSH エージェント → 有効にする"
+        msg_step "npiperelay + socat により Windows のエージェントが WSL の ~/.1password/agent.sock へ"
+        msg_step "ブリッジされ、ネイティブ WSL の ssh / git / scp / rsync すべてが 1Password 経由になります。"
+        msg_step "(npiperelay/socat が無い場合は ssh.exe / ssh-add.exe エイリアスにフォールバックします)"
+        printf '\n'
+        msg_step "NOTE: 1Password に鍵が多いと SSH 接続時に MaxAuthTries を超過し"
+        msg_step "      'Too many authentication failures' になることがあります。その場合は"
+        msg_step "      ~/.ssh/config でホストごとに鍵を限定してください:"
+        msg_step "        Host myhost"
+        msg_step "            IdentitiesOnly yes"
+        msg_step "            IdentityFile ~/.ssh/<対象鍵>.pub"
         printf '\n'
         msg_step "有効化:"
         msg_step "  export ENABLE_SSH_1PASSWORD=1  # ~/.zshenv 等に追加"
@@ -454,6 +637,12 @@ setup_1password() {
         install_config "$src" "$dst" "$label" "$hint"
     done
 
+    # --- 2.5. WSL: SSH エージェントブリッジ (npiperelay + socat) を導入 ---
+    if [[ "$env" == "wsl" ]]; then
+        _1password_setup_npiperelay_wsl ||
+            msg_warn "WSL ブリッジのセットアップに失敗しました（ssh.exe フォールバックで継続します）。"
+    fi
+
     # --- 3. SSH エージェント設定の案内 ---
     _1password_setup_ssh_agent "$env"
 
@@ -490,6 +679,18 @@ module_status() {
 # --- アンインストール ---
 uninstall_1password() {
     local restored=0
+
+    # WSL ブリッジ用 npiperelay.exe の削除 ($HOME 配下のみ)
+    if [[ -f "$OP_MOD_NPIPERELAY_BIN_PATH" ]]; then
+        if [[ "$OP_MOD_NPIPERELAY_BIN_PATH" == "$HOME"/* ]]; then
+            msg_info "npiperelay.exe を削除します (${OP_MOD_NPIPERELAY_BIN_PATH})..."
+            run_cmd command rm -f "$OP_MOD_NPIPERELAY_BIN_PATH" ||
+                msg_warn "${OP_MOD_NPIPERELAY_BIN_PATH} の削除に失敗しました。"
+            restored=1
+        else
+            msg_warn "${OP_MOD_NPIPERELAY_BIN_PATH} は \$HOME 配下ではないため削除をスキップします。"
+        fi
+    fi
 
     # Git 署名設定の解除
     if command -v git >/dev/null 2>&1; then
@@ -593,6 +794,9 @@ uninstall_1password() {
         msg_step "sudo apt-get remove 1password-cli"
         msg_step "sudo rm -f /etc/apt/sources.list.d/1password.list"
         msg_step "sudo rm -f /etc/apt/keyrings/1password-archive-keyring.gpg"
+        if [[ "$env" == "wsl" ]]; then
+            msg_step "socat は共有依存のため残しています (不要なら: sudo apt-get remove socat)。"
+        fi
         ;;
     macos)
         msg_step "brew uninstall --cask 1password-cli"

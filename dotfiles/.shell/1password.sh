@@ -40,14 +40,69 @@ _1password_is_wsl() {
 
 if _1password_is_wsl; then
     # -------------------------------------------------
-    # WSL: Use Windows-side 1Password SSH agent
+    # WSL: Windows 側 1Password の SSH エージェントを利用する
+    #   優先: npiperelay + socat で「名前付きパイプ」を WSL の UNIX ソケットへ
+    #         ブリッジし、ネイティブ WSL の ssh / git / scp / rsync すべてを
+    #         1Password 経由にする。
+    #   退避: npiperelay/socat が無ければ ssh.exe / ssh-add.exe エイリアスへ。
+    # NOTE: このファイルは bash / zsh の双方から source されるため、
+    #       両対応の構文のみを使用する（zsh 専用の &! 等は使わない）。
     # -------------------------------------------------
-    if command -v ssh.exe >/dev/null 2>&1; then
-        alias ssh='ssh.exe'
+    _op_sock="$HOME/.1password/agent.sock"
+    _op_npiperelay="$HOME/.local/bin/npiperelay.exe"
+
+    if [[ -x "$_op_npiperelay" ]] && command -v socat >/dev/null 2>&1; then
+        # 既にブリッジ用リスナーが起動しているか確認（多重起動防止）
+        # NOTE: grep -F でソケットパス中の "." 等をメタ文字として誤マッチさせない。
+        _op_running=0
+        if command -v ss >/dev/null 2>&1; then
+            ss -lx 2>/dev/null | grep -qF "$_op_sock" && _op_running=1
+        elif command -v ssh-add >/dev/null 2>&1; then
+            # ss が無い環境: ソケットへ実際に接続できる (rc!=2) 場合のみ稼働中とみなす。
+            # rc=2 は接続不可 = socat が落ちてソケットだけ残った stale 状態を含む。
+            SSH_AUTH_SOCK="$_op_sock" ssh-add -l >/dev/null 2>&1
+            [[ $? -ne 2 ]] && _op_running=1
+        elif [[ -S "$_op_sock" ]]; then
+            _op_running=1
+        fi
+
+        if [[ "$_op_running" -eq 0 ]]; then
+            # 多ユーザー WSL でも他ユーザーに渡らないよう本人専用権限にする
+            mkdir -p "${_op_sock%/*}" 2>/dev/null
+            chmod 700 "${_op_sock%/*}" 2>/dev/null
+            rm -f "$_op_sock" 2>/dev/null
+            # ブリッジをシェルから切り離して常駐させる。SIGHUP 保護の強さは経路で異なる:
+            #   setsid: 新セッションを作成して端末から完全分離（最優先）
+            #   nohup : SIGHUP を無視して起動（フォールバック）
+            #   env   : 最後の砦。socat を直接起動するだけで追加の SIGHUP 保護は無い
+            #           （setsid/nohup の両方が無い理論上のケース。nohup は POSIX 必須
+            #            なので実環境ではほぼ到達しない。次回シェル起動時に再チェックして
+            #            起動し直すため実用上は許容）。
+            # いずれも ( ... & ) サブシェルで起動するためシェルの job list には載らない。
+            # NOTE: _op_launcher は常に非空の単一語なので bash/zsh 双方で未クォート展開しても安全。
+            # mode=0600 でソケットを本人のみアクセス可能にする。
+            if command -v setsid >/dev/null 2>&1; then
+                _op_launcher="setsid"
+            elif command -v nohup >/dev/null 2>&1; then
+                _op_launcher="nohup"
+            else
+                _op_launcher="env"
+            fi
+            ($_op_launcher socat UNIX-LISTEN:"$_op_sock",fork,mode=0600 EXEC:"$_op_npiperelay -ei -s //./pipe/openssh-ssh-agent",nofork >/dev/null 2>&1 &) >/dev/null 2>&1
+            unset _op_launcher
+        fi
+        export SSH_AUTH_SOCK="$_op_sock"
+        unset _op_running
+    else
+        # フォールバック: Windows 側バイナリへ転送（対話的な ssh/ssh-add のみ）
+        if command -v ssh.exe >/dev/null 2>&1; then
+            alias ssh='ssh.exe'
+        fi
+        if command -v ssh-add.exe >/dev/null 2>&1; then
+            alias ssh-add='ssh-add.exe'
+        fi
     fi
-    if command -v ssh-add.exe >/dev/null 2>&1; then
-        alias ssh-add='ssh-add.exe'
-    fi
+    unset _op_sock _op_npiperelay
 
 elif [[ "$OSTYPE" == darwin* ]]; then
     # -------------------------------------------------
