@@ -14,6 +14,13 @@ setup() {
     source "$PROJECT_ROOT/lib/setup_helpers.sh"
     # shellcheck source=../modules/1password.sh
     source "$PROJECT_ROOT/modules/1password.sh"
+
+    # run_cmd は本番では setup.sh が定義する。テストでは未ロードのため最小スタブを置き、
+    # 依存不足環境でも副作用 (apt 実行) なく動くようにする。
+    run_cmd() {
+        if ((${DRY_RUN:-0})); then return 0; fi
+        "$@"
+    }
 }
 
 @test "npiperelay version は vX.Y.Z 形式で固定されている" {
@@ -57,9 +64,6 @@ setup() {
     OP_MOD_NPIPERELAY_BIN_DIR="$tmp_home/.local/bin"
     OP_MOD_NPIPERELAY_BIN_PATH="$OP_MOD_NPIPERELAY_BIN_DIR/npiperelay.exe"
     uname() { echo x86_64; }
-    # 依存確保 (apt 経由・run_cmd は setup.sh 側) は本テストの対象外なのでスタブ化し、
-    # 「DRY_RUN ではダウンロード・配置しない」点のみを検証する。
-    _1password_ensure_wsl_deps() { return 0; }
     DRY_RUN=1
     UPGRADE=0
 

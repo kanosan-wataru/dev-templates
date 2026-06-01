@@ -53,18 +53,27 @@ if _1password_is_wsl; then
 
     if [[ -x "$_op_npiperelay" ]] && command -v socat >/dev/null 2>&1; then
         # 既にブリッジ用リスナーが起動しているか確認（多重起動防止）
+        # NOTE: grep -F でソケットパス中の "." 等をメタ文字として誤マッチさせない。
         _op_running=0
         if command -v ss >/dev/null 2>&1; then
-            ss -lx 2>/dev/null | grep -q "$_op_sock" && _op_running=1
+            ss -lx 2>/dev/null | grep -qF "$_op_sock" && _op_running=1
+        elif command -v ssh-add >/dev/null 2>&1; then
+            # ss が無い環境: ソケットへ実際に接続できる (rc!=2) 場合のみ稼働中とみなす。
+            # rc=2 は接続不可 = socat が落ちてソケットだけ残った stale 状態を含む。
+            SSH_AUTH_SOCK="$_op_sock" ssh-add -l >/dev/null 2>&1
+            [[ $? -ne 2 ]] && _op_running=1
         elif [[ -S "$_op_sock" ]]; then
             _op_running=1
         fi
 
         if [[ "$_op_running" -eq 0 ]]; then
-            mkdir -p "${_op_sock%/*}" 2>/dev/null
+            # 多ユーザー WSL でも他ユーザーに渡らないよう本人専用権限で作成する
+            mkdir -p -m 700 "${_op_sock%/*}" 2>/dev/null
+            chmod 700 "${_op_sock%/*}" 2>/dev/null
             rm -f "$_op_sock" 2>/dev/null
-            # サブシェル + setsid でシェルから切り離してブリッジを常駐させる
-            (setsid socat UNIX-LISTEN:"$_op_sock",fork EXEC:"$_op_npiperelay -ei -s //./pipe/openssh-ssh-agent",nofork >/dev/null 2>&1 &) >/dev/null 2>&1
+            # サブシェル + setsid でシェルから切り離してブリッジを常駐させる。
+            # mode=0600 でソケットを本人のみアクセス可能にする。
+            (setsid socat UNIX-LISTEN:"$_op_sock",fork,mode=0600 EXEC:"$_op_npiperelay -ei -s //./pipe/openssh-ssh-agent",nofork >/dev/null 2>&1 &) >/dev/null 2>&1
         fi
         export SSH_AUTH_SOCK="$_op_sock"
         unset _op_running
