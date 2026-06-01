@@ -67,8 +67,8 @@ if _1password_is_wsl; then
         fi
 
         if [[ "$_op_running" -eq 0 ]]; then
-            # 多ユーザー WSL でも他ユーザーに渡らないよう本人専用権限で作成する
-            mkdir -p -m 700 "${_op_sock%/*}" 2>/dev/null
+            # 多ユーザー WSL でも他ユーザーに渡らないよう本人専用権限にする
+            mkdir -p "${_op_sock%/*}" 2>/dev/null
             chmod 700 "${_op_sock%/*}" 2>/dev/null
             rm -f "$_op_sock" 2>/dev/null
             # サブシェル + setsid でシェルから切り離してブリッジを常駐させる。
