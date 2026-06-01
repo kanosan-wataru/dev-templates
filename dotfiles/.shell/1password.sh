@@ -64,7 +64,7 @@ if _1password_is_wsl; then
             mkdir -p "${_op_sock%/*}" 2>/dev/null
             rm -f "$_op_sock" 2>/dev/null
             # サブシェル + setsid でシェルから切り離してブリッジを常駐させる
-            ( setsid socat UNIX-LISTEN:"$_op_sock",fork EXEC:"$_op_npiperelay -ei -s //./pipe/openssh-ssh-agent",nofork >/dev/null 2>&1 & ) >/dev/null 2>&1
+            (setsid socat UNIX-LISTEN:"$_op_sock",fork EXEC:"$_op_npiperelay -ei -s //./pipe/openssh-ssh-agent",nofork >/dev/null 2>&1 &) >/dev/null 2>&1
         fi
         export SSH_AUTH_SOCK="$_op_sock"
         unset _op_running

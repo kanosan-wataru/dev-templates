@@ -57,6 +57,9 @@ setup() {
     OP_MOD_NPIPERELAY_BIN_DIR="$tmp_home/.local/bin"
     OP_MOD_NPIPERELAY_BIN_PATH="$OP_MOD_NPIPERELAY_BIN_DIR/npiperelay.exe"
     uname() { echo x86_64; }
+    # 依存確保 (apt 経由・run_cmd は setup.sh 側) は本テストの対象外なのでスタブ化し、
+    # 「DRY_RUN ではダウンロード・配置しない」点のみを検証する。
+    _1password_ensure_wsl_deps() { return 0; }
     DRY_RUN=1
     UPGRADE=0
 
