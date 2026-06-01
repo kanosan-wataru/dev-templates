@@ -71,9 +71,20 @@ if _1password_is_wsl; then
             mkdir -p "${_op_sock%/*}" 2>/dev/null
             chmod 700 "${_op_sock%/*}" 2>/dev/null
             rm -f "$_op_sock" 2>/dev/null
-            # サブシェル + setsid でシェルから切り離してブリッジを常駐させる。
+            # ブリッジをシェルから切り離して常駐させる。setsid があれば新セッションで
+            # 完全分離、無ければ nohup (SIGHUP 無視)、それも無ければ env (no-op) で
+            # 通常のバックグラウンド起動にフォールバックする（setsid 不在でも黙って壊れない）。
+            # NOTE: _op_launcher は常に非空の単一語なので bash/zsh 双方で未クォート展開しても安全。
             # mode=0600 でソケットを本人のみアクセス可能にする。
-            (setsid socat UNIX-LISTEN:"$_op_sock",fork,mode=0600 EXEC:"$_op_npiperelay -ei -s //./pipe/openssh-ssh-agent",nofork >/dev/null 2>&1 &) >/dev/null 2>&1
+            if command -v setsid >/dev/null 2>&1; then
+                _op_launcher="setsid"
+            elif command -v nohup >/dev/null 2>&1; then
+                _op_launcher="nohup"
+            else
+                _op_launcher="env"
+            fi
+            ($_op_launcher socat UNIX-LISTEN:"$_op_sock",fork,mode=0600 EXEC:"$_op_npiperelay -ei -s //./pipe/openssh-ssh-agent",nofork >/dev/null 2>&1 &) >/dev/null 2>&1
+            unset _op_launcher
         fi
         export SSH_AUTH_SOCK="$_op_sock"
         unset _op_running

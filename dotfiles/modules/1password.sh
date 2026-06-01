@@ -196,7 +196,7 @@ _1password_ensure_wsl_deps() {
 }
 
 # --- ヘルパー: npiperelay.exe のダウンロード〜配置 (サブシェルでスコープを閉じる) ---
-# pi.sh と同じ防御方針: 一時 dir + EXIT trap、SHA256 検証、単一エントリのみ展開。
+# pi.sh と同じ防御方針: 一時 dir + EXIT trap、SHA256 検証、対象ファイルのみ展開。
 _1password_fetch_npiperelay() (
     local url="$1" asset="$2" expected_sha="$3"
 
@@ -245,7 +245,9 @@ _1password_fetch_npiperelay() (
         return 1
     fi
 
-    # npiperelay.exe のみを展開 (-j: 内部パス無視, 単一エントリ指定で path traversal を回避)
+    # アーカイブには LICENSE/README.md 等も含まれるが、対象名 npiperelay.exe の
+    # エントリのみ -j (内部パス除去) で展開し path traversal を回避する。
+    # zip 全体は SHA256 検証済みのため想定外エントリは混入しない。
     if ! unzip -o -j "$archive_path" 'npiperelay.exe' -d "$tmp_dir" >/dev/null 2>&1; then
         msg_error "npiperelay の展開に失敗しました。"
         return 1
