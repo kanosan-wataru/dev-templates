@@ -40,14 +40,44 @@ _1password_is_wsl() {
 
 if _1password_is_wsl; then
     # -------------------------------------------------
-    # WSL: Use Windows-side 1Password SSH agent
+    # WSL: Windows 側 1Password の SSH エージェントを利用する
+    #   優先: npiperelay + socat で「名前付きパイプ」を WSL の UNIX ソケットへ
+    #         ブリッジし、ネイティブ WSL の ssh / git / scp / rsync すべてを
+    #         1Password 経由にする。
+    #   退避: npiperelay/socat が無ければ ssh.exe / ssh-add.exe エイリアスへ。
+    # NOTE: このファイルは bash / zsh の双方から source されるため、
+    #       両対応の構文のみを使用する（zsh 専用の &! 等は使わない）。
     # -------------------------------------------------
-    if command -v ssh.exe >/dev/null 2>&1; then
-        alias ssh='ssh.exe'
+    _op_sock="$HOME/.1password/agent.sock"
+    _op_npiperelay="$HOME/.local/bin/npiperelay.exe"
+
+    if [[ -x "$_op_npiperelay" ]] && command -v socat >/dev/null 2>&1; then
+        # 既にブリッジ用リスナーが起動しているか確認（多重起動防止）
+        _op_running=0
+        if command -v ss >/dev/null 2>&1; then
+            ss -lx 2>/dev/null | grep -q "$_op_sock" && _op_running=1
+        elif [[ -S "$_op_sock" ]]; then
+            _op_running=1
+        fi
+
+        if [[ "$_op_running" -eq 0 ]]; then
+            mkdir -p "${_op_sock%/*}" 2>/dev/null
+            rm -f "$_op_sock" 2>/dev/null
+            # サブシェル + setsid でシェルから切り離してブリッジを常駐させる
+            ( setsid socat UNIX-LISTEN:"$_op_sock",fork EXEC:"$_op_npiperelay -ei -s //./pipe/openssh-ssh-agent",nofork >/dev/null 2>&1 & ) >/dev/null 2>&1
+        fi
+        export SSH_AUTH_SOCK="$_op_sock"
+        unset _op_running
+    else
+        # フォールバック: Windows 側バイナリへ転送（対話的な ssh/ssh-add のみ）
+        if command -v ssh.exe >/dev/null 2>&1; then
+            alias ssh='ssh.exe'
+        fi
+        if command -v ssh-add.exe >/dev/null 2>&1; then
+            alias ssh-add='ssh-add.exe'
+        fi
     fi
-    if command -v ssh-add.exe >/dev/null 2>&1; then
-        alias ssh-add='ssh-add.exe'
-    fi
+    unset _op_sock _op_npiperelay
 
 elif [[ "$OSTYPE" == darwin* ]]; then
     # -------------------------------------------------
