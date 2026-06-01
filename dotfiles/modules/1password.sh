@@ -247,7 +247,8 @@ _1password_fetch_npiperelay() (
 
     # アーカイブには LICENSE/README.md 等も含まれるが、対象名 npiperelay.exe の
     # エントリのみ -j (内部パス除去) で展開し path traversal を回避する。
-    # zip 全体は SHA256 検証済みのため想定外エントリは混入しない。
+    # amd64 では zip 全体を SHA256 検証済みのため想定外エントリは混入しない
+    # (チェックサム未登録アーキは _1password_setup_npiperelay_wsl が手前でスキップする)。
     if ! unzip -o -j "$archive_path" 'npiperelay.exe' -d "$tmp_dir" >/dev/null 2>&1; then
         msg_error "npiperelay の展開に失敗しました。"
         return 1

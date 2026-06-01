@@ -71,9 +71,14 @@ if _1password_is_wsl; then
             mkdir -p "${_op_sock%/*}" 2>/dev/null
             chmod 700 "${_op_sock%/*}" 2>/dev/null
             rm -f "$_op_sock" 2>/dev/null
-            # ブリッジをシェルから切り離して常駐させる。setsid があれば新セッションで
-            # 完全分離、無ければ nohup (SIGHUP 無視)、それも無ければ env (no-op) で
-            # 通常のバックグラウンド起動にフォールバックする（setsid 不在でも黙って壊れない）。
+            # ブリッジをシェルから切り離して常駐させる。SIGHUP 保護の強さは経路で異なる:
+            #   setsid: 新セッションを作成して端末から完全分離（最優先）
+            #   nohup : SIGHUP を無視して起動（フォールバック）
+            #   env   : 最後の砦。socat を直接起動するだけで追加の SIGHUP 保護は無い
+            #           （setsid/nohup の両方が無い理論上のケース。nohup は POSIX 必須
+            #            なので実環境ではほぼ到達しない。次回シェル起動時に再チェックして
+            #            起動し直すため実用上は許容）。
+            # いずれも ( ... & ) サブシェルで起動するためシェルの job list には載らない。
             # NOTE: _op_launcher は常に非空の単一語なので bash/zsh 双方で未クォート展開しても安全。
             # mode=0600 でソケットを本人のみアクセス可能にする。
             if command -v setsid >/dev/null 2>&1; then
