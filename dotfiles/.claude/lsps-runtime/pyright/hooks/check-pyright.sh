@@ -2,16 +2,16 @@
 
 # Check if pyright-langserver is installed and available in PATH
 
-if command -v pyright-langserver &> /dev/null; then
+if command -v pyright-langserver &>/dev/null; then
     exit 0
 fi
 
 # Prefer pipx (isolated venv, avoids PEP 668 externally-managed-environment)
-if command -v pipx &> /dev/null; then
+if command -v pipx &>/dev/null; then
     echo "[pyright] Installing pyright via pipx..."
     pipx install pyright
 
-    if command -v pyright-langserver &> /dev/null; then
+    if command -v pyright-langserver &>/dev/null; then
         echo "[pyright] Installed successfully"
     else
         echo "[pyright] Failed to install. Please run manually:"
@@ -21,12 +21,12 @@ if command -v pipx &> /dev/null; then
 fi
 
 # Fallback: pip with --user (avoids system-wide install)
-if command -v pip &> /dev/null; then
+if command -v pip &>/dev/null; then
     echo "[pyright] pipx not found. Installing via pip --user..."
-    pip install --user pyright 2>&1 || \
+    pip install --user pyright 2>&1 ||
         echo "[pyright] pip install failed. Install pipx first: sudo apt install pipx"
 
-    if command -v pyright-langserver &> /dev/null; then
+    if command -v pyright-langserver &>/dev/null; then
         echo "[pyright] Installed successfully"
     else
         echo "[pyright] Failed to install. Please run manually:"
