@@ -234,8 +234,8 @@ skillshare_run_sync() {
         return 0
     fi
     msg_step "skillshare sync --all --force を実行します (skills + agents)..."
-    printf "y\n" | skillshare sync --all --force >/dev/null 2>&1 \
-        || msg_warn "skillshare sync に失敗しました (手動で 'skillshare sync --all' を実行してください)。"
+    printf "y\n" | skillshare sync --all --force >/dev/null 2>&1 ||
+        msg_warn "skillshare sync に失敗しました (手動で 'skillshare sync --all' を実行してください)。"
 }
 
 # --- ヘルパー: Codex 用に .md エージェントを .toml に変換 ---
@@ -256,6 +256,6 @@ skillshare_convert_codex_agents() {
         return 0
     fi
     msg_step "Codex 用に .md → .toml 変換を実行します..."
-    python3 "$converter" "$agents_src" "$codex_out" \
-        || msg_warn "Codex agents の変換に失敗しました。"
+    python3 "$converter" "$agents_src" "$codex_out" ||
+        msg_warn "Codex agents の変換に失敗しました。"
 }
