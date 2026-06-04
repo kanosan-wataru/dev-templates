@@ -13,8 +13,42 @@ fi
 # ----------------------------
 # 履歴設定（${ZDOTDIR:-$HOME}/.zsh ディレクトリは setup.sh で作成済みの前提）
 HISTFILE="${ZDOTDIR:-$HOME}/.zsh/.zsh_history"
-# フェールセーフ: ディレクトリが存在しなければ作成
-[[ -d "${HISTFILE:h}" ]] || command mkdir -p -m 700 "${HISTFILE:h}"
+# 警告は Powerlevel10k の instant prompt（本ファイル冒頭で起動済み）に
+# バッファされ隠れ得るため、即時 print せず最初のプロンプト確定後に一度だけ
+# 表示する。$_histfile_warn が設定されていれば precmd フックが拾う。
+autoload -Uz add-zsh-hook
+_histfile_notify() {
+    [[ -n "$_histfile_warn" ]] && print -ru2 -- "$_histfile_warn"
+    add-zsh-hook -d precmd _histfile_notify
+    unset _histfile_warn
+    unfunction _histfile_notify
+}
+add-zsh-hook precmd _histfile_notify
+# フェールセーフ: 親ディレクトリが無ければ作成（失敗も握り潰さず通知する）
+if [[ ! -d "${HISTFILE:h}" ]]; then
+    command mkdir -p -m 700 "${HISTFILE:h}" 2>/dev/null \
+        || _histfile_warn="[zsh] 警告: ${HISTFILE:h} を作成できず、履歴が保存されない可能性があります。"
+fi
+# 自己修復: HISTFILE 自体がディレクトリ化していると zsh は履歴を書けず
+# 「failed to write history file ...: is a directory」エラーになる。Docker 等の
+# バインドマウントが未存在パスをホスト側に空ディレクトリとして作る既知の挙動が
+# 典型原因。本ガードはこの「ディレクトリ化」のみを対象とする（FIFO 等は対象外）。
+# rmdir は中身があれば失敗するため、実データは壊さない。
+[[ -d "$HISTFILE" ]] && command rmdir "$HISTFILE" 2>/dev/null
+if [[ -d "$HISTFILE" ]]; then
+    # rmdir 不可（非空、またはアクティブなバインドマウント等）。隣接の
+    # フォールバック先へ退避するが、そこも同じ要因でディレクトリ化し得るため
+    # 再度自己修復を試み、それでも駄目なら「保存されない」と正直に通知する。
+    _histfile_fallback="${HISTFILE}.local"
+    [[ -d "$_histfile_fallback" ]] && command rmdir "$_histfile_fallback" 2>/dev/null
+    if [[ -d "$_histfile_fallback" ]]; then
+        _histfile_warn="[zsh] 警告: ${HISTFILE} と ${_histfile_fallback} が共にディレクトリのため、このセッションの履歴は保存されません。"
+    else
+        _histfile_warn="[zsh] 警告: ${HISTFILE} がディレクトリのため ${_histfile_fallback} にフォールバックしました。"
+        HISTFILE="$_histfile_fallback"
+    fi
+    unset _histfile_fallback
+fi
 export HISTSIZE=50000
 export SAVEHIST=50000
 # セッション間で履歴を即時共有
