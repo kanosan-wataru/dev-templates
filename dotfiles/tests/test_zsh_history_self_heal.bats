@@ -19,8 +19,9 @@ setup() {
     ZSHRC="$PROJECT_ROOT/.zshrc"
     TEST_HOME="$(mktemp -d)"
 
-    # .zshrc から HISTFILE 設定ブロック（HISTFILE= 行〜 rmdir 自己修復行）を抽出。
-    HISTFILE_BLOCK="$(awk '/^HISTFILE=/{f=1} f{print} /rmdir "\$HISTFILE"/{exit}' "$ZSHRC")"
+    # .zshrc から HISTFILE 設定ブロック（HISTFILE= 行〜 export HISTSIZE= 直前）を抽出。
+    # 親ディレクトリ作成・空ディレクトリ除去・フォールバック切替を含む。
+    HISTFILE_BLOCK="$(awk '/^HISTFILE=/{f=1} /^export HISTSIZE=/{exit} f{print}' "$ZSHRC")"
     [ -n "$HISTFILE_BLOCK" ] || {
         echo "HISTFILE ブロックを .zshrc から抽出できませんでした" >&2
         return 1
@@ -84,4 +85,21 @@ run_histfile_block() {
     [ "$status" -eq 0 ]
     [ -d "$TEST_HOME/.zsh/.zsh_history" ]
     [ -f "$TEST_HOME/.zsh/.zsh_history/keep.txt" ]
+}
+
+@test "falls back to .local file when HISTFILE is a non-removable directory" {
+    # rmdir 不可なディレクトリ（非空。アクティブなバインドマウントの代理）でも、
+    # サイレントに失敗せずフォールバック先へ切り替え、警告を出し、書き込めること。
+    mkdir -p "$TEST_HOME/.zsh/.zsh_history"
+    echo "mounted" >"$TEST_HOME/.zsh/.zsh_history/keep.txt"
+    run env HOME="$TEST_HOME" ZDOTDIR="$TEST_HOME" zsh -f -c \
+        "$HISTFILE_BLOCK"$'\n'"print -r -- ': 0:0;echo fallback-test' >| \"\$HISTFILE\""
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"フォールバック"* ]]
+    # 元ディレクトリとその中身は保持されている。
+    [ -d "$TEST_HOME/.zsh/.zsh_history" ]
+    [ -f "$TEST_HOME/.zsh/.zsh_history/keep.txt" ]
+    # 書き込みはフォールバックファイルに行われている。
+    [ -f "$TEST_HOME/.zsh/.zsh_history.local" ]
+    grep -q "fallback-test" "$TEST_HOME/.zsh/.zsh_history.local"
 }

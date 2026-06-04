@@ -21,6 +21,13 @@ HISTFILE="${ZDOTDIR:-$HOME}/.zsh/.zsh_history"
 # 作ってしまう既知の挙動が典型原因。空ディレクトリのみ安全に除去する
 # （rmdir は中身があれば失敗するため、実データを壊さない）。
 [[ -d "$HISTFILE" ]] && command rmdir "$HISTFILE" 2>/dev/null
+# それでもディレクトリのまま（非空、またはアクティブなバインドマウント等で
+# rmdir 不可）の場合は、サイレントに同じエラーへ陥らないよう、隣接する
+# フォールバック履歴ファイルへ切り替えて警告する（履歴機能自体は維持する）。
+if [[ -d "$HISTFILE" ]]; then
+    print -u2 "[zsh] 警告: ${HISTFILE} がディレクトリのため履歴を書き込めません。${HISTFILE}.local にフォールバックします。"
+    HISTFILE="${HISTFILE}.local"
+fi
 export HISTSIZE=50000
 export SAVEHIST=50000
 # セッション間で履歴を即時共有
