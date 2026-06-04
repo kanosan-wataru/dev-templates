@@ -160,6 +160,14 @@ SETUP_FILE="$DOTFILES_DIR/setup.sh"
     [ "$status" -eq 0 ]
 }
 
+@test "skillshare: SHA256 default is pinned (64-hex) with colon-less default so empty env disables" {
+    # ${var:-...} だと空文字を渡してもデフォルトに戻り検証を無効化できない。
+    # 明示的な空文字での opt-out を効かせるため ${var-...} (コロンなし) を使い、
+    # かつデフォルトは 64 桁 hex の pin であること (= 既定で検証が有効) を保証する。
+    run grep -E '^SKILLSHARE_INSTALLER_SHA256="\$\{SKILLSHARE_INSTALLER_SHA256-[0-9a-f]{64}\}"' "$LIB_FILE"
+    [ "$status" -eq 0 ]
+}
+
 @test "skillshare: uses sync --all --force flags" {
     run grep -q 'sync --all --force' "$LIB_FILE"
     [ "$status" -eq 0 ]

@@ -14,10 +14,16 @@
 #       後から書き換わっても影響を受けないようにするため tag pin する。
 SKILLSHARE_INSTALL_DIR="${SKILLSHARE_INSTALL_DIR:-${HOME}/.local/bin}"
 SKILLSHARE_REPO="${SKILLSHARE_REPO:-runkids/skillshare}"
-SKILLSHARE_VERSION="${SKILLSHARE_VERSION:-v0.19.12}"
-# opt-in: install.sh の SHA256 期待値。空文字列なら検証スキップ。
-# 上流の install.sh が改竄/差し替えされた場合の防御線として利用する。
-SKILLSHARE_INSTALLER_SHA256="${SKILLSHARE_INSTALLER_SHA256:-}"
+SKILLSHARE_VERSION="${SKILLSHARE_VERSION:-v0.20.7}"
+# install.sh の SHA256 期待値。download 後にこの値と照合し、不一致なら install を中断する。
+# SKILLSHARE_VERSION (v0.20.7) に対応する install.sh のハッシュを pin することで、上流での
+# タグ差し替え (git tag -f) による静かな内容差し替えを検知する。tag pin だけでは
+# raw.githubusercontent.com の内容一意性は保証されないため、その弱点を塞ぐ supply-chain 防御線。
+# NOTE: SKILLSHARE_VERSION を更新する際は、必ずこの値も新タグの install.sh のハッシュへ更新すること。
+# NOTE: 検証を無効化したい場合は env で空文字列を明示する (例: SKILLSHARE_INSTALLER_SHA256= bash setup.sh)。
+#       空文字での opt-out を効かせるため ${var-...} (コロンなし) を使う。${var:-...} だと
+#       空文字でもデフォルト値に戻ってしまい無効化できない。
+SKILLSHARE_INSTALLER_SHA256="${SKILLSHARE_INSTALLER_SHA256-47a67522d12ced431279d878f6f4568284bf250a85699d446f64d8a8df9deeed}"
 
 # --- ヘルパー: ファイルの SHA256 を期待値と照合する ---
 # 戻り値: 0=一致 / 1=不一致 or 検証ツール無し。
