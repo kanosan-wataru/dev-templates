@@ -14,7 +14,7 @@
 #       後から書き換わっても影響を受けないようにするため tag pin する。
 SKILLSHARE_INSTALL_DIR="${SKILLSHARE_INSTALL_DIR:-${HOME}/.local/bin}"
 SKILLSHARE_REPO="${SKILLSHARE_REPO:-runkids/skillshare}"
-SKILLSHARE_VERSION="${SKILLSHARE_VERSION:-v0.19.12}"
+SKILLSHARE_VERSION="${SKILLSHARE_VERSION:-v0.20.7}"
 # opt-in: install.sh の SHA256 期待値。空文字列なら検証スキップ。
 # 上流の install.sh が改竄/差し替えされた場合の防御線として利用する。
 SKILLSHARE_INSTALLER_SHA256="${SKILLSHARE_INSTALLER_SHA256:-}"
