@@ -40,6 +40,14 @@ run_histfile_block() {
     run env HOME="$TEST_HOME" ZDOTDIR="$TEST_HOME" zsh -f -c "$HISTFILE_BLOCK; print -r -- \"\$HISTFILE\""
 }
 
+# ブロック実行後、登録済み precmd フックを発火させるヘルパ。
+# 警告は instant prompt 対策で precmd へ遅延されるため、非対話の -c では
+# 明示的に発火させないと表示されない。$1 に追加コマンドを渡せる。
+run_histfile_block_with_notify() {
+    run env HOME="$TEST_HOME" ZDOTDIR="$TEST_HOME" zsh -f -c \
+        "$HISTFILE_BLOCK"$'\n'"${1:-}"$'\n'"for hk in \$precmd_functions; do \$hk; done"
+}
+
 @test "removes empty directory that occupies the HISTFILE path" {
     mkdir -p "$TEST_HOME/.zsh/.zsh_history"
     run_histfile_block
@@ -89,17 +97,44 @@ run_histfile_block() {
 
 @test "falls back to .local file when HISTFILE is a non-removable directory" {
     # rmdir 不可なディレクトリ（非空。アクティブなバインドマウントの代理）でも、
-    # サイレントに失敗せずフォールバック先へ切り替え、警告を出し、書き込めること。
+    # サイレントに失敗せずフォールバック先へ切り替え、書き込めること。
     mkdir -p "$TEST_HOME/.zsh/.zsh_history"
     echo "mounted" >"$TEST_HOME/.zsh/.zsh_history/keep.txt"
     run env HOME="$TEST_HOME" ZDOTDIR="$TEST_HOME" zsh -f -c \
         "$HISTFILE_BLOCK"$'\n'"print -r -- ': 0:0;echo fallback-test' >| \"\$HISTFILE\""
     [ "$status" -eq 0 ]
-    [[ "$output" == *"フォールバック"* ]]
     # 元ディレクトリとその中身は保持されている。
     [ -d "$TEST_HOME/.zsh/.zsh_history" ]
     [ -f "$TEST_HOME/.zsh/.zsh_history/keep.txt" ]
     # 書き込みはフォールバックファイルに行われている。
     [ -f "$TEST_HOME/.zsh/.zsh_history.local" ]
     grep -q "fallback-test" "$TEST_HOME/.zsh/.zsh_history.local"
+}
+
+@test "fallback warning is deferred to precmd, not emitted immediately" {
+    # instant prompt に飲まれないよう、警告はブロック実行時点では出さず、
+    # precmd フック発火後にのみ表示される（HIGH 指摘への対応の回帰ガード）。
+    mkdir -p "$TEST_HOME/.zsh/.zsh_history"
+    echo "mounted" >"$TEST_HOME/.zsh/.zsh_history/keep.txt"
+    # 発火させない: 警告は出ない。
+    run_histfile_block
+    [ "$status" -eq 0 ]
+    [[ "$output" != *"フォールバック"* ]]
+    # precmd 発火後: 警告が出る。
+    run_histfile_block_with_notify
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"フォールバック"* ]]
+}
+
+@test "warns history is not persisted when both paths are directories" {
+    # フォールバック先 .local も同種要因でディレクトリ化し得る。両方ディレクトリなら
+    # サイレントに同じ is a directory エラーへ陥らず、保存されない旨を正直に通知する。
+    mkdir -p "$TEST_HOME/.zsh/.zsh_history/sub"
+    mkdir -p "$TEST_HOME/.zsh/.zsh_history.local/sub"
+    run_histfile_block_with_notify "print -r -- \"HISTFILE=\$HISTFILE\""
+    [ "$status" -eq 0 ]
+    [[ "$output" == *"保存されません"* ]]
+    # 双方のディレクトリは破壊されず保持される。
+    [ -d "$TEST_HOME/.zsh/.zsh_history/sub" ]
+    [ -d "$TEST_HOME/.zsh/.zsh_history.local/sub" ]
 }
