@@ -13,8 +13,14 @@ fi
 # ----------------------------
 # 履歴設定（${ZDOTDIR:-$HOME}/.zsh ディレクトリは setup.sh で作成済みの前提）
 HISTFILE="${ZDOTDIR:-$HOME}/.zsh/.zsh_history"
-# フェールセーフ: ディレクトリが存在しなければ作成
+# フェールセーフ: 親ディレクトリが存在しなければ作成
 [[ -d "${HISTFILE:h}" ]] || command mkdir -p -m 700 "${HISTFILE:h}"
+# 自己修復: HISTFILE 自体が（空の）ディレクトリ化していると zsh は履歴を書けず
+# 「failed to write history file ...: is a directory」エラーになる。
+# Docker 等のバインドマウントが未存在パスをホスト側に空ディレクトリとして
+# 作ってしまう既知の挙動が典型原因。空ディレクトリのみ安全に除去する
+# （rmdir は中身があれば失敗するため、実データを壊さない）。
+[[ -d "$HISTFILE" ]] && command rmdir "$HISTFILE" 2>/dev/null
 export HISTSIZE=50000
 export SAVEHIST=50000
 # セッション間で履歴を即時共有
