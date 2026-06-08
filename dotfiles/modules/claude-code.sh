@@ -379,6 +379,26 @@ setup_claude_code() {
     fi
 
     # =========================================
+    # ステータスライン (ccstatusline) のインストール
+    # =========================================
+    # NOTE: settings.json の statusLine が `ccstatusline` コマンドを呼ぶ。Claude Code 本体とは
+    #       独立した補助ツールのため、失敗しても致命的ではない（return せず警告に留める）。
+    if command -v ccstatusline >/dev/null 2>&1 && ! ((UPGRADE)); then
+        msg_info "ccstatusline は既にインストールされています。スキップします。"
+    elif ! command -v npm >/dev/null 2>&1; then
+        msg_warn "npm が見つからないため ccstatusline をスキップしました。"
+    else
+        msg_info "ステータスライン (ccstatusline) をインストールします..."
+        if ! run_cmd npm install -g ccstatusline@latest; then
+            msg_warn "ccstatusline のインストールに失敗しました（statusLine は表示されませんが Claude Code は利用可能です）。"
+        elif ((DRY_RUN)); then
+            msg_info "ccstatusline をインストール予定です（dry-run）。"
+        else
+            msg_success "ccstatusline のインストールが完了しました。"
+        fi
+    fi
+
+    # =========================================
     # 設定ファイルの配置
     # =========================================
     printf '\n'
@@ -537,6 +557,17 @@ uninstall_claude_code() {
         return 1
     }
     msg_success "Claude Code をアンインストールしました。"
+
+    # ステータスライン (ccstatusline) も併せて削除（補助ツールのため非致命）
+    if command -v npm >/dev/null 2>&1 && npm ls -g ccstatusline >/dev/null 2>&1; then
+        msg_info "ccstatusline をアンインストールします..."
+        if run_cmd npm uninstall -g ccstatusline; then
+            msg_success "ccstatusline をアンインストールしました。"
+        else
+            msg_warn "ccstatusline のアンインストールに失敗しました。"
+        fi
+    fi
+
     printf '%s\n' "NOTE: ~/.claude/ ディレクトリの空ディレクトリは削除されていません。不要な場合は手動で削除してください:"
     local cleanup_dirs="rules"
     local d

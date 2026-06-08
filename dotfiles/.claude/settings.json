@@ -361,5 +361,11 @@
   },
   "language": "日本語",
   "effortLevel": "high",
-  "autoMemoryEnabled": true
+  "autoMemoryEnabled": true,
+  "statusLine": {
+    "type": "command",
+    "command": "ccstatusline",
+    "padding": 0,
+    "refreshInterval": 10
+  }
 }
